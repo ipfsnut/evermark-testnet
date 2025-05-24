@@ -1,0 +1,290 @@
+# Evermark Protocol Contract Architecture
+
+## Overview
+
+The Evermark Protocol employs an 8-contract architecture designed to create a sustainable, community-driven content curation ecosystem. The system integrates tokenomics, governance, and content preservation through a sophisticated reward mechanism that incentivizes quality content creation, thoughtful curation, and active community participation.
+
+## Core Architecture
+
+### 1. Clanker ERC20 Token ($EMARK)
+
+**Purpose**: The foundational economic layer providing the native $EMARK token with integrated fee routing and bonding curve mechanics.
+
+**Key Features**:
+- Standard ERC20 functionality with enhanced fee collection
+- Automatic 1% trading fee on all transfers
+- Integrated routing of 80% of fees to the Fee Collector contract
+- 20% fee allocation to Clanker protocol for bonding curve maintenance
+- Deflationary pressure through fee burns during low-activity periods
+
+**Objectives**:
+- Establish $EMARK as the primary value transfer mechanism
+- Create sustainable fee generation for ecosystem rewards
+- Provide liquidity through bonding curve mechanics
+- Enable price discovery through decentralized trading
+
+**Security Considerations**:
+- Implements OpenZeppelin's battle-tested ERC20 standard
+- Fee routing is immutable once deployed to prevent rug-pulling
+- Bonding curve parameters are locked to ensure predictable economics
+
+---
+
+### 2. Fee Collector Contract
+
+**Purpose**: Central hub for collecting and routing trading fees from $EMARK transactions to appropriate reward pools.
+
+**Key Features**:
+- Receives 80% of all $EMARK trading fees automatically
+- Implements sophisticated routing logic to distribute fees across reward pools
+- Maintains separate accounting for different fee types (trading vs. other sources)
+- Provides transparent fee collection metrics and analytics
+- Emergency pause functionality for system protection
+
+**Objectives**:
+- Ensure reliable fee collection and distribution
+- Maintain transparent accounting of all protocol revenues
+- Enable future fee source integration (NFT sales, premium features)
+- Provide foundation for protocol sustainability
+
+**Distribution Logic**:
+- Routes collected fees to Rewards Distribution contract based on predefined schedules
+- Maintains reserve pools for system stability during low-activity periods
+- Implements gradual release mechanisms to smooth reward distribution
+
+---
+
+### 3. Wrapped EMARK Token (wEMARK)
+
+**Purpose**: Non-transferable representation of staked $EMARK that provides voting power and reward eligibility.
+
+**Key Features**:
+- 1:1 backing with staked $EMARK tokens
+- Non-transferable design prevents vote selling and gaming
+- Automatic voting power calculation based on wEMARK balance
+- Integration with all voting and governance mechanisms
+- Burn mechanism when $EMARK is unstaked
+
+**Objectives**:
+- Prevent vote selling and delegation market manipulation
+- Create clear distinction between liquid and staked assets
+- Enable precise tracking of voting power distribution
+- Facilitate governance participation rewards
+
+**Technical Implementation**:
+- Minted when users stake $EMARK through the EMARK Staking contract
+- Burned when users complete the unstaking process
+- Balance represents cumulative voting power across all protocol governance
+- Implements soulbound token mechanics to prevent transfers
+
+---
+
+### 4. EMARK Staking Contract
+
+**Purpose**: Manages the conversion of liquid $EMARK to staked wEMARK with tiered reward mechanisms based on engagement levels.
+
+**Key Features**:
+- 7-day minimum lock period for all staking operations
+- Tiered reward structure: 15% base, +15% social, +30% full delegation
+- Integration with Farcaster for social engagement verification
+- Proportional reward distribution based on stake size
+- Unbonding queue system for orderly unstaking
+
+**Objectives**:
+- Incentivize long-term token holding and community participation
+- Create economic rewards for social amplification and governance participation
+- Establish clear progression path from passive to active community member
+- Reduce circulating supply to support token price stability
+
+**Reward Tiers**:
+1. **Base Staking (15%)**: Automatic for all stakers, proportional to stake size
+2. **Social Amplification (+15%)**: Requires verified Farcaster posts about $EMARK
+3. **Full Delegation (+30%)**: Requires 100% delegation of voting power to content
+
+**Engagement Verification**:
+- Farcaster cast verification through webhook integration
+- Weekly reset of social engagement requirements
+- Automated tracking of delegation percentages
+- Grace periods for technical difficulties or network issues
+
+---
+
+### 5. Evermark NFT Contract
+
+**Purpose**: Free content preservation NFTs with optional attestation system for creator verification and reward eligibility.
+
+**Key Features**:
+- Gas-only minting with no protocol fees
+- Rich metadata support including ISBN, DOI, URL, and custom fields
+- IPFS integration for decentralized metadata storage
+- Two-tier system: unstaked (safe) vs. staked (attested) NFTs
+- Attestation system with community challenge mechanisms
+- Burn protection for false attestation claims
+
+**Objectives**:
+- Enable free, permanent content preservation on blockchain
+- Create verifiable creator attribution system
+- Establish foundation for creator reward distribution
+- Build community trust through attestation accountability
+
+**Attestation System**:
+- Required claim: "I am the sole author of this content"
+- IPFS storage of supporting evidence and proof
+- Community challenge mechanism with staking requirements
+- Automatic burning of NFTs with proven false attestations
+- Protection for unstaked NFTs from burning (no attestation required)
+
+**Content Types Supported**:
+- Academic papers (DOI integration)
+- Books and publications (ISBN support)
+- Web articles and blog posts (URL preservation)
+- Farcaster casts (automated webhook creation)
+- Custom content with flexible metadata
+
+---
+
+### 6. Voting Contract
+
+**Purpose**: Weekly voting cycles for content curation with automatic delegation tracking and reward calculation.
+
+**Key Features**:
+- 7-day voting cycles with automatic rollover
+- Delegation of wEMARK voting power to specific NFTs
+- Real-time tracking of delegation percentages for reward calculation
+- Automatic undelegation when staked NFTs are burned
+- Vote success tracking for delegator reward distribution
+- Protection against vote manipulation and Sybil attacks
+
+**Objectives**:
+- Enable democratic content curation through token-weighted voting
+- Create economic incentives for thoughtful vote delegation
+- Establish transparent ranking system for content quality
+- Provide foundation for creator reward distribution
+
+**Delegation Mechanics**:
+- Users delegate wEMARK voting power to specific Evermark NFTs
+- Delegations persist across weeks unless manually changed
+- 100% delegation required for maximum reward tier
+- Automatic return of delegations when target NFTs are burned
+- Grace period for redistribution of returned delegations
+
+**Vote Success Calculation**:
+- Tracks final rankings of voted content
+- Rewards delegators based on content performance
+- Implements anti-gaming measures for vote coordination
+- Provides transparent scoring for delegator rewards
+
+---
+
+### 7. NFT Staking Contract
+
+**Purpose**: Enables creators to stake their Evermark NFTs for Creator's Council membership and creator reward distribution.
+
+**Key Features**:
+- Requires valid attestation before staking eligibility
+- Creator's Council governance participation
+- Proportional creator reward distribution based on votes received
+- Risk-bearing through potential NFT burning for false attestations
+- Automatic unstaking when NFTs are burned for false claims
+
+**Objectives**:
+- Create exclusive governance body of verified creators
+- Distribute creator rewards to authentic content producers
+- Establish reputation-based system for creator verification
+- Enable creator community self-governance
+
+**Creator's Council**:
+- Governance voting power proportional to staked NFT count
+- Decision-making authority over protocol parameters
+- Dispute resolution for attestation challenges
+- Strategic direction input for protocol development
+
+**Creator Rewards**:
+- 40% of weekly trading fee distribution
+- Allocation based on community votes received
+- Minimum staking period to prevent gaming
+- Automatic exclusion if NFTs are burned for false attestations
+
+---
+
+### 8. Rewards Distribution Contract
+
+**Purpose**: Implements half-life distribution model for sustainable, perpetual reward distribution across all participant categories.
+
+**Key Features**:
+- Half-life distribution: 50% of accumulated balance distributed weekly
+- Three-tier distribution: 60% to engaged stakers, 40% to creators
+- Sophisticated calculation engine for proportional rewards
+- Integration with all other contracts for reward eligibility determination
+- Emergency pause and recovery mechanisms
+
+**Objectives**:
+- Ensure protocol sustainability through never-depleting reward pools
+- Create predictable reward distribution schedule
+- Align economic incentives across all participant types
+- Scale rewards with protocol activity and success
+
+**Distribution Algorithm**:
+1. **Weekly Collection**: Aggregate fees from Fee Collector
+2. **Half-Life Calculation**: Distribute 50% of total accumulated balance
+3. **Tier Allocation**: 
+   - 60% to engaged stakers (proportional to engagement tier)
+   - 40% to creators (proportional to votes received)
+4. **Individual Distribution**: Calculate individual rewards based on participation metrics
+
+**Sustainability Model**:
+- Never fully depletes reward pool (50% always remains)
+- Scales up during high-activity periods
+- Maintains minimum reward levels during low-activity periods
+- Creates long-term incentive alignment for community growth
+
+## Contract Interactions
+
+### Staking Flow
+1. User stakes $EMARK through EMARK Staking Contract
+2. wEMARK tokens minted and sent to user
+3. User becomes eligible for base staking rewards (15%)
+4. Social engagement and delegation unlock additional reward tiers
+
+### Content Creation Flow
+1. Creator mints Evermark NFT (free, gas-only)
+2. Creator adds attestation claiming sole authorship (or explaining more complex authorship relations - truthfully)
+3. Creator stakes NFT through NFT Staking Contract
+4. Creator joins Creator's Council and becomes eligible for creator rewards
+
+### Voting Flow
+1. Stakers delegate wEMARK voting power to preferred content
+2. Weekly voting cycles determine content rankings
+3. Successful delegations earn delegator rewards
+4. Content rankings determine creator reward distribution
+
+### Reward Distribution Flow
+1. $EMARK trading generates fees routed to Fee Collector
+2. Rewards Distribution Contract implements half-life distribution
+3. Rewards allocated to stakers and creators based on engagement and performance
+4. Users claim rewards through respective contracts
+
+## Security Architecture
+
+All contracts implement OpenZeppelin standards for:
+- **Upgradeability**: Transparent proxy pattern for protocol evolution
+- **Pausability**: Emergency pause functionality for security incidents
+- **Access Control**: Role-based permissions for administrative functions
+- **Reentrancy Protection**: Guards against common DeFi attack vectors
+
+Additional security measures include:
+- Multi-signature requirements for critical parameter changes
+- Time delays for sensitive operations
+- Circuit breakers for abnormal activity detection
+- Formal verification for core economic logic
+
+## Economic Sustainability
+
+The protocol achieves long-term sustainability through:
+- Self-reinforcing economic flywheel: Trading → Fees → Rewards → Engagement → More Trading
+- Half-life distribution ensures perpetual reward availability
+- Multiple revenue streams: trading fees, premium features, governance proposals
+- Deflationary mechanisms during low-activity periods
+- Organic growth incentives through social amplification requirements
+
+This architecture creates a robust, sustainable ecosystem that aligns economic incentives with quality content creation, thoughtful curation, and active community participation.

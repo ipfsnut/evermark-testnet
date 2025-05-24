@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Evermark - Content Curation on Blockchain</title>
+    
+    <!-- Farcaster Mini App Frame Embed -->
+    <meta name="fc:frame" content='{"version":"next","imageUrl":"https://evermarks.net/og-image.png","button":{"title":"📖 Open Evermark","action":{"type":"launch_frame","name":"Evermark","url":"https://evermarks.net","splashImageUrl":"https://evermarks.net/splash.png","splashBackgroundColor":"#7c3aed"}}}' />
+    
+    <!-- Legacy Farcaster Frame Support -->
+    <meta name="fc:frame:image" content="https://evermarks.net/og-image.png" />
+    <meta name="fc:frame:button:1" content="📖 Open Evermark" />
+    <meta name="fc:frame:button:1:action" content="link" />
+    <meta name="fc:frame:button:1:target" content="https://evermarks.net" />
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="Evermark - Content Curation on Blockchain" />
+    <meta property="og:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+    <meta property="og:image" content="https://evermarks.net/og-image.png" />
+    <meta property="og:url" content="https://evermarks.net" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Evermark" />
+    
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Evermark - Content Curation on Blockchain" />
+    <meta name="twitter:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+    <meta name="twitter:image" content="https://evermarks.net/og-image.png" />
+    
+    <!-- App-specific Meta Tags -->
+    <meta name="description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+    <meta name="keywords" content="blockchain, content curation, voting, farcaster, web3, evermark" />
+    <meta name="author" content="Evermark" />
+    
+    <!-- Theme and App Icons -->
+    <meta name="theme-color" content="#7c3aed" />
+    <link rel="icon" type="image/png" href="/icon.png" />
+    <link rel="apple-touch-icon" href="/icon.png" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Remove preload links until assets exist -->
+    <!-- 
+    <link rel="preload" href="/splash.png" as="image" />
+    <link rel="preload" href="/og-image.png" as="image" />
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
