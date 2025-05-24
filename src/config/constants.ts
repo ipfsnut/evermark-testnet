@@ -1,6 +1,7 @@
 // src/config/constants.ts
 import { defineChain } from "thirdweb";
-import { base } from "thirdweb/chains";
+import { base, baseSepolia } from "thirdweb/chains";
+
 
 export const CHAIN = base;
 

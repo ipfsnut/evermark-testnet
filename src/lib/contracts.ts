@@ -1,18 +1,18 @@
-import { defineChain } from "thirdweb";
-import { base, baseSepolia } from "thirdweb/chains";
+import { CHAIN, CONTRACT_ADDRESSES } from '../config/constants';
 
-export const CHAIN = baseSepolia;
+// Re-export for backward compatibility
+export { CHAIN };
 
 export const CONTRACTS = {
   EVERMARK_NFT: import.meta.env.VITE_EVERMARK_NFT_ADDRESS as string,
-  VOTING: import.meta.env.VITE_VOTING_ADDRESS as string,
-  REWARDS: import.meta.env.VITE_REWARDS_ADDRESS as string,
-  AUCTION: import.meta.env.VITE_AUCTION_ADDRESS as string,
-  LEADERBOARD: import.meta.env.VITE_LEADERBOARD_ADDRESS as string,
+  VOTING: import.meta.env.VITE_EVERMARK_VOTING_ADDRESS as string,
+  REWARDS: import.meta.env.VITE_EVERMARK_REWARDS_ADDRESS as string,
+  AUCTION: import.meta.env.VITE_EVERMARK_AUCTION_ADDRESS as string,
+  LEADERBOARD: import.meta.env.VITE_EVERMARK_LEADERBOARD_ADDRESS as string,
   CARD_CATALOG: import.meta.env.VITE_CARD_CATALOG_ADDRESS as string,
   NFT_STAKING: import.meta.env.VITE_NFT_STAKING_ADDRESS as string,
   FEE_COLLECTOR: import.meta.env.VITE_FEE_COLLECTOR_ADDRESS as string,
-  EMARK_TOKEN: import.meta.env.VITE_EMARK_TOKEN_ADDRESS as string,
+  EMARK_TOKEN: import.meta.env.VITE_MOCK_EMARK_ADDRESS as string,
 };
 
 const validateContracts = () => {
@@ -253,6 +253,8 @@ export const CARD_CATALOG_ABI = [
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"releaseTime","type":"uint256"}],"name":"UnwrapRequested","type":"event"},
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"implementation","type":"address"}],"name":"Upgraded","type":"event"},
   {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"Wrapped","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"user","type":"address"},{"indexed":false,"internalType":"uint256","name":"available","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"delegated","type":"uint256"}],"name":"VotingPowerUpdated","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"EmergencyPauseSet","type":"event"},
   {"inputs":[],"name":"ADMIN_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"DEFAULT_ADMIN_ROLE","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},
   {"inputs":[],"name":"UNBONDING_PERIOD","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
@@ -265,10 +267,25 @@ export const CARD_CATALOG_ABI = [
   {"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"subtractedValue","type":"uint256"}],"name":"decreaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
   {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getAvailableVotingPower","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getDelegatedVotingPower","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"bytes32","name":"role","type":"bytes32"}],"name":"getRoleAdmin","outputs":[{"internalType":"bytes32","name":"","type":"bytes32"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"getTotalStakedNsi","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getTotalVotingPower","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
   {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUnbondingAmount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"address","name":"newImplementation","type":"address"},{"internalType":"bytes","name":"data","type":"bytes"}],"name":"upgradeToAndCall","outputs":[],"stateMutability":"payable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUnbondingRequests","outputs":[{"components":[{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"releaseTime","type":"uint256"},{"internalType":"bool","name":"active","type":"bool"}],"internalType":"struct CardCatalog.UnbondingRequest[]","name":"","type":"tuple[]"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUnbondingRequestCount","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserStakingSummary","outputs":[{"internalType":"uint256","name":"totalWrapped","type":"uint256"},{"internalType":"uint256","name":"availablePower","type":"uint256"},{"internalType":"uint256","name":"delegatedPower","type":"uint256"},{"internalType":"uint256","name":"unbondingAmount","type":"uint256"},{"internalType":"uint256","name":"unbondingRequestsCount","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"addedValue","type":"uint256"}],"name":"increaseAllowance","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"requestIndex","type":"uint256"}],"name":"isUnbondingReady","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"pause","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"paused","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"requestUnwrap","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},
+  {"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"uint256","name":"delegated","type":"uint256"}],"name":"updateVotingPowerDelegation","outputs":[],"stateMutability":"nonpayable","type":"function"},
   {"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"wrap","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ] as const;
 

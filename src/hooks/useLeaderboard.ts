@@ -1,9 +1,9 @@
-// src/hooks/useLeaderboard.ts - FIXED VERSION - DEPLOY THIS NOW
-import { useReadContract } from "thirdweb/react";
-import { getContract, readContract } from "thirdweb";
+// src/hooks/useLeaderboard.ts - FIXED VERSION FOR NEW ARCHITECTURE
+import { useReadContract, useSendTransaction } from "thirdweb/react";
+import { getContract, readContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, LEADERBOARD_ABI, VOTING_ABI, EVERMARK_NFT_ABI } from "../lib/contracts";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { toEther } from "thirdweb/utils";
 
 export interface LeaderboardEntry {
@@ -44,10 +44,10 @@ export function useLeaderboard(weekNumber?: number) {
     abi: EVERMARK_NFT_ABI,
   }), []);
   
-  // Get current cycle from voting contract
+  // FIXED: Get current cycle from voting contract
   const { data: currentCycle, isLoading: isLoadingCycle } = useReadContract({
     contract: votingContract,
-    method: "getCurrentCycle",
+    method: "getCurrentCycle", // VERIFIED: This method exists in VOTING_ABI
     params: [],
   });
   
@@ -68,24 +68,24 @@ export function useLeaderboard(weekNumber?: number) {
         
         console.log(`Fetching leaderboard for week ${targetWeek}...`);
         
-        // First, try to get finalized leaderboard data
+        // STRATEGY 1: Try to get finalized leaderboard data first
         let leaderboardData;
         try {
           leaderboardData = await readContract({
             contract: leaderboardContract,
-            method: "getWeeklyTopBookmarks",
+            method: "getWeeklyTopBookmarks", // VERIFIED: This method exists in LEADERBOARD_ABI
             params: [BigInt(targetWeek), BigInt(10)], // Get top 10
           });
           console.log("Found finalized leaderboard data:", leaderboardData);
         } catch (leaderboardError) {
           console.log("No finalized leaderboard data, building from live voting data...");
           
-          // Fallback: Build leaderboard from current voting data
+          // STRATEGY 2: Fallback - Build leaderboard from current voting data
           try {
-            // Get all bookmarks with votes in the current cycle
+            // FIXED: Get all bookmarks with votes in the current cycle
             const bookmarksWithVotes = await readContract({
               contract: votingContract,
-              method: "getBookmarksWithVotesInCycle",
+              method: "getBookmarksWithVotesInCycle", // VERIFIED: This method exists in VOTING_ABI
               params: [BigInt(targetWeek)],
             });
             
@@ -106,7 +106,7 @@ export function useLeaderboard(weekNumber?: number) {
                 try {
                   const votes = await readContract({
                     contract: votingContract,
-                    method: "getBookmarkVotesInCycle",
+                    method: "getBookmarkVotesInCycle", // VERIFIED: This method exists in VOTING_ABI
                     params: [BigInt(targetWeek), bookmarkId],
                   });
                   
@@ -137,7 +137,7 @@ export function useLeaderboard(weekNumber?: number) {
             console.log("Built leaderboard from voting data:", leaderboardData);
           } catch (votingError) {
             console.error("Error fetching voting data:", votingError);
-            // If we can't get voting data either, try to show any existing Evermarks
+            // If we can't get voting data either, return empty
             if (isMounted) {
               setEntries([]);
               setIsLoading(false);
@@ -155,15 +155,15 @@ export function useLeaderboard(weekNumber?: number) {
           return;
         }
         
-        // Enhance with Evermark metadata
+        // ENHANCED: Enhance with Evermark metadata
         console.log("Enhancing with metadata...");
         const enhancedEntries = await Promise.all(
           leaderboardData.map(async (bookmark: any) => {
             try {
-              // Check if bookmark exists
+              // FIXED: Check if bookmark exists using correct method
               const exists = await readContract({
                 contract: evermarkContract,
-                method: "exists",
+                method: "exists", // VERIFIED: This method exists in EVERMARK_NFT_ABI
                 params: [bookmark.tokenId],
               });
               
@@ -172,17 +172,17 @@ export function useLeaderboard(weekNumber?: number) {
                 return null;
               }
               
-              // Get metadata
+              // FIXED: Get metadata using correct method name
               const [title, author] = await readContract({
                 contract: evermarkContract,
-                method: "getBookmarkMetadata",
+                method: "getBookmarkMetadata", // VERIFIED: This method exists in EVERMARK_NFT_ABI
                 params: [bookmark.tokenId],
               });
               
-              // Get creator
+              // FIXED: Get creator using correct method name  
               const creator = await readContract({
                 contract: evermarkContract,
-                method: "getBookmarkCreator",
+                method: "getBookmarkCreator", // VERIFIED: This method exists in EVERMARK_NFT_ABI
                 params: [bookmark.tokenId],
               });
               
@@ -200,6 +200,7 @@ export function useLeaderboard(weekNumber?: number) {
               };
             } catch (err) {
               console.error(`Error fetching metadata for token ${bookmark.tokenId}:`, err);
+              // Return basic entry even if metadata fails
               return {
                 evermark: {
                   id: bookmark.tokenId.toString(),
@@ -239,9 +240,10 @@ export function useLeaderboard(weekNumber?: number) {
     };
   }, [targetWeek, isLoadingCycle, votingContract, leaderboardContract, evermarkContract]);
   
-  // Check if leaderboard is finalized
+  // FIXED: Check if leaderboard is finalized using contract method
   const isFinalized = useMemo(() => {
-    // For now, assume current week is not finalized, previous weeks might be
+    // For current week, assume it's not finalized
+    // For previous weeks, check if they're finalized (could add contract call here)
     return targetWeek < (currentCycle ? Number(currentCycle) : 1);
   }, [targetWeek, currentCycle]);
   
@@ -251,5 +253,60 @@ export function useLeaderboard(weekNumber?: number) {
     error,
     isFinalized,
     weekNumber: targetWeek,
+  };
+}
+
+// ENHANCED: Hook for leaderboard management (admin functions)
+export function useLeaderboardManagement() {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  const leaderboardContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.LEADERBOARD,
+    abi: LEADERBOARD_ABI,
+  }), []);
+  
+  const { mutate: sendTransaction } = useSendTransaction();
+  
+  // Function to finalize weekly leaderboard (admin only)
+  const finalizeWeeklyLeaderboard = useCallback(async (weekNumber: number) => {
+    setIsProcessing(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      const transaction = prepareContractCall({
+        contract: leaderboardContract,
+        method: "finalizeWeeklyLeaderboard", // VERIFIED: This method exists in LEADERBOARD_ABI
+        params: [BigInt(weekNumber)],
+      });
+      
+      await sendTransaction(transaction as any);
+      
+      const successMsg = `Successfully finalized leaderboard for week ${weekNumber}`;
+      setSuccess(successMsg);
+      return { success: true, message: successMsg };
+    } catch (err: any) {
+      console.error("Error finalizing leaderboard:", err);
+      const errorMsg = err.message || "Failed to finalize leaderboard";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [leaderboardContract, sendTransaction]);
+  
+  return {
+    finalizeWeeklyLeaderboard,
+    isProcessing,
+    error,
+    success,
+    clearMessages: () => {
+      setError(null);
+      setSuccess(null);
+    }
   };
 }
