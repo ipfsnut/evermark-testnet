@@ -3,7 +3,7 @@ import { useSendTransaction, useReadContract } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
 import { toEther, toWei } from "thirdweb/utils";
 import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, CARD_CATALOG_ABI } from "../lib/contracts";
+import { CHAIN, CONTRACTS, CARD_CATALOG_ABI, EMARK_TOKEN_ABI } from "../lib/contracts";
 
 export interface UnbondingRequest {
   amount: bigint;
@@ -21,6 +21,13 @@ export function useStaking(userAddress?: string) {
     chain: CHAIN,
     address: CONTRACTS.CARD_CATALOG,
     abi: CARD_CATALOG_ABI,
+  });
+
+  const emarkContract = getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.EMARK_TOKEN,
+    abi: EMARK_TOKEN_ABI,
   });
   
   // Get total staked amount (wrapped EMARK tokens = WEMARK)
@@ -78,6 +85,51 @@ export function useStaking(userAddress?: string) {
   const isLoadingUnbondingRequests = unbondingAmountQuery.isLoading;
   
   const { mutate: sendTransaction } = useSendTransaction();
+
+  const approveTokens = async (amount: string) => {
+    if (!userAddress) {
+      return { success: false, error: "Please connect your wallet" };
+    }
+
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const amountWei = toWei(amount);
+      
+      const approveTransaction = prepareContractCall({
+        contract: emarkContract,
+        method: "approve",
+        params: [CONTRACTS.CARD_CATALOG, amountWei] as const,
+      });
+
+      console.log("📝 Sending approval transaction...");
+      
+      return new Promise<{ success: boolean; error?: string }>((resolve) => {
+        sendTransaction(approveTransaction as any, {
+          onSuccess: (result: any) => {
+            console.log("✅ Approval successful:", result);
+            setIsProcessing(false);
+            resolve({ success: true });
+          },
+          onError: (error: any) => {
+            console.error("❌ Approval failed:", error);
+            const errorMsg = error.message || "Failed to approve tokens";
+            setError(errorMsg);
+            setIsProcessing(false);
+            resolve({ success: false, error: errorMsg });
+          }
+        });
+      });
+
+    } catch (err: any) {
+      console.error("Error approving tokens:", err);
+      const errorMsg = err.message || "Failed to approve tokens";
+      setError(errorMsg);
+      setIsProcessing(false);
+      return { success: false, error: errorMsg };
+    }
+  };
   
   // Function to stake EMARK tokens (wrap them into WEMARK)
   const stakeTokens = async (amount: string) => {
@@ -91,11 +143,21 @@ export function useStaking(userAddress?: string) {
       return { success: false, error: "Please enter a valid amount" };
     }
     
-    setIsProcessing(true);
-    setError(null);
-    setSuccess(null);
-    
     try {
+      // Step 1: Approve tokens
+      console.log("🔐 Step 1: Approving tokens...");
+      const approvalResult = await approveTokens(amount);
+      
+      if (!approvalResult.success) {
+        return approvalResult;
+      }
+      
+      // Step 2: Stake tokens (your existing code)
+      console.log("🏦 Step 2: Staking tokens...");
+      setIsProcessing(true);
+      setError(null);
+      setSuccess(null);
+      
       const amountWei = toWei(amount);
       
       const transaction = prepareContractCall({
@@ -104,28 +166,41 @@ export function useStaking(userAddress?: string) {
         params: [amountWei] as const,
       });
       
-      await sendTransaction(transaction as any);
+      console.log("📤 Sending staking transaction...");
       
-      // Refetch data after successful transaction
-      setTimeout(() => {
-        totalStakedQuery.refetch();
-        votingPowerQuery.refetch();
-      }, 2000);
+      return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
+        sendTransaction(transaction as any, {
+          onSuccess: (result: any) => {
+            console.log("✅ Staking transaction successful:", result);
+            
+            setTimeout(() => {
+              totalStakedQuery.refetch();
+              votingPowerQuery.refetch();
+            }, 2000);
+            
+            const successMsg = `Successfully staked ${amount} EMARK (converted to WEMARK)`;
+            setSuccess(successMsg);
+            setIsProcessing(false);
+            resolve({ success: true, message: successMsg });
+          },
+          onError: (error: any) => {
+            console.error("❌ Staking transaction failed:", error);
+            const errorMsg = error.message || "Failed to stake EMARK tokens";
+            setError(errorMsg);
+            setIsProcessing(false);
+            resolve({ success: false, error: errorMsg });
+          }
+        });
+      });
       
-      const successMsg = `Successfully staked ${amount} EMARK (converted to WEMARK)`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
     } catch (err: any) {
-      console.error("Error staking tokens:", err);
+      console.error("Error in staking flow:", err);
       const errorMsg = err.message || "Failed to stake EMARK tokens";
       setError(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
       setIsProcessing(false);
+      return { success: false, error: errorMsg };
     }
-  };
-  
-  // Function to request unstaking (unwrap WEMARK back to EMARK)
+  };  // Function to request unstaking (unwrap WEMARK back to EMARK)
   const requestUnstake = async (amount: string) => {
     if (!userAddress) {
       setError("Please connect your wallet");

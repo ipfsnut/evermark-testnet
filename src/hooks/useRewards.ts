@@ -1,4 +1,3 @@
-// src/hooks/useRewards.ts - FINALIZED VERSION WITH CORRECT TOKEN NAMING
 import React, { useState, useCallback, useMemo } from "react";
 import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
