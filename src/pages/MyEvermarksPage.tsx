@@ -58,7 +58,7 @@ const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
         
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-500">
-            {new Date(evermark.creationTime).toLocaleDateString()}
+            {new Date(evermark.creationTime * 1000).toLocaleDateString()}
           </span>
           <BookmarkIcon className="h-4 w-4 text-purple-600" />
         </div>
@@ -69,7 +69,8 @@ const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
 
 const MyEvermarksPage: React.FC = () => {
   const account = useActiveAccount();
-  const { evermarks, isLoading, error } = useUserEvermarks(account?.address);
+  const address = account?.address;
+  const { evermarks, isLoading, error } = useUserEvermarks(address);
 
   return (
     <PageContainer title="My Collection">

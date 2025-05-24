@@ -1,4 +1,4 @@
-// src/hooks/useRewards.ts - FIXED VERSION FOR NEW MULTI-STREAM ARCHITECTURE
+// src/hooks/useRewards.ts - FINALIZED VERSION WITH CORRECT TOKEN NAMING
 import React, { useState, useCallback, useMemo } from "react";
 import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
@@ -18,23 +18,24 @@ export function useRewards(userAddress?: string) {
     abi: REWARDS_ABI,
   }), []);
   
-  // FIXED: Get pending rewards using correct method name and enabled pattern
+  // Get pending rewards using the correct method name
   const pendingRewardsResult = useReadContract({
     contract: rewardsContract,
-    method: "getPendingRewards", // VERIFIED: This method exists in REWARDS_ABI
+    method: "getUserRewardSummary",
     params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress, // Only run query if userAddress exists
+      enabled: !!userAddress,
     },
   });
   
-  const pendingRewards = userAddress ? pendingRewardsResult.data : undefined;
+  // Extract total pending from the reward summary
+  const pendingRewards = pendingRewardsResult.data?.totalPending;
   const isLoadingRewards = userAddress ? pendingRewardsResult.isLoading : false;
   const rewardsError = userAddress ? pendingRewardsResult.error : null;
   
   const { mutate: sendTransaction } = useSendTransaction();
   
-  // FIXED: Function to claim rewards with proper validation and error handling
+  // Function to claim all available rewards
   const claimRewards = useCallback(async () => {
     if (!userAddress) {
       const errorMsg = "Please connect your wallet";
@@ -53,11 +54,10 @@ export function useRewards(userAddress?: string) {
     setSuccess(null);
     
     try {
-      // FIXED: Using correct method name from REWARDS_ABI
       const transaction = prepareContractCall({
         contract: rewardsContract,
-        method: "claimRewards", // VERIFIED: This method exists in REWARDS_ABI
-        params: [] as const, // No parameters needed for user's own rewards
+        method: "claimAllRewards",
+        params: [] as const,
       });
       
       await sendTransaction(transaction as any);
@@ -67,7 +67,7 @@ export function useRewards(userAddress?: string) {
         pendingRewardsResult.refetch?.();
       }, 2000);
       
-      const successMsg = `Successfully claimed ${toEther(pendingRewards)} NSI tokens!`;
+      const successMsg = `Successfully claimed ${toEther(pendingRewards)} EMARK tokens!`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
     } catch (err: any) {
@@ -79,6 +79,45 @@ export function useRewards(userAddress?: string) {
       setIsClaimingRewards(false);
     }
   }, [userAddress, pendingRewards, rewardsContract, sendTransaction, pendingRewardsResult]);
+  
+  // Function to claim rewards for a specific week
+  const claimWeeklyRewards = useCallback(async (week: number) => {
+    if (!userAddress) {
+      const errorMsg = "Please connect your wallet";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+    
+    setIsClaimingRewards(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      const transaction = prepareContractCall({
+        contract: rewardsContract,
+        method: "claimWeeklyRewards",
+        params: [BigInt(week)] as const,
+      });
+      
+      await sendTransaction(transaction as any);
+      
+      // Refetch pending rewards after successful claim
+      setTimeout(() => {
+        pendingRewardsResult.refetch?.();
+      }, 2000);
+      
+      const successMsg = `Successfully claimed EMARK rewards for week ${week}!`;
+      setSuccess(successMsg);
+      return { success: true, message: successMsg };
+    } catch (err: any) {
+      console.error("Error claiming weekly rewards:", err);
+      const errorMsg = err.message || "Failed to claim weekly rewards";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsClaimingRewards(false);
+    }
+  }, [userAddress, rewardsContract, sendTransaction, pendingRewardsResult]);
   
   // Clear messages
   const clearMessages = useCallback(() => {
@@ -95,17 +134,72 @@ export function useRewards(userAddress?: string) {
   
   return {
     pendingRewards,
+    rewardSummary: pendingRewardsResult.data, // Full reward breakdown
     isLoadingRewards,
     isClaimingRewards,
     error,
     success,
     claimRewards,
+    claimWeeklyRewards,
     clearMessages,
     refetch: pendingRewardsResult.refetch,
   };
 }
 
-// ENHANCED: Hook for rewards distribution info (for transparency/admin)
+// Hook for current week information
+export function useCurrentWeek() {
+  const rewardsContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.REWARDS,
+    abi: REWARDS_ABI,
+  }), []);
+  
+  const { data: currentWeekInfo, isLoading, error } = useReadContract({
+    contract: rewardsContract,
+    method: "getCurrentWeekInfo",
+    params: [],
+  });
+  
+  return {
+    currentWeekInfo,
+    isLoading,
+    error,
+    currentWeek: currentWeekInfo?.week,
+    weekStartTime: currentWeekInfo?.startTime,
+    weekEndTime: currentWeekInfo?.endTime,
+    totalPool: currentWeekInfo?.totalPool,
+    timeRemaining: currentWeekInfo?.timeRemaining,
+    isFinalized: currentWeekInfo?.finalized,
+  };
+}
+
+// Hook for week-specific information
+export function useWeekInfo(weekNumber: number) {
+  const rewardsContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.REWARDS,
+    abi: REWARDS_ABI,
+  }), []);
+  
+  const { data: weekInfo, isLoading, error } = useReadContract({
+    contract: rewardsContract,
+    method: "getWeekInfo",
+    params: [BigInt(weekNumber)],
+    queryOptions: {
+      enabled: weekNumber > 0,
+    },
+  });
+  
+  return {
+    weekInfo,
+    isLoading,
+    error,
+  };
+}
+
+// Hook for rewards distribution info (for transparency/admin)
 export function useRewardsInfo() {
   const rewardsContract = useMemo(() => getContract({
     client,
@@ -114,65 +208,86 @@ export function useRewardsInfo() {
     abi: REWARDS_ABI,
   }), []);
   
-  // FIXED: Get reward percentages using correct method names
-  const { data: stakingRewardPercentage, isLoading: isLoadingStaking } = useReadContract({
+  // Get total rewards distributed
+  const { data: totalDistributed } = useReadContract({
     contract: rewardsContract,
-    method: "stakingRewardPercentage", // VERIFIED: Exists in ABI
+    method: "totalRewardsDistributed",
     params: [],
   });
   
-  const { data: creatorRewardPercentage, isLoading: isLoadingCreator } = useReadContract({
+  // Get total token staker rewards
+  const { data: totalTokenStakerRewards } = useReadContract({
     contract: rewardsContract,
-    method: "creatorRewardPercentage", // VERIFIED: Exists in ABI  
+    method: "totalTokenStakerRewards",
+    params: [],
+  });
+  
+  // Get total creator rewards
+  const { data: totalCreatorRewards } = useReadContract({
+    contract: rewardsContract,
+    method: "totalCreatorRewards",
+    params: [],
+  });
+  
+  // Get total NFT staker rewards
+  const { data: totalNftStakerRewards } = useReadContract({
+    contract: rewardsContract,
+    method: "totalNftStakerRewards",
     params: [],
   });
   
   return {
-    stakingRewardPercentage: stakingRewardPercentage ? Number(stakingRewardPercentage) : 60, // Default 60%
-    creatorRewardPercentage: creatorRewardPercentage ? Number(creatorRewardPercentage) : 40, // Default 40%
-    isLoading: isLoadingStaking || isLoadingCreator,
+    totalDistributed: totalDistributed || BigInt(0),
+    totalTokenStakerRewards: totalTokenStakerRewards || BigInt(0),
+    totalCreatorRewards: totalCreatorRewards || BigInt(0),
+    totalNftStakerRewards: totalNftStakerRewards || BigInt(0),
   };
 }
 
-// ENHANCED: Hook for tracking total rewards distributed (for stats/dashboard)
+// Hook for tracking total rewards distributed (for stats/dashboard)
 export function useRewardsStats() {
-  const [totalClaimed, setTotalClaimed] = useState<bigint>(BigInt(0));
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Since there's no direct method to get total claimed rewards in the current ABI,
-  // we could track this through events or other means in the future
-  // For now, returning placeholder data
-  
-  React.useEffect(() => {
-    // TODO: Implement if needed for dashboard stats
-    // Could listen to RewardClaimed events or maintain a counter
-    setTotalClaimed(BigInt(0));
-    setIsLoading(false);
-  }, []);
+  const rewardsInfo = useRewardsInfo();
+  const currentWeek = useCurrentWeek();
   
   return {
-    totalClaimed,
-    isLoading,
+    ...rewardsInfo,
+    currentWeek: currentWeek.currentWeek || 0,
+    currentWeekPool: currentWeek.totalPool || BigInt(0),
+    isCurrentWeekFinalized: currentWeek.isFinalized || false,
+    timeRemainingInWeek: currentWeek.timeRemaining || 0,
   };
 }
 
-// NEW: Hook for weekly reward cycle information
-export function useRewardCycles() {
+// Hook for user's reward calculation for a specific week
+export function useUserWeeklyRewards(userAddress?: string, week?: number) {
   const rewardsContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
     address: CONTRACTS.REWARDS,
     abi: REWARDS_ABI,
   }), []);
-
-  // This would require additional contract methods for cycle tracking
-  // For now, return mock data structure for future implementation
-  const [currentCycle, setCurrentCycle] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+  
+  const { data: weeklyRewards, isLoading, error } = useReadContract({
+    contract: rewardsContract,
+    method: "calculateUserWeeklyRewards",
+    params: [
+      userAddress || "0x0000000000000000000000000000000000000000",
+      BigInt(week || 0)
+    ] as const,
+    queryOptions: {
+      enabled: !!userAddress && !!week && week > 0,
+    },
+  });
   
   return {
-    currentCycle,
+    baseRewards: weeklyRewards?.[0] || BigInt(0),
+    variableRewards: weeklyRewards?.[1] || BigInt(0),
+    nftRewards: weeklyRewards?.[2] || BigInt(0),
+    totalWeeklyRewards: weeklyRewards ? 
+      (weeklyRewards[0] || BigInt(0)) + 
+      (weeklyRewards[1] || BigInt(0)) + 
+      (weeklyRewards[2] || BigInt(0)) : BigInt(0),
     isLoading,
-    // Future: Add methods to get cycle details, history, etc.
+    error,
   };
 }

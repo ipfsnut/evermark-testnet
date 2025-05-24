@@ -1,4 +1,3 @@
-// src/hooks/useStaking.ts - VERIFIED VERSION FOR NEW ARCHITECTURE
 import { useState } from "react";
 import { useSendTransaction, useReadContract } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
@@ -9,6 +8,7 @@ import { CHAIN, CONTRACTS, CARD_CATALOG_ABI } from "../lib/contracts";
 export interface UnbondingRequest {
   amount: bigint;
   releaseTime: bigint;
+  active: boolean;
 }
 
 export function useStaking(userAddress?: string) {
@@ -23,10 +23,10 @@ export function useStaking(userAddress?: string) {
     abi: CARD_CATALOG_ABI,
   });
   
-  // VERIFIED: Get total staked amount (wrapped tokens) using correct method
+  // Get total staked amount (wrapped EMARK tokens = WEMARK)
   const totalStakedQuery = useReadContract({
     contract: catalogContract,
-    method: "balanceOf", // VERIFIED: Standard ERC20 method in CARD_CATALOG_ABI
+    method: "balanceOf",
     params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!userAddress,
@@ -36,10 +36,10 @@ export function useStaking(userAddress?: string) {
   const totalStaked = totalStakedQuery.data;
   const isLoadingTotalStaked = totalStakedQuery.isLoading;
   
-  // VERIFIED: Get available voting power using correct method
+  // Get available voting power (in WEMARK)
   const votingPowerQuery = useReadContract({
     contract: catalogContract,
-    method: "getAvailableVotingPower", // VERIFIED: This method exists in CARD_CATALOG_ABI
+    method: "getAvailableVotingPower",
     params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!userAddress,
@@ -49,29 +49,37 @@ export function useStaking(userAddress?: string) {
   const availableVotingPower = votingPowerQuery.data;
   const isLoadingVotingPower = votingPowerQuery.isLoading;
   
-  // FIXED: Get unbonding amount using available method (getUnbondingRequests doesn't exist in ABI)
+  // Get unbonding amount
   const unbondingAmountQuery = useReadContract({
     contract: catalogContract,
-    method: "getUnbondingAmount", // CORRECTED: This method actually exists in CARD_CATALOG_ABI
+    method: "getUnbondingAmount",
     params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!userAddress,
     },
   });
   
-  // Mock unbonding requests since the contract doesn't expose this method
-  // In production, you might track this through events or a separate mapping
-  const unbondingRequests = unbondingAmountQuery.data ? [
+  // Get unbonding period for calculations
+  const unbondingPeriodQuery = useReadContract({
+    contract: catalogContract,
+    method: "UNBONDING_PERIOD",
+    params: [],
+  });
+  
+  // Create simplified unbonding requests from the amount
+  const unbondingRequests: UnbondingRequest[] = unbondingAmountQuery.data && unbondingAmountQuery.data > BigInt(0) ? [
     {
       amount: unbondingAmountQuery.data,
-      releaseTime: BigInt(Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)) // 7 days from now
+      releaseTime: BigInt(Math.floor(Date.now() / 1000) + Number(unbondingPeriodQuery.data || 7 * 24 * 60 * 60)),
+      active: true
     }
   ] : [];
+  
   const isLoadingUnbondingRequests = unbondingAmountQuery.isLoading;
   
   const { mutate: sendTransaction } = useSendTransaction();
   
-  // VERIFIED: Function to stake tokens using wrap method
+  // Function to stake EMARK tokens (wrap them into WEMARK)
   const stakeTokens = async (amount: string) => {
     if (!userAddress) {
       setError("Please connect your wallet");
@@ -90,10 +98,9 @@ export function useStaking(userAddress?: string) {
     try {
       const amountWei = toWei(amount);
       
-      // VERIFIED: Using correct method name from CARD_CATALOG_ABI
       const transaction = prepareContractCall({
         contract: catalogContract,
-        method: "wrap", // VERIFIED: This method exists in CARD_CATALOG_ABI
+        method: "wrap",
         params: [amountWei] as const,
       });
       
@@ -105,12 +112,12 @@ export function useStaking(userAddress?: string) {
         votingPowerQuery.refetch();
       }, 2000);
       
-      const successMsg = `Successfully staked ${amount} NSI`;
+      const successMsg = `Successfully staked ${amount} EMARK (converted to WEMARK)`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
     } catch (err: any) {
       console.error("Error staking tokens:", err);
-      const errorMsg = err.message || "Failed to stake tokens";
+      const errorMsg = err.message || "Failed to stake EMARK tokens";
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
@@ -118,7 +125,7 @@ export function useStaking(userAddress?: string) {
     }
   };
   
-  // VERIFIED: Function to request unstaking using requestUnwrap method
+  // Function to request unstaking (unwrap WEMARK back to EMARK)
   const requestUnstake = async (amount: string) => {
     if (!userAddress) {
       setError("Please connect your wallet");
@@ -131,7 +138,7 @@ export function useStaking(userAddress?: string) {
     }
     
     if (!totalStaked || toWei(amount) > totalStaked) {
-      setError(`Insufficient staked balance. Available: ${toEther(totalStaked || BigInt(0))} NSI`);
+      setError(`Insufficient staked balance. Available: ${toEther(totalStaked || BigInt(0))} WEMARK`);
       return { success: false, error: `Insufficient staked balance` };
     }
     
@@ -142,10 +149,9 @@ export function useStaking(userAddress?: string) {
     try {
       const amountWei = toWei(amount);
       
-      // VERIFIED: Using correct method name from CARD_CATALOG_ABI
       const transaction = prepareContractCall({
         contract: catalogContract,
-        method: "requestUnwrap", // VERIFIED: This method exists in CARD_CATALOG_ABI
+        method: "requestUnwrap",
         params: [amountWei] as const,
       });
       
@@ -157,7 +163,7 @@ export function useStaking(userAddress?: string) {
         unbondingAmountQuery.refetch();
       }, 2000);
       
-      const successMsg = `Successfully requested unstaking of ${amount} NSI. Please wait for the unbonding period to complete.`;
+      const successMsg = `Successfully requested unstaking of ${amount} WEMARK. Please wait for the unbonding period to complete before claiming your EMARK.`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
     } catch (err: any) {
@@ -170,7 +176,7 @@ export function useStaking(userAddress?: string) {
     }
   };
   
-  // VERIFIED: Function to complete unstaking
+  // Function to complete unstaking (claim EMARK from unbonded WEMARK)
   const completeUnstake = async (requestIndex: number) => {
     if (!userAddress) {
       setError("Please connect your wallet");
@@ -182,10 +188,9 @@ export function useStaking(userAddress?: string) {
     setSuccess(null);
     
     try {
-      // VERIFIED: Using correct method name from CARD_CATALOG_ABI
       const transaction = prepareContractCall({
         contract: catalogContract,
-        method: "completeUnwrap", // VERIFIED: This method exists in CARD_CATALOG_ABI
+        method: "completeUnwrap",
         params: [BigInt(requestIndex)] as const,
       });
       
@@ -198,7 +203,7 @@ export function useStaking(userAddress?: string) {
         votingPowerQuery.refetch();
       }, 2000);
       
-      const successMsg = `Successfully unstaked your NSI tokens!`;
+      const successMsg = `Successfully unstaked and received your EMARK tokens!`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
     } catch (err: any) {
@@ -211,7 +216,7 @@ export function useStaking(userAddress?: string) {
     }
   };
   
-  // VERIFIED: Function to cancel an unbonding request
+  // Function to cancel an unbonding request
   const cancelUnbonding = async (requestIndex: number) => {
     if (!userAddress) {
       setError("Please connect your wallet");
@@ -223,10 +228,9 @@ export function useStaking(userAddress?: string) {
     setSuccess(null);
     
     try {
-      // VERIFIED: Using correct method name from CARD_CATALOG_ABI
       const transaction = prepareContractCall({
         contract: catalogContract,
-        method: "cancelUnbonding", // VERIFIED: This method exists in CARD_CATALOG_ABI
+        method: "cancelUnbonding",
         params: [BigInt(requestIndex)] as const,
       });
       
@@ -238,7 +242,7 @@ export function useStaking(userAddress?: string) {
         unbondingAmountQuery.refetch();
       }, 2000);
       
-      const successMsg = `Successfully cancelled unbonding request!`;
+      const successMsg = `Successfully cancelled unbonding request and restored your WEMARK!`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
     } catch (err: any) {
@@ -252,19 +256,19 @@ export function useStaking(userAddress?: string) {
   };
   
   return {
-    totalStaked,
-    availableVotingPower,
-    unbondingRequests,
+    totalStaked, // WEMARK balance
+    availableVotingPower, // Available WEMARK for voting
+    unbondingRequests, // WEMARK being unbonded
     isLoadingTotalStaked,
     isLoadingVotingPower,
     isLoadingUnbondingRequests,
     isProcessing,
     error,
     success,
-    stakeTokens,
-    requestUnstake,
-    completeUnstake,
-    cancelUnbonding,
+    stakeTokens, // Stake EMARK → get WEMARK
+    requestUnstake, // Request to unbond WEMARK
+    completeUnstake, // Complete unbonding → get EMARK back
+    cancelUnbonding, // Cancel unbonding → restore WEMARK
     clearMessages: () => {
       setError(null);
       setSuccess(null);
@@ -272,7 +276,7 @@ export function useStaking(userAddress?: string) {
   };
 }
 
-// ENHANCED: Hook for staking stats and analytics
+// Enhanced hook for staking stats
 export function useStakingStats() {
   const catalogContract = getContract({
     client,
@@ -281,26 +285,25 @@ export function useStakingStats() {
     abi: CARD_CATALOG_ABI,
   });
   
-  // Get total supply of wrapped tokens (total staked across all users)
+  // Get total supply of wrapped tokens (total WEMARK in circulation)
   const { data: totalSupply, isLoading: isLoadingTotalSupply } = useReadContract({
     contract: catalogContract,
-    method: "totalSupply", // Standard ERC20 method
+    method: "totalSupply",
     params: [],
   });
   
   // Get unbonding period constant
   const { data: unbondingPeriod } = useReadContract({
     contract: catalogContract,
-    method: "UNBONDING_PERIOD", // VERIFIED: This constant exists in CARD_CATALOG_ABI
+    method: "UNBONDING_PERIOD",
     params: [],
   });
   
   return {
-    totalStaked: totalSupply || BigInt(0),
-    unbondingPeriodSeconds: unbondingPeriod ? Number(unbondingPeriod) : 7 * 24 * 60 * 60, // Default 7 days
+    totalStaked: totalSupply || BigInt(0), // Total WEMARK staked
+    unbondingPeriodSeconds: unbondingPeriod ? Number(unbondingPeriod) : 7 * 24 * 60 * 60,
     isLoading: isLoadingTotalSupply,
     
-    // Utility functions
     formatUnbondingPeriod: () => {
       const days = unbondingPeriod ? Number(unbondingPeriod) / (24 * 60 * 60) : 7;
       return `${days} day${days !== 1 ? 's' : ''}`;
@@ -310,7 +313,7 @@ export function useStakingStats() {
       if (!totalSupply || totalSupply === BigInt(0)) return 0;
       const weeklyRate = Number(rewardsPerWeek) / Number(totalSupply);
       const yearlyRate = weeklyRate * 52;
-      return (yearlyRate * 100); // Convert to percentage
+      return (yearlyRate * 100);
     }
   };
 }

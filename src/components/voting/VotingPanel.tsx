@@ -4,8 +4,7 @@ import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/
 import { getContract, prepareContractCall } from "thirdweb";
 import { toEther, toWei } from "thirdweb/utils";
 import { client } from "../../lib/thirdweb";
-import { CONTRACT_ADDRESSES, CHAIN } from "../../config/constants";
-import { VOTING_ABI, CARD_CATALOG_ABI } from "../../lib/contracts";
+import { CONTRACTS, CHAIN, VOTING_ABI, CARD_CATALOG_ABI } from "../../lib/contracts";
 import { VoteIcon, TrendingUpIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react';
 
 interface VotingPanelProps {
@@ -24,16 +23,16 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   const votingContract = getContract({
     client,
     chain: CHAIN,
-    address: CONTRACT_ADDRESSES.BOOKMARK_VOTING, // REAL: Using BOOKMARK_VOTING not "VOTING"
-    abi: VOTING_ABI, // REAL: Using actual ABI from contracts file
+    address: CONTRACTS.VOTING,
+    abi: VOTING_ABI,
   });
   
   // Get card catalog contract for voting power
   const catalogContract = getContract({
     client,
     chain: CHAIN,
-    address: CONTRACT_ADDRESSES.CARD_CATALOG, // REAL: Using actual contract address
-    abi: CARD_CATALOG_ABI, // REAL: Using actual ABI
+    address: CONTRACTS.CARD_CATALOG,
+    abi: CARD_CATALOG_ABI,
   });
   
   // REAL: Using actual method name "getBookmarkVotes" not "getVotes"

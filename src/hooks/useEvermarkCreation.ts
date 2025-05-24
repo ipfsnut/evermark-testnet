@@ -1,255 +1,381 @@
-import { useState } from "react";
-import { useSendTransaction } from "thirdweb/react";
-import { getContract, prepareContractCall } from "thirdweb";
+import { useState, useCallback, useRef } from "react";
+import { useActiveAccount, useSendTransaction } from "thirdweb/react";
+import { getContract, prepareContractCall, readContract } from "thirdweb";
+import { toWei, toEther } from "thirdweb/utils";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
 
 export interface EvermarkMetadata {
   title: string;
   description: string;
-  sourceUrl?: string;
-  author?: string;
-  imageFile?: File | null;
+  sourceUrl: string;
+  author: string;
+  imageFile?: File;
 }
 
+// Add the helper function we need
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return 'An unknown error occurred';
+};
+
 export function useEvermarkCreation() {
+  const account = useActiveAccount();
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [createdEvermarkId, setCreatedEvermarkId] = useState<string | null>(null);
   
-  const { mutate: sendTransaction } = useSendTransaction();
-  
-  const contract = getContract({
+  // Use ref to track if operation is in progress to prevent reentrancy
+  const operationInProgress = useRef(false);
+  const lastTransactionTime = useRef<number>(0);
+
+  const evermarkContract = getContract({
     client,
     chain: CHAIN,
     address: CONTRACTS.EVERMARK_NFT,
     abi: EVERMARK_NFT_ABI,
   });
-  
-  // Check if we have valid Pinata API keys
-  const hasValidPinataKeys = () => {
-    const apiKey = import.meta.env.VITE_PINATA_API_KEY;
-    const secretKey = import.meta.env.VITE_PINATA_SECRET_KEY;
-    return apiKey && secretKey && apiKey.length > 10 && secretKey.length > 10;
-  };
-  
-  // Upload image to IPFS via Pinata
-  const uploadImageToIPFS = async (imageFile: File): Promise<string> => {
-    console.log("Uploading image to IPFS:", imageFile.name);
-    
-    if (!hasValidPinataKeys()) {
-      console.warn("Pinata API keys not configured - creating metadata without image");
-      return ""; // Return empty string instead of mock hash
-    }
-    
+
+  const { mutate: sendTransaction } = useSendTransaction();
+
+  // Function to get minting fee from contract
+  const getMintingFee = async (): Promise<bigint> => {
     try {
-      // Create form data for Pinata API
-      const formData = new FormData();
-      formData.append('file', imageFile);
-      formData.append('pinataMetadata', JSON.stringify({
-        name: `Evermark-Image-${imageFile.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`,
-        keyvalues: {
-          uploadedAt: new Date().toISOString(),
-          fileType: imageFile.type,
-        }
-      }));
-      
-      console.log("Uploading image to Pinata...");
-      
-      // Make API request to Pinata
-      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-        method: 'POST',
-        headers: {
-          'pinata_api_key': import.meta.env.VITE_PINATA_API_KEY,
-          'pinata_secret_api_key': import.meta.env.VITE_PINATA_SECRET_KEY,
-        },
-        body: formData
+      const fee = await readContract({
+        contract: evermarkContract,
+        method: "MINTING_FEE",
+        params: [],
       });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Pinata image upload failed:", response.status, errorText);
-        throw new Error(`Failed to upload image to IPFS: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log("Image upload successful:", data);
-      
-      if (!data.IpfsHash) {
-        throw new Error("No IPFS hash returned from Pinata");
-      }
-      
-      return `ipfs://${data.IpfsHash}`;
+      console.log(`✅ Minting fee from contract:`, toEther(fee), "ETH");
+      return fee;
     } catch (error) {
-      console.error("Image upload error:", error);
-      // Instead of returning a mock hash, just return empty string
-      // This prevents 400 errors when trying to fetch invalid hashes
-      return "";
+      console.error("Error getting minting fee from contract:", error);
+      throw new Error("Could not get minting fee from contract");
     }
   };
-  
-  // Upload metadata to IPFS
+
+  // Check contract state before minting
+  const checkContractState = async (): Promise<void> => {
+    try {
+      console.log("🔍 Checking contract state...");
+      
+      // Check if contract is paused
+      const isPaused = await readContract({
+        contract: evermarkContract,
+        method: "paused",
+        params: [],
+      });
+      console.log("⏸️ Contract paused:", isPaused);
+      
+      if (isPaused) {
+        throw new Error("Contract is currently paused");
+      }
+      
+      // Check total supply
+      const totalSupply = await readContract({
+        contract: evermarkContract,
+        method: "totalSupply",
+        params: [],
+      });
+      console.log("📊 Current total supply:", totalSupply.toString());
+      
+      // Check user's balance
+      const userBalance = await readContract({
+        contract: evermarkContract,
+        method: "balanceOf",
+        params: [account!.address],
+      });
+      console.log("👤 User balance:", userBalance.toString());
+      
+      // Add a delay to ensure contract state is clean
+      const timeSinceLastTx = Date.now() - lastTransactionTime.current;
+      const MIN_TIME_BETWEEN_TX = 10000; // 10 seconds
+      
+      if (timeSinceLastTx < MIN_TIME_BETWEEN_TX && lastTransactionTime.current > 0) {
+        const waitTime = Math.ceil((MIN_TIME_BETWEEN_TX - timeSinceLastTx) / 1000);
+        console.warn(`⏳ Waiting ${waitTime} seconds before next transaction...`);
+        throw new Error(`Please wait ${waitTime} seconds before creating another Evermark`);
+      }
+      
+    } catch (error) {
+      console.error("❌ Contract state check failed:", error);
+      throw error;
+    }
+  };
+
+  // Your existing IPFS upload functions (keep them as they are)
+  const uploadImageToIPFS = async (file: File): Promise<string> => {
+    console.log("Uploading image to IPFS:", file.name);
+    
+    if (!import.meta.env.VITE_PINATA_API_KEY || !import.meta.env.VITE_PINATA_SECRET_KEY) {
+      throw new Error("Pinata API credentials not configured");
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    formData.append('pinataMetadata', JSON.stringify({
+      name: `Evermark-Image-${sanitizedFileName}`,
+      keyvalues: {
+        type: 'evermark-image',
+        uploadedAt: new Date().toISOString()
+      }
+    }));
+
+    formData.append('pinataOptions', JSON.stringify({
+      cidVersion: 1,
+      wrapWithDirectory: false
+    }));
+
+    console.log("Uploading image to Pinata...");
+    
+    const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      method: 'POST',
+      headers: {
+        'pinata_api_key': import.meta.env.VITE_PINATA_API_KEY,
+        'pinata_secret_api_key': import.meta.env.VITE_PINATA_SECRET_KEY,
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Pinata upload failed:", errorText);
+      throw new Error(`Failed to upload image: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log("Image upload successful:", result);
+    
+    return `ipfs://${result.IpfsHash}`;
+  };
+
   const uploadMetadataToIPFS = async (metadata: any): Promise<string> => {
-    console.log("Preparing to upload metadata to IPFS:", metadata);
-    
-    if (!hasValidPinataKeys()) {
-      console.warn("Pinata API keys not configured - creating simple metadata URI");
-      // Instead of creating a mock IPFS hash, create a data URI or use empty string
-      const metadataString = JSON.stringify(metadata);
-      const encodedMetadata = encodeURIComponent(metadataString);
-      return `data:application/json,${encodedMetadata}`;
-    }
-    
-    try {
-      // Convert metadata to JSON string
-      const jsonString = JSON.stringify(metadata, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      
-      // Create form data for Pinata API
-      const formData = new FormData();
-      formData.append('file', blob, 'metadata.json');
-      formData.append('pinataMetadata', JSON.stringify({
-        name: `Evermark-Metadata-${metadata.name ? metadata.name.slice(0, 30).replace(/[^a-zA-Z0-9.-]/g, '_') : 'unnamed'}`,
-        keyvalues: {
-          uploadedAt: new Date().toISOString(),
-          title: metadata.name || 'Untitled',
-        }
-      }));
-      
-      console.log("Uploading metadata to Pinata...");
-      
-      // Make API request to Pinata
-      const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
-        method: 'POST',
-        headers: {
-          'pinata_api_key': import.meta.env.VITE_PINATA_API_KEY,
-          'pinata_secret_api_key': import.meta.env.VITE_PINATA_SECRET_KEY,
+    const metadataObject = {
+      name: metadata.title,
+      description: metadata.description,
+      external_url: metadata.sourceUrl,
+      image: metadata.image,
+      attributes: [
+        {
+          trait_type: "Author",
+          value: metadata.author
         },
-        body: formData
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Pinata metadata upload failed:", response.status, errorText);
-        throw new Error(`Failed to upload metadata to IPFS: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      console.log("Metadata upload successful:", data);
-      
-      if (!data.IpfsHash) {
-        throw new Error("No IPFS hash returned from Pinata");
-      }
-      
-      return `ipfs://${data.IpfsHash}`;
-    } catch (error) {
-      console.error("Metadata upload error:", error);
-      
-      // Fallback to data URI instead of mock IPFS hash
-      const metadataString = JSON.stringify(metadata);
-      const encodedMetadata = encodeURIComponent(metadataString);
-      return `data:application/json,${encodedMetadata}`;
+        {
+          trait_type: "Source URL",
+          value: metadata.sourceUrl
+        },
+        {
+          trait_type: "Created",
+          value: new Date().toISOString()
+        },
+        {
+          trait_type: "Type",
+          value: "Evermark"
+        }
+      ]
+    };
+
+    console.log("Preparing to upload metadata to IPFS:", metadataObject);
+
+    if (!import.meta.env.VITE_PINATA_API_KEY || !import.meta.env.VITE_PINATA_SECRET_KEY) {
+      throw new Error("Pinata API credentials not configured");
     }
+
+    const sanitizedTitle = metadata.title.replace(/[^a-zA-Z0-9\s]/g, '_').replace(/\s+/g, '_');
+    
+    const pinataMetadata = {
+      name: `Evermark-Metadata-${sanitizedTitle}`,
+      keyvalues: {
+        type: 'evermark-metadata',
+        title: metadata.title,
+        author: metadata.author,
+        uploadedAt: new Date().toISOString()
+      }
+    };
+
+    const pinataOptions = {
+      cidVersion: 1,
+      wrapWithDirectory: false
+    };
+
+    console.log("Uploading metadata to Pinata...");
+
+    const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'pinata_api_key': import.meta.env.VITE_PINATA_API_KEY,
+        'pinata_secret_api_key': import.meta.env.VITE_PINATA_SECRET_KEY,
+      },
+      body: JSON.stringify({
+        pinataContent: metadataObject,
+        pinataMetadata,
+        pinataOptions
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Pinata metadata upload failed:", errorText);
+      throw new Error(`Failed to upload metadata: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log("Metadata upload successful:", result);
+    
+    return `ipfs://${result.IpfsHash}`;
   };
-  
-  const createEvermark = async (metadata: EvermarkMetadata) => {
+
+  const createEvermark = useCallback(async (metadata: EvermarkMetadata) => {
+    // Prevent reentrancy at the hook level
+    if (operationInProgress.current || isCreating) {
+      console.warn("Creation already in progress, ignoring duplicate call");
+      return { success: false, error: "Operation already in progress" };
+    }
+
+    if (!account) {
+      const errorMsg = "Please connect your wallet";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    // Set both flags to prevent reentrancy
+    operationInProgress.current = true;
     setIsCreating(true);
     setError(null);
     setSuccess(null);
-    
+
     try {
-      console.log("Creating Evermark with metadata:", metadata);
-      
-      let imageIPFSUrl = "";
-      
-      // Upload image first if provided
+      console.log("🚀 Creating Evermark with metadata:", metadata);
+
+      // Check contract state and timing
+      await checkContractState();
+
+      // STEP 1: Get the minting fee from contract
+      console.log("💰 Getting minting fee from contract...");
+      const mintingFee = await getMintingFee();
+      console.log(`💰 Minting fee: ${toEther(mintingFee)} ETH`);
+
+      // STEP 2: Upload content to IPFS
+      let imageUrl = "";
       if (metadata.imageFile) {
-        console.log("Uploading image to IPFS...");
-        imageIPFSUrl = await uploadImageToIPFS(metadata.imageFile);
-        if (imageIPFSUrl) {
-          console.log("Image uploaded, IPFS URL:", imageIPFSUrl);
-        } else {
-          console.log("Image upload skipped or failed - continuing without image");
+        console.log("📸 Uploading image to IPFS...");
+        try {
+          imageUrl = await uploadImageToIPFS(metadata.imageFile);
+          console.log("✅ Image uploaded, IPFS URL:", imageUrl);
+        } catch (imageError) {
+          console.error("❌ Image upload failed:", imageError);
+          throw new Error(`Failed to upload image: ${getErrorMessage(imageError)}`);
         }
       }
-      
-      // Prepare metadata object for IPFS
-      const ipfsMetadata = {
-        name: metadata.title,
-        description: metadata.description || "",
-        external_url: metadata.sourceUrl || "",
-        ...(imageIPFSUrl && { image: imageIPFSUrl }), // Only include image if we have a valid URL
-        attributes: [
-          {
-            trait_type: "Content Type",
-            value: "Website"
-          },
-          {
-            trait_type: "Creator",
-            value: metadata.author || "Unknown"
-          },
-          {
-            trait_type: "Created",
-            value: new Date().toISOString()
-          },
-          ...(imageIPFSUrl ? [{
-            trait_type: "Has Image",
-            value: "Yes"
-          }] : [{
-            trait_type: "Has Image", 
-            value: "No"
-          }])
-        ]
-      };
-      
-      // Upload metadata to IPFS
-      console.log("Uploading metadata to IPFS...");
-      const metadataURI = await uploadMetadataToIPFS(ipfsMetadata);
-      console.log("Metadata uploaded, URI:", metadataURI);
-      
-      // Prepare contract call
-      console.log("Preparing mintBookmark transaction...");
-      const transaction = prepareContractCall({
-        contract,
-        method: "mintBookmark",
-        params: [
-          metadataURI,
-          metadata.title,
-          metadata.author || "Unknown"
-        ] as const,
+
+      console.log("📄 Uploading metadata to IPFS...");
+      let metadataUri: string;
+      try {
+        metadataUri = await uploadMetadataToIPFS({
+          ...metadata,
+          image: imageUrl
+        });
+        console.log("✅ Metadata uploaded, URI:", metadataUri);
+      } catch (metadataError) {
+        console.error("❌ Metadata upload failed:", metadataError);
+        throw new Error(`Failed to upload metadata: ${getErrorMessage(metadataError)}`);
+      }
+
+      // STEP 3: Prepare and send transaction using mintEvermarkWithReferral
+      console.log("⚙️ Preparing mintEvermarkWithReferral transaction with fee:", toEther(mintingFee), "ETH");
+      console.log("🎯 Using REWARDS contract as referrer:", CONTRACTS.REWARDS);
+      console.log("📋 Transaction params:", {
+        metadataUri,
+        title: metadata.title,
+        author: metadata.author,
+        referrer: CONTRACTS.REWARDS,
+        fee: toEther(mintingFee) + " ETH"
       });
       
-      // Send transaction
-      console.log("Sending transaction...");
-      const result = await sendTransaction(transaction as any);
-      console.log("Transaction sent:", result);
+      // Add a delay before preparing the transaction
+      console.log("⏳ Waiting 2 seconds before transaction preparation...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Success
-      setCreatedEvermarkId("new");
-      setSuccess("Your Evermark was created successfully! Check your collection to view it.");
+      const transaction = prepareContractCall({
+        contract: evermarkContract,
+        method: "mintEvermarkWithReferral",
+        params: [
+          metadataUri,
+          metadata.title,
+          metadata.author,
+          CONTRACTS.REWARDS // Use REWARDS contract as referrer
+        ] as const,
+        value: mintingFee,
+      });
+
+      console.log("📤 Sending transaction...");
       
-      return { 
-        success: true, 
-        evermarkId: "new",
-        transactionHash: result 
-      };
+      // Update last transaction time
+      lastTransactionTime.current = Date.now();
       
-    } catch (err: any) {
-      console.error("Error creating evermark:", err);
-      setError(err.message || "Failed to create Evermark");
-      return { success: false, error: err.message };
-    } finally {
+      return new Promise<{ success: boolean; message?: string; error?: string; txHash?: string }>((resolve) => {
+        sendTransaction(transaction as any, {
+          onSuccess: (result: any) => {
+            console.log("✅ Transaction successful:", result);
+            const successMsg = `Successfully created Evermark: ${metadata.title}`;
+            setSuccess(successMsg);
+            
+            // Reset flags on success
+            setIsCreating(false);
+            operationInProgress.current = false;
+            
+            resolve({ success: true, message: successMsg, txHash: result.transactionHash });
+          },
+          onError: (error: any) => {
+            console.error("❌ Transaction failed:", error);
+            
+            // Log more details about the error
+            console.error("❌ Error details:", {
+              message: error.message,
+              code: error.code,
+              data: error.data,
+              stack: error.stack
+            });
+            
+            const errorMsg = getErrorMessage(error);
+            setError(errorMsg);
+            
+            // Reset flags on error
+            setIsCreating(false);
+            operationInProgress.current = false;
+            
+            resolve({ success: false, error: errorMsg });
+          }
+        });
+      });
+
+    } catch (err: unknown) {
+      console.error("❌ Error creating Evermark:", err);
+      const errorMsg = getErrorMessage(err);
+      setError(errorMsg);
+      
+      // Reset flags on catch
       setIsCreating(false);
+      operationInProgress.current = false;
+      
+      return { success: false, error: errorMsg };
     }
-  };
-  
+  }, [account, evermarkContract, sendTransaction, isCreating]);
+
+  const clearMessages = useCallback(() => {
+    setError(null);
+    setSuccess(null);
+  }, []);
+
   return {
     createEvermark,
     isCreating,
     error,
     success,
-    createdEvermarkId,
-    hasValidPinataKeys: hasValidPinataKeys(),
+    clearMessages
   };
 }
