@@ -1,9 +1,9 @@
-// src/hooks/useVoting.ts - FIXED VERSION FOR NEW ARCHITECTURE
+// src/hooks/useVoting.ts - CORRECTED for EvermarkVoting contract
 import { useState, useCallback, useMemo } from "react";
 import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, VOTING_ABI, CARD_CATALOG_ABI } from "../lib/contracts";
+import { CHAIN, CONTRACTS, VOTING_ABI } from "../lib/contracts";
 import { toEther, toWei } from "thirdweb/utils";
 
 export function useVoting(evermarkId: string, userAddress?: string) {
@@ -11,7 +11,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // Memoize contracts to prevent recreation
+  // Only need the voting contract now - it has all the methods we need
   const votingContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
@@ -19,52 +19,39 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     abi: VOTING_ABI,
   }), []);
   
-  const catalogContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.CARD_CATALOG,
-    abi: CARD_CATALOG_ABI,
-  }), []);
-  
-  // FIXED: Get total votes for this Evermark using correct method name
+  // ✅ Get total votes for this Evermark
   const { data: totalVotes, isLoading: isLoadingTotalVotes, refetch: refetchTotalVotes } = useReadContract({
     contract: votingContract,
-    method: "getBookmarkVotes", // VERIFIED: This method exists in the ABI
+    method: "getBookmarkVotes", // ✅ Correct
     params: [BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!evermarkId && evermarkId !== "0",
     },
   });
   
-  // FIXED: Get user's votes for this Evermark - Always call hook, use enabled to control execution
+  // ✅ Get user's votes for this Evermark
   const userVotesQuery = useReadContract({
     contract: votingContract,
-    method: "getUserVotesForBookmark", // VERIFIED: This method exists in the ABI
+    method: "getUserVotesForBookmark", // ✅ Correct
     params: [userAddress || "0x0000000000000000000000000000000000000000", BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!userAddress && !!evermarkId && evermarkId !== "0",
     },
   });
   
-  const userVotes = userVotesQuery.data;
-  const isLoadingUserVotes = userVotesQuery.isLoading;
-  
-  // FIXED: Get user's available voting power from CardCatalog
+  // ✅ FIXED: Get user's remaining voting power from EvermarkVoting (not CardCatalog)
   const votingPowerQuery = useReadContract({
-    contract: catalogContract,
-    method: "getAvailableVotingPower", // VERIFIED: This method exists in CardCatalog ABI
+    contract: votingContract,
+    method: "getRemainingVotingPower", // ✅ FIXED: This is the correct method name
     params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!userAddress,
     },
   });
   
-  const availableVotingPower = votingPowerQuery.data;
-  const isLoadingVotingPower = votingPowerQuery.isLoading;
-  
   const { mutate: sendTransaction } = useSendTransaction();
   
-  // FIXED: Function to delegate votes using correct method name
+  // ✅ Delegate votes function
   const delegateVotes = useCallback(async (amount: string) => {
     if (!userAddress) {
       const errorMsg = "Please connect your wallet";
@@ -87,8 +74,8 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     const voteAmountWei = toWei(amount);
     
     // Check if user has enough voting power
-    if (availableVotingPower && voteAmountWei > availableVotingPower) {
-      const errorMsg = `Insufficient voting power. Available: ${toEther(availableVotingPower)} EMARK`;
+    if (votingPowerQuery.data && voteAmountWei > votingPowerQuery.data) {
+      const errorMsg = `Insufficient voting power. Available: ${toEther(votingPowerQuery.data)} WEMARK`;
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -98,36 +85,45 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setSuccess(null);
     
     try {
-      // FIXED: Using correct method name from VOTING_ABI
       const transaction = prepareContractCall({
         contract: votingContract,
-        method: "delegateVotes", // VERIFIED: This method exists in VOTING_ABI
+        method: "delegateVotes", // ✅ Correct
         params: [BigInt(evermarkId), voteAmountWei] as const,
       });
       
-      await sendTransaction(transaction as any);
-      
-      // Refetch data after successful transaction
-      setTimeout(() => {
-        refetchTotalVotes();
-        userVotesQuery.refetch();
-        votingPowerQuery.refetch();
-      }, 2000);
-      
-      const successMsg = `Successfully delegated ${amount} WEMARK to this Evermark!`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+      return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
+        sendTransaction(transaction as any, {
+          onSuccess: (result: any) => {
+            const successMsg = `Successfully delegated ${amount} WEMARK to this Evermark!`;
+            setSuccess(successMsg);
+            
+            // Refetch data after successful transaction
+            setTimeout(() => {
+              refetchTotalVotes();
+              userVotesQuery.refetch?.();
+              votingPowerQuery.refetch?.();
+            }, 2000);
+            
+            resolve({ success: true, message: successMsg });
+          },
+          onError: (error: any) => {
+            console.error("Error delegating votes:", error);
+            const errorMsg = error.message || "Failed to delegate votes";
+            setError(errorMsg);
+            resolve({ success: false, error: errorMsg });
+          }
+        });
+      });
     } catch (err: any) {
-      console.error("Error delegating votes:", err);
       const errorMsg = err.message || "Failed to delegate votes";
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsVoting(false);
     }
-  }, [userAddress, evermarkId, availableVotingPower, votingContract, sendTransaction, refetchTotalVotes, userVotesQuery, votingPowerQuery]);
+  }, [userAddress, evermarkId, votingPowerQuery.data, votingContract, sendTransaction, refetchTotalVotes, userVotesQuery, votingPowerQuery]);
   
-  // FIXED: Function to undelegate votes using correct method name
+  // ✅ Undelegate votes function
   const undelegateVotes = useCallback(async (amount: string) => {
     if (!userAddress) {
       const errorMsg = "Please connect your wallet";
@@ -135,6 +131,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       return { success: false, error: errorMsg };
     }
     
+    const userVotes = userVotesQuery.data;
     if (!userVotes || userVotes === BigInt(0)) {
       const errorMsg = "No votes to withdraw";
       setError(errorMsg);
@@ -148,9 +145,8 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     }
     
     const withdrawAmountWei = toWei(amount);
-    
     if (withdrawAmountWei > userVotes) {
-      const errorMsg = `Cannot withdraw more than delegated. Your delegation: ${toEther(userVotes)} EMARK`;
+      const errorMsg = `Cannot withdraw more than delegated. Your delegation: ${toEther(userVotes)} WEMARK`;
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -160,34 +156,43 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setSuccess(null);
     
     try {
-      // FIXED: Using correct method name from VOTING_ABI
       const transaction = prepareContractCall({
         contract: votingContract,
-        method: "undelegateVotes", // VERIFIED: This method exists in VOTING_ABI
+        method: "undelegateVotes", // ✅ Correct
         params: [BigInt(evermarkId), withdrawAmountWei] as const,
       });
       
-      await sendTransaction(transaction as any);
-      
-      // Refetch data after successful transaction
-      setTimeout(() => {
-        refetchTotalVotes();
-        userVotesQuery.refetch();
-        votingPowerQuery.refetch();
-      }, 2000);
-      
-      const successMsg = `Successfully withdrew ${amount} EMARK from this Evermark!`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+      return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
+        sendTransaction(transaction as any, {
+          onSuccess: (result: any) => {
+            const successMsg = `Successfully withdrew ${amount} WEMARK from this Evermark!`;
+            setSuccess(successMsg);
+            
+            // Refetch data after successful transaction
+            setTimeout(() => {
+              refetchTotalVotes();
+              userVotesQuery.refetch?.();
+              votingPowerQuery.refetch?.();
+            }, 2000);
+            
+            resolve({ success: true, message: successMsg });
+          },
+          onError: (error: any) => {
+            console.error("Error undelegating votes:", error);
+            const errorMsg = error.message || "Failed to undelegate votes";
+            setError(errorMsg);
+            resolve({ success: false, error: errorMsg });
+          }
+        });
+      });
     } catch (err: any) {
-      console.error("Error undelegating votes:", err);
       const errorMsg = err.message || "Failed to undelegate votes";
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsVoting(false);
     }
-  }, [userAddress, userVotes, evermarkId, votingContract, sendTransaction, refetchTotalVotes, userVotesQuery, votingPowerQuery]);
+  }, [userAddress, userVotesQuery.data, evermarkId, votingContract, sendTransaction, refetchTotalVotes, userVotesQuery, votingPowerQuery]);
   
   // Clear messages
   const clearMessages = useCallback(() => {
@@ -196,12 +201,12 @@ export function useVoting(evermarkId: string, userAddress?: string) {
   }, []);
   
   return {
-    totalVotes,
-    userVotes,
-    availableVotingPower,
+    totalVotes: totalVotes || BigInt(0),
+    userVotes: userVotesQuery.data || BigInt(0),
+    availableVotingPower: votingPowerQuery.data || BigInt(0), // This is now "remaining" voting power
     isLoadingTotalVotes,
-    isLoadingUserVotes,
-    isLoadingVotingPower,
+    isLoadingUserVotes: userVotesQuery.isLoading,
+    isLoadingVotingPower: votingPowerQuery.isLoading,
     isVoting,
     error,
     success,

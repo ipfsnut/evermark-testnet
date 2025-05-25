@@ -17,3 +17,4 @@ export const AUCTION_ABI = AuctionABI as any;
 export const NFT_STAKING_ABI = NFTStakingABI as any;
 export const FEE_COLLECTOR_ABI = FeeCollectorABI as any;
 export const EMARK_TOKEN_ABI = EmarkTokenABI as any;
+
