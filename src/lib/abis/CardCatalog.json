@@ -19,6 +19,7 @@
         "name": "newAdmin",
         "type": "address"
       }
+      
     ],
     "name": "AdminChanged",
     "type": "event"
