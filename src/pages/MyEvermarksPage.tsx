@@ -4,6 +4,7 @@ import { BookmarkIcon, PlusIcon, ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageContainer from '../components/layout/PageContainer';
 import { useUserEvermarks } from '../hooks/useEvermarks';
+import { ProfileStatsWidget } from '../components/profile/ProfileStatsWidget';
 
 // Individual Evermark Card Component
 const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
@@ -75,6 +76,9 @@ const MyEvermarksPage: React.FC = () => {
   return (
     <PageContainer title="My Collection">
       <div className="space-y-6">
+        {/* Profile Stats Widget - only show when user is connected */}
+        {address && <ProfileStatsWidget userAddress={address} />}
+        
         <div className="flex justify-between items-center">
           <p className="text-gray-600">Your personal library of Evermarks</p>
           <Link

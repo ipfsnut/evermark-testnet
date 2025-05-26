@@ -1,25 +1,25 @@
 {
   "accountAssociation": {
     "header": "eyJmaWQiOjg1NzMsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg1Mjk0MjMzMTViMTVEQTk2OTFBYkM1QjdjMWNiMEQwNDUwOUIyMmIwIn0",
-    "payload": "eyJkb21haW4iOiJldmVybWFyay1taW5pLWFwcC5uZXRsaWZ5LmFwcCJ9",
-    "signature": "UPDATE_SIGNATURE_HERE"
+    "payload": "eyJkb21haW4iOiJldmVybWFya3MubmV0In0",
+    "signature": "MHg0ZmNiYzBjMzE3NzM3M2M5NzkzMGRjNzk4ZjRkZmJhZDE1NjEzZWY4MDY4Mzc0ZTdlZDNmMzZiMzRjZjlkOWZiMDA4MzNiNGRhNDAyNTdiOWMxNDc5YWM2NWQxMjg5YWM2ODkxNGE0MGNmZTMwOTFkNzVmNDM2OGE5NDYzYzRjZjFj"
   },
   "frame": {
     "version": "1",
-    "name": "Evermark Testnet",
-    "iconUrl": "https://evermark-mini-app.netlify.app/icon.png",
-    "homeUrl": "https://evermark-mini-app.netlify.app",
-    "imageUrl": "https://evermark-mini-app.netlify.app/og-image.png",
+    "name": "Evermark",
+    "iconUrl": "https://evermarks.net/icon.png",
+    "homeUrl": "https://evermarks.net",
+    "imageUrl": "https://evermarks.net/og-image.png", 
     "buttonTitle": "📖 Open Evermark",
-    "splashImageUrl": "https://evermark-mini-app.netlify.app/splash.png",
+    "splashImageUrl": "https://evermarks.net/splash.png",
     "splashBackgroundColor": "#7c3aed",
-    "subtitle": "Content Curation & Voting (Testnet)",
-    "description": "Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards. Running on Base Sepolia testnet.",
-    "requiredChains": ["eip155:84532"],
-    "webhookUrl": "https://evermark-mini-app.netlify.app/.netlify/functions/webhook",
+    "subtitle": "Content Curation & Voting",
+    "description": "Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards.",
+    "requiredChains": ["eip155:8453"],
+    "webhookUrl": "https://evermarks.net/.netlify/functions/webhook",
     "screenshotUrls": [
-      "https://evermark-mini-app.netlify.app/screenshot1.png",
-      "https://evermark-mini-app.netlify.app/screenshot2.png"
+      "https://evermarks.net/screenshot1.png",
+      "https://evermarks.net/screenshot2.png"
     ]
   }
 }
