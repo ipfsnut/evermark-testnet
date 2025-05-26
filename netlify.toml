@@ -40,10 +40,3 @@
   [headers.values]
     Content-Type = "application/json"
     Access-Control-Allow-Origin = "*"
-
-[build]
-  # Skip TypeScript checking for now, just build
-  command = "vite build"
-  publish = "dist"
-  environment = { NODE_VERSION = "20" }
-  functions = "netlify/functions"
