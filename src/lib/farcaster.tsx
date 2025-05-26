@@ -3,7 +3,7 @@ import sdk from '@farcaster/frame-sdk';
 
 interface FarcasterContextType {
   isSDKLoaded: boolean;
-  user: any;
+  user: any | null;  // Explicitly allow null
   isInFarcaster: boolean;
 }
 
@@ -14,9 +14,9 @@ const FarcasterContext = createContext<FarcasterContextType>({
 });
 
 export function FarcasterProvider({ children }: PropsWithChildren) {
-  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [user, setUser] = useState(null);
-  const [isInFarcaster, setIsInFarcaster] = useState(false);
+  const [isSDKLoaded, setIsSDKLoaded] = useState<boolean>(false);
+  const [user, setUser] = useState<any | null>(null);  // Explicitly type as any | null
+  const [isInFarcaster, setIsInFarcaster] = useState<boolean>(false);
 
   useEffect(() => {
     const initSDK = async () => {
@@ -33,12 +33,6 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
           // Initialize the SDK
           const result = await sdk.actions.ready();
           console.log('✅ Farcaster SDK ready:', result);
-          
-          // Get user info if available
-          if (result?.user) {
-            setUser(result.user);
-            console.log('👤 Farcaster user:', result.user);
-          }
           
           setIsSDKLoaded(true);
         } else {
@@ -64,11 +58,6 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
       console.log('📐 Frame resized');
     };
 
-    const handleThemeChange = (theme: any) => {
-      console.log('🎨 Theme changed:', theme);
-      // You could update your app theme based on Farcaster's theme
-    };
-
     // Add more event listeners as needed
     window.addEventListener('resize', handleResize);
     
@@ -77,7 +66,7 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
     };
   }, [isInFarcaster, isSDKLoaded]);
 
-  const value = {
+  const contextValue: FarcasterContextType = {
     isSDKLoaded,
     user,
     isInFarcaster,
@@ -96,13 +85,13 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
   }
 
   return (
-    <FarcasterContext.Provider value={value}>
+    <FarcasterContext.Provider value={contextValue}>
       {children}
     </FarcasterContext.Provider>
   );
 }
 
-export function useFarcaster() {
+export function useFarcaster(): FarcasterContextType {
   const context = useContext(FarcasterContext);
   if (!context) {
     throw new Error('useFarcaster must be used within FarcasterProvider');
