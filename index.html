@@ -1,59 +1,193 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-  <title>Evermark - Content Curation</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+<title>Evermark - Content Curation</title>
 
-  <!-- Simplified CSP for maximum Farcaster compatibility -->
-  <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self' 'unsafe-inline' 'unsafe-eval' https: wss: data: blob:;
-    frame-ancestors *;
-  ">
+<!-- MOBILE WEBVIEW OPTIMIZED CSP -->
+<meta http-equiv="Content-Security-Policy" content="
+      default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
+      connect-src 'self' https: wss: data: blob:;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net https://esm.sh;
+      img-src 'self' https: data: blob:;
+      font-src 'self' data: https:;
+      media-src 'self' blob: https:;
+      worker-src 'self' blob:;
+      child-src 'self' blob: https:;
+      frame-src 'self' https:;
+      frame-ancestors * data: blob:;
+      object-src 'none';
+      base-uri 'self';
+    ">
 
-  <!-- Farcaster Mini App Frame Embed -->
-  <meta name="fc:frame" content='{"version":"next","imageUrl":"https://evermarks.net/og-image.png","button":{"title":"📖 Open Evermark","action":{"type":"launch_frame","name":"Evermark","url":"https://evermarks.net","splashImageUrl":"https://evermarks.net/splash.png","splashBackgroundColor":"#7c3aed"}}}' />
+<!-- Farcaster Mini App Frame Embed -->
+<meta name="fc:frame" content='{"version":"next","imageUrl":"https://evermarks.net/og-image.png","button":{"title":"📖 Open Evermark","action":{"type":"launch_frame","name":"Evermark","url":"https://evermarks.net","splashImageUrl":"https://evermarks.net/splash.png","splashBackgroundColor":"#7c3aed"}}}' />
 
-  <!-- Legacy Farcaster Frame Support -->
-  <meta name="fc:frame:image" content="https://evermarks.net/og-image.png" />
-  <meta name="fc:frame:button:1" content="📖 Open Evermark" />
-  <meta name="fc:frame:button:1:action" content="link" />
-  <meta name="fc:frame:button:1:target" content="https://evermarks.net" />
+<!-- Legacy Farcaster Frame Support -->
+<meta name="fc:frame:image" content="https://evermarks.net/og-image.png" />
+<meta name="fc:frame:button:1" content="📖 Open Evermark" />
+<meta name="fc:frame:button:1:action" content="link" />
+<meta name="fc:frame:button:1:target" content="https://evermarks.net" />
 
-  <!-- Open Graph Meta Tags -->
-  <meta property="og:title" content="Evermark - Content Curation on Blockchain" />
-  <meta property="og:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
-  <meta property="og:image" content="https://evermarks.net/og-image.png" />
-  <meta property="og:url" content="https://evermarks.net" />
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Evermark" />
+<!-- Open Graph Meta Tags -->
+<meta property="og:title" content="Evermark - Content Curation on Blockchain" />
+<meta property="og:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+<meta property="og:image" content="https://evermarks.net/og-image.png" />
+<meta property="og:url" content="https://evermarks.net" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Evermark" />
 
-  <!-- Twitter Card Meta Tags -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Evermark - Content Curation on Blockchain" />
-  <meta name="twitter:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
-  <meta name="twitter:image" content="https://evermarks.net/og-image.png" />
+<!-- Twitter Card Meta Tags -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Evermark - Content Curation on Blockchain" />
+<meta name="twitter:description" content="Preserve and curate your friendly content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+<meta name="twitter:image" content="https://evermarks.net/og-image.png" />
 
-  <!-- App-specific Meta Tags -->
-  <meta name="description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
-  <meta name="keywords" content="blockchain, content curation, voting, farcaster, web3, evermark" />
-  <meta name="author" content="Evermark" />
+<!-- App-specific Meta Tags -->
+<meta name="description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+<meta name="keywords" content="blockchain, content curation, voting, farcaster, web3, evermark" />
+<meta name="author" content="Evermark" />
 
-  <!-- iOS specific optimizations -->
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="format-detection" content="telephone=no">
+<!-- Theme and App Icons -->
+<meta name="theme-color" content="#7c3aed" />
+<link rel="icon" type="image/png" href="/icon.png" />
+<link rel="apple-touch-icon" href="/icon.png" />
 
-  <!-- Theme and App Icons -->
-  <meta name="theme-color" content="#7c3aed" />
-  <link rel="icon" type="image/png" href="/icon.png" />
-  <link rel="apple-touch-icon" href="/icon.png" />
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json" />
 
-  <!-- PWA Manifest -->
-  <link rel="manifest" href="/manifest.json" />
+<!-- MOBILE WEBVIEW: Preload critical resources -->
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js" as="script" crossorigin>
 </head>
 <body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
+<div id="root"></div>
+
+<!-- CRITICAL: Mobile WebView-specific SDK initialization -->
+<script>
+// Mobile WebView Detection and SDK Initialization
+(function() {
+  console.log('🚀 Mobile WebView SDK initialization starting...');
+  
+  // Enhanced mobile WebView detection
+  const isMobileWebView = (() => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = ua.includes('android');
+    const isIOS = ua.includes('iphone') || ua.includes('ipad');
+    const isWarpcast = ua.includes('warpcast') || ua.includes('farcaster');
+    const isWebView = ua.includes('wv') || ua.includes('webview');
+    
+    // Check for iframe context
+    let isFramed = false;
+    try {
+      isFramed = window.self !== window.top;
+    } catch (e) {
+      isFramed = true; // Cross-origin frame
+    }
+    
+    // Check for mobile app context
+    const isMobileApp = (isAndroid || isIOS) && (isWebView || isWarpcast || isFramed);
+    
+    console.log('📱 WebView Detection:', {
+      userAgent: ua,
+      isAndroid,
+      isIOS,
+      isWarpcast,
+      isWebView,
+      isFramed,
+      isMobileApp
+    });
+    
+    return isMobileApp;
+  })();
+  
+  if (isMobileWebView) {
+    console.log('📱 Mobile WebView detected - initializing SDK...');
+    
+    // CRITICAL: Load SDK synchronously for mobile
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
+    script.async = false; // Synchronous loading for mobile reliability
+    
+    script.onload = function() {
+      console.log('✅ SDK loaded, sending ready signal...');
+      
+      // Multiple ready signal attempts for mobile WebView reliability
+      const sendReady = () => {
+        try {
+          if (window.FrameSDK && window.FrameSDK.actions) {
+            // MOBILE: Disable native gestures that might interfere
+            window.FrameSDK.actions.ready({ 
+              disableNativeGestures: true 
+            });
+            console.log('✅ Ready signal sent with disabled gestures');
+            return true;
+          }
+        } catch (error) {
+          console.warn('⚠️ Ready signal failed:', error);
+          return false;
+        }
+        return false;
+      };
+      
+      // Immediate attempt
+      if (!sendReady()) {
+        // Retry with delays for stubborn mobile WebViews
+        const retryIntervals = [100, 250, 500, 1000, 2000];
+        retryIntervals.forEach(delay => {
+          setTimeout(() => {
+            if (sendReady()) {
+              console.log(`✅ Ready signal succeeded after ${delay}ms`);
+            }
+          }, delay);
+        });
+      }
+    };
+    
+    script.onerror = function(error) {
+      console.error('❌ SDK loading failed:', error);
+      // Fallback: try alternative CDN
+      const fallbackScript = document.createElement('script');
+      fallbackScript.src = 'https://esm.sh/@farcaster/frame-sdk@latest';
+      fallbackScript.type = 'module';
+      fallbackScript.onload = () => {
+        console.log('✅ Fallback SDK loaded');
+        // Try ready signal with fallback
+        setTimeout(() => {
+          try {
+            import('https://esm.sh/@farcaster/frame-sdk@latest').then(sdk => {
+              sdk.default.actions.ready({ disableNativeGestures: true });
+              console.log('✅ Fallback ready signal sent');
+            });
+          } catch (e) {
+            console.error('❌ Fallback failed:', e);
+          }
+        }, 100);
+      };
+      document.head.appendChild(fallbackScript);
+    };
+    
+    document.head.appendChild(script);
+    
+    // MOBILE: Listen for postMessage events that might indicate WebView issues
+    window.addEventListener('message', function(event) {
+      console.log('📨 PostMessage received:', event.origin, event.data);
+    }, false);
+    
+    // MOBILE: Prevent default touch behaviors that might interfere
+    document.addEventListener('touchstart', function(e) {
+      // Allow normal scrolling but prevent some gestures that might close the app
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+    
+  } else {
+    console.log('🖥️ Desktop/Browser detected - standard initialization');
+  }
+})();
+</script>
+
+<script type="module" src="/src/main.tsx"></script>
 </body>
 </html>

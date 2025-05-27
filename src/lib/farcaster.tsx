@@ -18,6 +18,22 @@ const FarcasterContext = createContext<FarcasterContextType>({
   error: undefined,
 });
 
+
+export const useFarcasterUser = () => {
+  const context = useContext(FarcasterContext);
+  return {
+    user: context.user,
+    isAuthenticated: context.isAuthenticated,
+    isInFarcaster: context.isInFarcaster,
+    isReady: context.isReady,           
+    error: context.error,
+    getDisplayName: () => context.user?.displayName || context.user?.username || '',
+    getAvatarUrl: () => context.user?.pfpUrl || '',
+    getUserHandle: () => context.user?.username ? `@${context.user.username}` : '',
+    getProfileUrl: () => context.user?.username ? `https://warpcast.com/${context.user.username}` : '',
+  };
+};
+
 export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [isReady, setIsReady] = useState(false);
   const [context, setContext] = useState<any>(null);
@@ -98,4 +114,21 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
       {children}
     </FarcasterContext.Provider>
   );
+};
+
+export const useFarcasterActions = () => {
+  return {
+    openWarpcastProfile: (username: string) => {
+      const url = `https://warpcast.com/${username}`;
+      if (typeof window !== 'undefined') {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    },
+    shareFrame: (frameUrl: string) => {
+      const shareUrl = `https://warpcast.com/~/compose?text=Check%20out%20this%20frame%3A%20${encodeURIComponent(frameUrl)}`;
+      if (typeof window !== 'undefined') {
+        window.open(shareUrl, '_blank', 'noopener,noreferrer');
+      }
+    },
+  };
 };

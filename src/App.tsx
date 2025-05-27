@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AppThirdwebProvider } from './lib/thirdweb';
-import { FarcasterProvider, useFarcaster } from './lib/farcaster';
+import { FarcasterProvider, useFarcasterUser } from './lib/farcaster';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -16,7 +16,7 @@ import { EvermarkDetail } from './components/evermark/EvermarkDetail';
 import BookshelfPage from './pages/BookshelfPage';
 
 function DebugInfo() {
-  const { isInFarcaster, isReady } = useFarcaster();
+  const { isInFarcaster, isReady } = useFarcasterUser();
   
   useEffect(() => {
     console.log('🔍 App Debug Info:');
@@ -29,7 +29,7 @@ function DebugInfo() {
 }
 
 function AppContent() {
-  const { isReady, error, isInFarcaster } = useFarcaster();
+  const { isReady, isInFarcaster } = useFarcasterUser();
   
   if (!isReady) {
     return (
