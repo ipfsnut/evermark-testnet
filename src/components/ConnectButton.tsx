@@ -1,11 +1,8 @@
-// src/components/ConnectButton.tsx
-import React from 'react';
 import { ConnectButton } from "thirdweb/react";
 import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { client } from "../lib/thirdweb";
 import { base } from "thirdweb/chains";
 
-// Create wallet options including Farcaster for Frame support
 const wallets = [
   inAppWallet({
     auth: {

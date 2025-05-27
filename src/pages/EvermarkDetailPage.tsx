@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon, BookmarkIcon, BookOpenIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ShieldIcon } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { ArrowLeftIcon, BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ShieldIcon } from 'lucide-react';
 import { useActiveAccount } from "thirdweb/react";
 import { VotingPanel } from '../components/voting/VotingPanel';
 import { getContract, readContract } from "thirdweb";
@@ -21,7 +21,6 @@ interface EvermarkMetadata {
 const EvermarkDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const account = useActiveAccount();
-  const navigate = useNavigate();
   const [evermark, setEvermark] = useState<EvermarkMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

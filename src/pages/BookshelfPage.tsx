@@ -46,7 +46,7 @@ const BookshelfPage: React.FC = () => {
   const [newCollectionName, setNewCollectionName] = useState('');
   const [newCollectionDescription, setNewCollectionDescription] = useState('');
   const [newCollectionIsPublic, setNewCollectionIsPublic] = useState(false);
-  const [editingCollection, setEditingCollection] = useState<string | null>(null);
+  const [, setEditingCollection] = useState<string | null>(null);
   
   // Load collections from localStorage (in production, this would be from blockchain/database)
   useEffect(() => {
@@ -100,27 +100,6 @@ const BookshelfPage: React.FC = () => {
         setSelectedCollection(null);
       }
     }
-  };
-  
-  const addToCollection = (collectionId: string, evermarkId: string) => {
-    const collection = collections.find(c => c.id === collectionId);
-    if (collection && !collection.evermarkIds.includes(evermarkId)) {
-      const updated = collections.map(c => 
-        c.id === collectionId 
-          ? { ...c, evermarkIds: [...c.evermarkIds, evermarkId], updatedAt: new Date() }
-          : c
-      );
-      saveCollections(updated);
-    }
-  };
-  
-  const removeFromCollection = (collectionId: string, evermarkId: string) => {
-    const updated = collections.map(c => 
-      c.id === collectionId 
-        ? { ...c, evermarkIds: c.evermarkIds.filter(id => id !== evermarkId), updatedAt: new Date() }
-        : c
-    );
-    saveCollections(updated);
   };
   
   const exportCollection = (collection: Collection) => {

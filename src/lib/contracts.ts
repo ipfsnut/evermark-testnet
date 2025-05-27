@@ -1,5 +1,4 @@
-import { defineChain } from "thirdweb";
-import { base, baseSepolia } from "thirdweb/chains";
+import { baseSepolia } from "thirdweb/chains";
 
 // Chain configuration
 export const CHAIN = baseSepolia; // Change to baseSepolia for testnet

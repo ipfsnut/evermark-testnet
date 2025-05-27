@@ -1,4 +1,3 @@
-// src/components/layout/Sidebar.tsx - UPDATED with unified profile
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
@@ -25,10 +24,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     avatar,
     handle,
     isAuthenticated,
-    isWalletConnected,
     walletAddress,
     isInFarcaster,
-    isFarcasterAuthenticated,
     farcasterUser
   } = useProfile();
   

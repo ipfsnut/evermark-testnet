@@ -1,4 +1,3 @@
-// src/components/FarcasterUserProfile.tsx
 import React from 'react';
 import { useFarcasterUser, useFarcasterActions } from '../../lib/farcaster';
 import { UserIcon, ExternalLinkIcon } from 'lucide-react';

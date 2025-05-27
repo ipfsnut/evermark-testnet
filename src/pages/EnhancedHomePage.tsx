@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useActiveAccount } from "thirdweb/react";
 import { PlusIcon, BookOpenIcon, TrendingUpIcon, ExternalLinkIcon, ImageIcon, UserIcon } from 'lucide-react';
 import { useEvermarks } from '../hooks/useEvermarks';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import PageContainer from '../components/layout/PageContainer';
 
 // Component for individual evermark with image

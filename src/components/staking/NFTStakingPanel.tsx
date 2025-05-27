@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '../../hooks/useWallet';
 import { useUserEvermarks } from '../../hooks/useEvermarks';
-import { useVoting } from '../../hooks/useVoting';
 import { 
   LockIcon, 
   UnlockIcon, 

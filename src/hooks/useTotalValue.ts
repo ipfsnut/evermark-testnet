@@ -1,8 +1,4 @@
 import { useState, useEffect } from "react";
-import { useReadContract } from "thirdweb/react";
-import { getContract } from "thirdweb";
-import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, AUCTION_ABI } from "../lib/contracts";
 import { toEther } from "thirdweb/utils";
 import { useAuctions } from "./useAuctions";
 

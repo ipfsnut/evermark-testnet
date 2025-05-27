@@ -11,7 +11,7 @@ import {
   VoteIcon,
   ClockIcon
 } from 'lucide-react';
-import { toEther, toWei } from 'thirdweb/utils';
+import { toEther } from 'thirdweb/utils';
 
 interface RewardComponent {
   name: string;
@@ -30,7 +30,6 @@ export const RewardsCalculator: React.FC = () => {
   // Base reward rates (mock values - in production from contract)
   const baseStakingRate = 0.05; // 5% APY
   const baseDelegationRate = 0.02; // 2% per week for full delegation
-  const baseCreatorRate = 0.01; // 1% of trading fees
   
   // Calculate reward components
   const rewardComponents = useMemo((): RewardComponent[] => {

@@ -1,7 +1,7 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useActiveAccount } from "thirdweb/react";
 import { MenuIcon } from 'lucide-react';
-import { Link } from 'react-router-dom';
 import { WalletConnect } from '../ConnectButton';
 
 interface HeaderProps {
@@ -10,13 +10,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ openSidebar }) => {
   const account = useActiveAccount();
-  const isConnected = !!account;
   
-  // Format address for display
-  const displayAddress = account ? 
-    `${account.address.substring(0, 6)}...${account.address.substring(account.address.length - 4)}` : 
-    '';
-    
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
       <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
@@ -41,6 +35,10 @@ const Header: React.FC<HeaderProps> = ({ openSidebar }) => {
         {/* Right: Wallet Connect Button */}
         <div className="flex items-center ml-auto">
           <WalletConnect />
+          {/* Show connection status indicator */}
+          {account && (
+            <div className="ml-2 w-2 h-2 bg-green-500 rounded-full" title="Wallet Connected" />
+          )}
         </div>
       </div>
     </header>

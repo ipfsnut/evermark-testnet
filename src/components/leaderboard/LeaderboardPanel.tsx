@@ -1,4 +1,3 @@
-import React from "react";
 import { useLeaderboard } from "../../hooks/useLeaderboard";
 import { TrophyIcon, ChevronRightIcon, BookmarkIcon, VoteIcon } from 'lucide-react';
 import { Link } from "react-router-dom";
@@ -7,7 +6,6 @@ import { toEther } from "thirdweb/utils";
 export function LeaderboardPanel() {
   const { entries, isLoading, error, isFinalized, weekNumber } = useLeaderboard();
   
-  // Get week date range
   const getWeekDateRange = (weekNum: number) => {
     const now = new Date();
     const startOfWeek = new Date(now.getFullYear(), 0, 1 + (weekNum - 1) * 7);

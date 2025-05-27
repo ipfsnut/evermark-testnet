@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useWallet } from "../../hooks/useWallet";
 import { useAuctionDetails } from "../../hooks/useAuctions";
 import { 

@@ -1,5 +1,5 @@
 // src/components/voting/VotingPanel.tsx - COMPLETE VERSION WITH DEBUG LOGS
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
 import { toEther, toWei } from "thirdweb/utils";
@@ -76,15 +76,14 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   });
 
   // FIXED: Get remaining voting power from EvermarkVoting contract
-  const votingPowerQuery = account ? useReadContract({
+  const votingPowerQuery = useReadContract({
     contract: votingContract,
-    method: "getRemainingVotingPower", 
-    params: [account.address] as const,
-  }) : { data: undefined, isLoading: false, error: null };
+    method: "getVotingPower",
+    params: [account?.address || ""],
+  });
 
   const availableVotingPower = votingPowerQuery.data;
   const isLoadingVotingPower = 'isLoading' in votingPowerQuery ? votingPowerQuery.isLoading : false;
-  const votingPowerError = 'error' in votingPowerQuery ? votingPowerQuery.error : null;
   
   console.log("🔍 Voting power query:", {
     data: availableVotingPower ? toEther(availableVotingPower) : "not loaded",
@@ -92,7 +91,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
     userAddress: account?.address
   });
   
-  const { mutate: sendTransaction, isPending, error: txError } = useSendTransaction();
+  const { mutate: sendTransaction } = useSendTransaction();
   console.log("🔍 sendTransaction function:", typeof sendTransaction);
   
   // Clear messages after 5 seconds

@@ -24,7 +24,6 @@ export const DelegationHistory: React.FC = () => {
     delegationHistory,
     currentCycleDelegations,
     delegationStats,
-    isLoading,
     getSupportedEvermarks,
     getConsistencyBonus,
     currentCycle

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookmarkIcon, UserIcon, CalendarIcon, ImageIcon } from 'lucide-react';
 import { Evermark } from '../../hooks/useEvermarks';
@@ -9,7 +9,7 @@ interface EvermarkCardProps {
 }
 
 export function EvermarkCard({ evermark, isCompact = false }: EvermarkCardProps) {
-  const { id, title, author, description, image, creator, creationTime } = evermark;
+  const { id, title, author, description, image, creationTime } = evermark;
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   

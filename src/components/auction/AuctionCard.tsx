@@ -1,11 +1,10 @@
-// src/components/auction/AuctionCard.tsx - USING REAL CONTRACT METHODS
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
 import { toEther, toWei } from "thirdweb/utils";
 import { client } from "../../lib/thirdweb";
-import { CONTRACT_ADDRESSES, CHAIN } from "../../config/constants";
-import { AUCTION_ABI } from "../../lib/contracts"; // REAL: Using actual ABI import
+import { CONTRACTS, CHAIN } from "../../lib/contracts"; // FIXED: Changed from CONTRACT_ADDRESSES
+import { AUCTION_ABI } from "../../lib/contracts";
 import { 
   DollarSignIcon, 
   ClockIcon, 
@@ -19,7 +18,6 @@ interface AuctionCardProps {
   auctionId: string;
 }
 
-// REAL: Using the actual auction struct from the contract ABI
 interface AuctionDetails {
   tokenId: bigint;
   nftContract: string;
@@ -41,18 +39,16 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
   const [isBidding, setIsBidding] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>("");
   
-  // REAL: Using actual contract address and ABI
   const contract = getContract({
     client,
     chain: CHAIN,
-    address: CONTRACT_ADDRESSES.BOOKMARK_AUCTION, // REAL: Using BOOKMARK_AUCTION not "AUCTION"
-    abi: AUCTION_ABI, // REAL: Using actual ABI from contracts file
+    address: CONTRACTS.AUCTION, // FIXED: Using CONTRACTS instead of CONTRACT_ADDRESSES
+    abi: AUCTION_ABI,
   });
   
-  // REAL: Using actual method "getAuctionDetails" with correct return type
   const { data: auctionData, isLoading, error: contractError } = useReadContract({
     contract,
-    method: "getAuctionDetails", // REAL: This method actually exists
+    method: "getAuctionDetails",
     params: [BigInt(auctionId)],
   });
   
@@ -86,7 +82,7 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
     };
     
     updateTimeRemaining();
-    const interval = setInterval(updateTimeRemaining, 60000); // Update every minute
+    const interval = setInterval(updateTimeRemaining, 60000);
     
     return () => clearInterval(interval);
   }, [auctionData]);
@@ -120,7 +116,7 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
     
     const bidAmountWei = toWei(bidAmount);
     const minBid = auctionData.currentBid > BigInt(0) 
-      ? auctionData.currentBid + toWei("0.01") // Minimum increment
+      ? auctionData.currentBid + toWei("0.01")
       : auctionData.startingPrice;
     
     if (bidAmountWei < minBid) {
@@ -128,7 +124,6 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
       return;
     }
     
-    // Check if auction has ended
     const now = Math.floor(Date.now() / 1000);
     if (Number(auctionData.endTime) <= now) {
       setError("Auction has ended");
@@ -140,12 +135,11 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
     setSuccess(null);
     
     try {
-      // REAL: Using actual method "placeBid" with correct parameters
       const transaction = prepareContractCall({
         contract,
-        method: "placeBid", // REAL: This method actually exists
-        params: [BigInt(auctionId)], // REAL: Only auctionId parameter
-        value: bidAmountWei, // REAL: ETH amount sent as value
+        method: "placeBid",
+        params: [BigInt(auctionId)],
+        value: bidAmountWei,
       });
       
       await sendTransaction(transaction);
@@ -183,7 +177,6 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
     );
   }
   
-  // REAL: Properly casting the auction data to the correct type
   const auction = auctionData as AuctionDetails;
   const isAuctionEnded = Math.floor(Date.now() / 1000) >= Number(auction.endTime);
   const isUserSeller = account?.address.toLowerCase() === auction.seller.toLowerCase();
@@ -191,7 +184,6 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-r from-green-50 to-emerald-50 px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center">
@@ -209,7 +201,6 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
         </div>
       </div>
       
-      {/* Auction Details */}
       <div className="p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div>
@@ -227,13 +218,10 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
             <p className="text-lg font-semibold text-gray-700">
               {toEther(auction.reservePrice)} ETH
             </p>
-            <p className="text-xs text-gray-500">
-              Minimum to win
-            </p>
+            <p className="text-xs text-gray-500">Minimum to win</p>
           </div>
         </div>
         
-        {/* Seller Info */}
         <div className="flex items-center mb-4 p-3 bg-gray-50 rounded-lg">
           <UserIcon className="h-4 w-4 text-gray-500 mr-2" />
           <div>
@@ -244,7 +232,6 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
           </div>
         </div>
         
-        {/* Status Messages */}
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
             <AlertCircleIcon className="h-4 w-4 text-red-600 mr-2" />
@@ -259,7 +246,6 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
           </div>
         )}
         
-        {/* Bidding Interface */}
         {!isAuctionEnded && !isUserSeller && account && (
           <div className="space-y-4">
             <div>
@@ -298,7 +284,6 @@ export function AuctionCard({ auctionId }: AuctionCardProps) {
           </div>
         )}
         
-        {/* Auction Status */}
         {isAuctionEnded && (
           <div className="text-center py-4 bg-gray-50 rounded-lg">
             <p className="text-gray-700 font-medium">Auction Ended</p>

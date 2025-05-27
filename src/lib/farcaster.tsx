@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
+import { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
 import sdk from '@farcaster/frame-sdk';
 
 interface FarcasterUser {

@@ -3,7 +3,7 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EMARK_TOKEN_ABI } from "../lib/contracts";
 import { useState, useCallback } from "react";
-import { toEther, toWei } from "thirdweb/utils";
+import { toWei } from "thirdweb/utils";
 
 export function useEmarkToken() {
   const account = useActiveAccount();

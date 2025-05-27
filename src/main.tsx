@@ -1,14 +1,11 @@
-// src/main.tsx - UPDATED with debugging and error boundary
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { AppThirdwebProvider } from './lib/thirdweb';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import App from './App';
 import './index.css';
 
-// Add console logging to track app initialization
 console.log('🚀 Evermark Mini App Starting...');
 console.log('Environment:', {
   isDev: import.meta.env.DEV,
@@ -33,7 +30,6 @@ const queryClient = new QueryClient({
   }
 });
 
-// Add global error handlers
 window.addEventListener('error', (event) => {
   console.error('🚨 Global JavaScript Error:', {
     message: event.message,
@@ -48,12 +44,10 @@ window.addEventListener('unhandledrejection', (event) => {
   console.error('🚨 Unhandled Promise Rejection:', event.reason);
 });
 
-// Log when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   console.log('✅ DOM Content Loaded');
 });
 
-// Simple fallback if React fails to mount
 const rootElement = document.getElementById('root');
 if (!rootElement) {
   console.error('❌ Root element not found!');
@@ -85,7 +79,6 @@ if (!rootElement) {
   } catch (error) {
     console.error('❌ Failed to mount React app:', error);
     
-    // Fallback UI if React completely fails
     rootElement.innerHTML = `
       <div style="min-height: 100vh; background: #7c3aed; color: white; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px;">
         <div>

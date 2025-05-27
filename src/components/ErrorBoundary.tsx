@@ -1,5 +1,4 @@
-// src/components/ErrorBoundary.tsx - NEW FILE
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
@@ -29,7 +28,6 @@ export class ErrorBoundary extends Component<Props, State> {
       errorInfo
     });
 
-    // Log to console for debugging in Farcaster
     console.error('Error details:', {
       message: error.message,
       stack: error.stack,

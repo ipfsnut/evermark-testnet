@@ -1,4 +1,3 @@
-// Updated useEvermarks.ts with proper IPFS error handling and correct contract calls
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getContract, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
@@ -334,7 +333,6 @@ export function useUserEvermarks(userAddress?: string) {
   const [evermarks, setEvermarks] = useState<Evermark[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastFetch, setLastFetch] = useState<number>(0);
 
   const contract = useMemo(() => getContract({
     client,

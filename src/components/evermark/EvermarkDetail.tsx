@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ArrowLeftIcon, ShieldIcon, ImageIcon } from 'lucide-react';
+import { BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ArrowLeftIcon, ShieldIcon } from 'lucide-react';
 import { useEvermarkDetail } from '../../hooks/useEvermarks';
 import { VotingPanel } from '../voting/VotingPanel';
 import { useWallet } from '../../hooks/useWallet';

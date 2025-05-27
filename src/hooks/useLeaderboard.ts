@@ -4,7 +4,6 @@ import { getContract, readContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, LEADERBOARD_ABI, VOTING_ABI, EVERMARK_NFT_ABI } from "../lib/contracts";
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { toEther } from "thirdweb/utils";
 
 export interface LeaderboardEntry {
   evermark: {

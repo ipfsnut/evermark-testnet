@@ -1,4 +1,3 @@
-// src/hooks/useVoting.ts - CORRECTED for EvermarkVoting contract
 import { useState, useCallback, useMemo } from "react";
 import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
@@ -93,7 +92,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       
       return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
         sendTransaction(transaction as any, {
-          onSuccess: (result: any) => {
+          onSuccess: () => {
             const successMsg = `Successfully delegated ${amount} WEMARK to this Evermark!`;
             setSuccess(successMsg);
             
@@ -164,7 +163,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       
       return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
         sendTransaction(transaction as any, {
-          onSuccess: (result: any) => {
+          onSuccess: () => {
             const successMsg = `Successfully withdrew ${amount} WEMARK from this Evermark!`;
             setSuccess(successMsg);
             
