@@ -1,3 +1,4 @@
+// src/lib/farcaster.tsx - Updated with verified addresses support
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren, useRef } from 'react';
 import sdk from "@farcaster/frame-sdk";
 
