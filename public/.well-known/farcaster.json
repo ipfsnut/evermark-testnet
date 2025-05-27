@@ -12,7 +12,7 @@
     "splashBackgroundColor": "#7c3aed",
     "homeUrl": "https://evermarks.net",
     "webhookUrl": "https://evermarks.net/.netlify/functions/webhook",
-    "subtitle": "Content Curation",
+    "subtitle": "Content Surfacing",
     "description": "Preserve important references and participate in social curation to earn rewards",
     "screenshotUrls": [
       "https://evermarks.net/og-image.png"
@@ -26,9 +26,9 @@
       "web3"
     ],
     "heroImageUrl": "https://evermarks.net/og-image.png",
-    "tagline": "Preserve valuable content forever",
-    "ogTitle": "Evermark - Content Curation",
-    "ogDescription": "Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards.",
+    "tagline": "Surfacing quality content",
+    "ogTitle": "Evermark Content Surface",
+    "ogDescription": "Curate your favorite content and earn",
     "ogImageUrl": "https://evermarks.net/og-image.png"
   }
 }
