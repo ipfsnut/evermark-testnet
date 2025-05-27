@@ -1,5 +1,3 @@
-// QUICK FIX: Update your src/lib/farcaster.tsx
-
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
 import sdk from '@farcaster/frame-sdk';
 
