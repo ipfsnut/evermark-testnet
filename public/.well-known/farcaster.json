@@ -16,10 +16,6 @@
     "subtitle": "Content Curation & Voting",
     "description": "Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards.",
     "requiredChains": ["eip155:8453"],
-    "webhookUrl": "https://evermarks.net/.netlify/functions/webhook",
-    "screenshotUrls": [
-      "https://evermarks.net/screenshot1.png",
-      "https://evermarks.net/screenshot2.png"
-    ]
+    "webhookUrl": "https://evermarks.net/.netlify/functions/webhook"
   }
 }

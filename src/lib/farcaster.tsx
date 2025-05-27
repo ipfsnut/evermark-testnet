@@ -1,7 +1,8 @@
+// QUICK FIX: Update your src/lib/farcaster.tsx
+
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
 import sdk from '@farcaster/frame-sdk';
 
-// Proper Farcaster user type based on the Frame SDK
 interface FarcasterUser {
   fid: number;
   username?: string;
@@ -45,75 +46,65 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
         if (isInFrame) {
           setIsInFarcaster(true);
           
-          // Initialize the SDK
-          const result = await sdk.actions.ready();
-          console.log('✅ Farcaster SDK ready:', result);
+          // ADD TIMEOUT to prevent hanging
+          const initPromise = sdk.actions.ready();
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('SDK init timeout')), 5000)
+          );
           
-          // Get user info if available - be very defensive about the typing
-          if (result !== null && result !== undefined && typeof result === 'object') {
-            // Now safely check if user property exists and has value
-            const hasUser = 'user' in result;
-            if (hasUser) {
-              const userValue = (result as any).user;
-              if (userValue !== null && userValue !== undefined && typeof userValue === 'object') {
-                // Extract user data safely
-                const userData = userValue;
-                
-                // Helper function to safely get property values
-                const safeGet = (obj: any, key: string) => {
-                  const value = obj?.[key];
-                  return (value !== undefined && value !== null && typeof value !== 'function') ? value : undefined;
-                };
-                
+          try {
+            const result = await Promise.race([initPromise, timeoutPromise]);
+            console.log('✅ Farcaster SDK ready:', result);
+            
+            // SIMPLIFIED user extraction - don't let this block everything
+            if (result && typeof result === 'object' && 'user' in result) {
+              const userData = (result as any).user;
+              if (userData) {
                 const farcasterUser: FarcasterUser = {
-                  fid: safeGet(userData, 'fid') ?? 0,
-                  username: safeGet(userData, 'username'),
-                  displayName: safeGet(userData, 'displayName') ?? safeGet(userData, 'display_name'),
-                  pfpUrl: safeGet(userData, 'pfpUrl') ?? safeGet(userData, 'pfp_url'),
-                  custodyAddress: safeGet(userData, 'custodyAddress') ?? safeGet(userData, 'custody_address'),
-                  verifications: safeGet(userData, 'verifications'),
-                  bio: safeGet(userData, 'bio'),
-                  followerCount: safeGet(userData, 'followerCount') ?? safeGet(userData, 'follower_count'),
-                  followingCount: safeGet(userData, 'followingCount') ?? safeGet(userData, 'following_count'),
+                  fid: userData.fid ?? 0,
+                  username: userData.username,
+                  displayName: userData.displayName ?? userData.display_name,
+                  pfpUrl: userData.pfpUrl ?? userData.pfp_url,
+                  custodyAddress: userData.custodyAddress ?? userData.custody_address,
+                  verifications: userData.verifications,
+                  bio: userData.bio,
+                  followerCount: userData.followerCount ?? userData.follower_count,
+                  followingCount: userData.followingCount ?? userData.following_count,
                 };
-                
                 setUser(farcasterUser);
                 console.log('👤 Farcaster user:', farcasterUser);
               }
             }
+          } catch (sdkError) {
+            console.error('❌ Farcaster SDK failed:', sdkError);
+            // Don't block - continue loading
           }
           
           setIsSDKLoaded(true);
         } else {
           console.log('🖥️ Running outside Farcaster - normal web mode');
-          setIsSDKLoaded(true); // Still mark as loaded for normal web usage
+          setIsSDKLoaded(true);
         }
       } catch (error) {
         console.error('❌ Farcaster SDK initialization failed:', error);
-        // Don't block the app if SDK fails
-        setIsSDKLoaded(true);
+        setIsSDKLoaded(true); // Don't block the app
       }
     };
 
-    initSDK();
-  }, []);
+    // ADD FALLBACK TIMEOUT - if init takes too long, just continue
+    const fallbackTimeout = setTimeout(() => {
+      console.warn('⚠️ Farcaster init taking too long, continuing anyway...');
+      setIsSDKLoaded(true);
+    }, 8000); // 8 second max wait
 
-  // Add event listeners for Farcaster events
-  useEffect(() => {
-    if (!isInFarcaster || !isSDKLoaded) return;
+    initSDK().finally(() => {
+      clearTimeout(fallbackTimeout);
+    });
 
-    const handleResize = () => {
-      // Handle frame resize events
-      console.log('📐 Frame resized');
-    };
-
-    // Add more event listeners as needed
-    window.addEventListener('resize', handleResize);
-    
     return () => {
-      window.removeEventListener('resize', handleResize);
+      clearTimeout(fallbackTimeout);
     };
-  }, [isInFarcaster, isSDKLoaded]);
+  }, []);
 
   const value: FarcasterContextType = {
     isSDKLoaded,
@@ -122,13 +113,19 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
     isAuthenticated: user !== null,
   };
 
-  // Show loading screen while SDK initializes
+  // TEMPORARY: Show loading for max 10 seconds, then continue anyway
   if (!isSDKLoaded) {
     return (
       <div className="min-h-screen bg-purple-600 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
           <p>Loading Evermark...</p>
+          <p className="text-sm mt-2 opacity-75">
+            In frame: {window.parent !== window ? 'Yes' : 'No'}
+          </p>
+          <p className="text-xs mt-1 opacity-50">
+            If this takes too long, try refreshing
+          </p>
         </div>
       </div>
     );
@@ -141,6 +138,7 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
   );
 }
 
+// Keep the rest of your hooks the same...
 export function useFarcaster() {
   const context = useContext(FarcasterContext);
   if (!context) {
@@ -149,7 +147,6 @@ export function useFarcaster() {
   return context;
 }
 
-// Helper hook for Farcaster actions
 export function useFarcasterActions() {
   const { isInFarcaster } = useFarcaster();
   
@@ -185,7 +182,6 @@ export function useFarcasterActions() {
   return { openUrl, close, openWarpcastProfile };
 }
 
-// Helper hook for Farcaster user utilities
 export function useFarcasterUser() {
   const { user, isAuthenticated, isInFarcaster } = useFarcaster();
   
