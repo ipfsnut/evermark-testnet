@@ -30,6 +30,9 @@
     "tagline": "Surfacing quality content",
     "ogTitle": "Evermark Content Surface",
     "ogDescription": "Curate your favorite content and earn",
-    "ogImageUrl": "https://evermarks.net/og-image.png"
+    "ogImageUrl": "https://evermarks.net/og-image.png",
+    "noindex": false,
+    "requiredChains": ["eip155:84532", "eip155:8453"],
+    "requiredCapabilities": []
   }
 }
