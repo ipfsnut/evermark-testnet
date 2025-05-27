@@ -20,7 +20,7 @@ const FarcasterContext = createContext<FarcasterContextType>({
   error: undefined,
 });
 
-// Enhanced mobile-ready frame detection with better cross-origin handling
+// Enhanced mobile-ready frame detection with PostMessage detection
 function detectFarcasterEnvironment() {
   if (typeof window === 'undefined') {
     return { isInFarcaster: false, confidence: 'high', methods: ['no-window'] };
@@ -30,66 +30,74 @@ function detectFarcasterEnvironment() {
   let isInFarcaster = false;
   let confidence: 'high' | 'medium' | 'low' = 'low';
 
-  // Method 1: User Agent Detection (HIGH CONFIDENCE)
   const userAgent = navigator.userAgent.toLowerCase();
+  
+  // Method 1: Direct Farcaster indicators (HIGH CONFIDENCE)
   if (userAgent.includes('farcaster') || userAgent.includes('warpcast')) {
     isInFarcaster = true;
     confidence = 'high';
-    methods.push('user-agent');
+    methods.push('user-agent-farcaster');
   }
 
-  // Method 2: Enhanced WebView Detection
+  // Method 2: CrKey detection (HIGH CONFIDENCE) - This is your environment!
+  if (userAgent.includes('crkey')) {
+    isInFarcaster = true;
+    confidence = 'high';
+    methods.push('crkey-detected');
+  }
+
+  // Method 3: Enhanced WebView Detection
   const isWebView = (
-    (userAgent.includes('mobile') && !userAgent.includes('safari')) ||
-    userAgent.includes('wkwebview') ||
     userAgent.includes('wv') ||
-    (userAgent.includes('version/') && userAgent.includes('chrome') && userAgent.includes('mobile'))
+    userAgent.includes('webview') ||
+    userAgent.includes('crkey') ||
+    (userAgent.includes('mobile') && !userAgent.includes('safari')) ||
+    (userAgent.includes('android') && userAgent.includes('chrome'))
   );
 
   if (isWebView) {
     methods.push('webview');
-    
-    // Method 3: URL Parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('frame') || urlParams.has('farcaster') || urlParams.get('ref') === 'farcaster') {
+    if (!isInFarcaster) {
       isInFarcaster = true;
-      confidence = 'high';
-      methods.push('url-params');
+      confidence = 'medium';
     }
+  }
 
-    // Method 4: Referrer Detection
-    if (document.referrer.toLowerCase().includes('farcaster') || document.referrer.toLowerCase().includes('warpcast')) {
-      isInFarcaster = true;
-      confidence = confidence === 'high' ? 'high' : 'medium';
-      methods.push('referrer');
-    }
+  // Method 4: URL Parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('frame') || urlParams.has('farcaster') || urlParams.get('ref') === 'farcaster') {
+    isInFarcaster = true;
+    confidence = 'high';
+    methods.push('url-params');
+  }
 
-    // Method 5: Window properties (with cross-origin safety)
-    try {
-      const windowChecks = {
-        noOpener: !window.opener,
-        limitedHistory: window.history.length <= 3,
-        hasParent: window.parent !== window
-      };
+  // Method 5: Referrer Detection
+  if (document.referrer.toLowerCase().includes('farcaster') || document.referrer.toLowerCase().includes('warpcast')) {
+    isInFarcaster = true;
+    confidence = confidence === 'high' ? 'high' : 'medium';
+    methods.push('referrer');
+  }
 
-      if (Object.values(windowChecks).filter(Boolean).length >= 2) {
-        methods.push('window-properties');
-        if (!isInFarcaster && isWebView) {
-          isInFarcaster = true;
-          confidence = 'medium';
-        }
-      }
-    } catch (e) {
-      // Cross-origin access blocked - this is actually a good sign for frames
-      methods.push('cross-origin-blocked');
-      if (isWebView) {
+  // Method 6: Cross-origin frame detection
+  try {
+    const hasParent = window.parent !== window;
+    if (hasParent && (isWebView || userAgent.includes('android'))) {
+      methods.push('cross-origin-frame');
+      if (!isInFarcaster) {
         isInFarcaster = true;
         confidence = 'medium';
       }
     }
+  } catch (e) {
+    // Cross-origin access blocked - good sign for frames
+    methods.push('cross-origin-blocked');
+    if (isWebView || userAgent.includes('crkey')) {
+      isInFarcaster = true;
+      confidence = 'medium';
+    }
   }
 
-  // Method 6: SDK availability check (with safety)
+  // Method 7: SDK availability check
   try {
     if ((window as any).FrameSDK || (window as any).frameSDK) {
       isInFarcaster = true;
@@ -97,16 +105,7 @@ function detectFarcasterEnvironment() {
       methods.push('sdk-available');
     }
   } catch (e) {
-    // Ignore cross-origin errors
-  }
-
-  // Method 7: Additional WebView indicators
-  if (isWebView || userAgent.includes('farcaster')) {
-    methods.push('additional-indicators');
-    if (!isInFarcaster) {
-      isInFarcaster = true;
-      confidence = 'low';
-    }
+    // Ignore errors
   }
 
   return { isInFarcaster, confidence, methods };
@@ -118,16 +117,35 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
   const [user, setUser] = useState<any>(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
+  const [detectedFromPostMessage, setDetectedFromPostMessage] = useState(false);
   const initializationRef = useRef(false);
   
   // Enhanced frame detection
   const detection = detectFarcasterEnvironment();
-  const isInFarcaster = detection.isInFarcaster;
+  
+  // ENHANCED: Listen for PostMessages from farcaster.xyz as additional detection
+  useEffect(() => {
+    const handlePostMessage = (event: MessageEvent) => {
+      if (event.origin === 'https://farcaster.xyz' || 
+          event.data?.type === 'frameEvent' ||
+          event.data?.type === 'RAW') {
+        console.log('📨 Farcaster PostMessage detected:', event.origin, event.data);
+        setDetectedFromPostMessage(true);
+      }
+    };
+
+    window.addEventListener('message', handlePostMessage);
+    return () => window.removeEventListener('message', handlePostMessage);
+  }, []);
+  
+  // Use detection OR PostMessage detection
+  const isInFarcaster = detection.isInFarcaster || detectedFromPostMessage;
 
   console.log('🔍 Farcaster Detection:', {
     isInFarcaster,
     confidence: detection.confidence,
     methods: detection.methods,
+    detectedFromPostMessage,
     userAgent: navigator.userAgent,
     url: window.location.href,
     referrer: document.referrer
