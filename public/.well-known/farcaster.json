@@ -9,6 +9,8 @@
     "version": "1",
     "name": "Evermark",
     "iconUrl": "https://evermarks.net/icon.png",
+    "imageUrl": "https://evermarks.net/og-image.png",
+    "buttonTitle": "Open Evermark",
     "splashImageUrl": "https://evermarks.net/splash.png",
     "splashBackgroundColor": "#7c3aed",
     "homeUrl": "https://evermarks.net",
