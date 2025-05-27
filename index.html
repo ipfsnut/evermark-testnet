@@ -2,20 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Evermark - Content Curation</title>
 
-<!-- More permissive CSP for Farcaster mini apps -->
+<!-- FIXED CSP: Added frame-ancestors and removed conflicts -->
 <meta http-equiv="Content-Security-Policy" content="
       default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
       connect-src 'self' https: wss: data: blob:;
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net;
       img-src 'self' https: data: blob:;
       font-src 'self' data: https:;
       media-src 'self' blob: https:;
       worker-src 'self' blob:;
       child-src 'self' blob:;
       frame-src 'self' https:;
+      frame-ancestors *;
       object-src 'none';
       base-uri 'self';
     ">
@@ -59,24 +60,46 @@
 <body>
 <div id="root"></div>
 
-<!-- Module backup wrapped in async function -->
-<script type="module">
-  (async function() {
-    const isInFarcaster = window.parent !== window;
+<!-- FIXED: Mobile-first Farcaster SDK initialization -->
+<script>
+  // Early detection and immediate ready signal for mobile
+  (function() {
+    console.log('🔄 Early SDK check...');
+    
+    const isInFarcaster = (() => {
+      try {
+        return window.parent !== window || 
+               window.location !== window.parent.location ||
+               window.frameElement !== null ||
+               navigator.userAgent.includes('Farcaster') ||
+               document.referrer.includes('warpcast.com');
+      } catch (e) {
+        return true; // If we can't check, assume we're in frame
+      }
+    })();
+    
+    console.log('📱 Is in Farcaster:', isInFarcaster);
     
     if (isInFarcaster) {
-      console.log('📱 Module backup - loading SDK...');
-      
-      try {
-        const { default: sdk } = await import('@farcaster/frame-sdk');
-        console.log('✅ Module SDK loaded');
-        
-        sdk.actions.ready();
-        console.log('✅ Module ready signal sent');
-        
-      } catch (error) {
-        console.error('❌ Module SDK failed:', error);
-      }
+      // Mobile-optimized SDK loading
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
+      script.async = true;
+      script.onload = function() {
+        console.log('✅ SDK loaded via script tag');
+        try {
+          if (window.FrameSDK) {
+            window.FrameSDK.actions.ready();
+            console.log('✅ Ready signal sent immediately');
+          }
+        } catch (error) {
+          console.error('❌ Ready signal failed:', error);
+        }
+      };
+      script.onerror = function(error) {
+        console.error('❌ SDK script loading failed:', error);
+      };
+      document.head.appendChild(script);
     }
   })();
 </script>

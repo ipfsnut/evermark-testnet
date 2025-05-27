@@ -14,23 +14,20 @@
   to = "/index.html"
   status = 200
 
-# MOBILE-OPTIMIZED HEADERS
+# MOBILE-OPTIMIZED HEADERS - REMOVED CSP CONFLICTS
 [[headers]]
   for = "/*"
   [headers.values]
-    # Security headers
+    # Security headers (REMOVED CSP to avoid conflicts with HTML)
     Strict-Transport-Security = "max-age=31536000; includeSubDomains"
     X-Content-Type-Options = "nosniff"
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     
-    # SIMPLIFIED CSP for mobile compatibility
-    Content-Security-Policy = "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https: wss: data: blob:; img-src 'self' https: data: blob:; font-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; child-src 'self' blob:; frame-src 'self' https:; object-src 'none'; base-uri 'self';"
+    # MOBILE FRAME SUPPORT - Allow all frame embedding
+    # X-Frame-Options removed to avoid conflicts with CSP frame-ancestors
     
-    # MOBILE FRAME SUPPORT - Remove X-Frame-Options to avoid conflicts
-    # X-Frame-Options = "ALLOWALL"  # REMOVED - conflicts with CSP frame-ancestors
-    
-    # CORS for mobile
+    # CORS for mobile webviews
     Access-Control-Allow-Origin = "*"
     Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
     Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With"
@@ -38,9 +35,6 @@
     # Mobile-specific optimizations
     X-UA-Compatible = "IE=edge"
     Vary = "Accept-Encoding, User-Agent"
-    
-    # Viewport and mobile meta (these don't go in netlify.toml but should be in your HTML)
-    # <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
 # Static assets caching
 [[headers]]
@@ -57,13 +51,14 @@
     Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With, x-farcaster-signature"
     Cache-Control = "no-cache"
 
-# Farcaster well-known files
+# Farcaster well-known files - MOBILE OPTIMIZED
 [[headers]]
   for = "/.well-known/*"
   [headers.values]
-    # SIMPLIFIED for mobile compatibility
+    Content-Type = "application/json"
     Access-Control-Allow-Origin = "*"
     Cache-Control = "public, max-age=300"
+    # Remove frame restrictions for mobile compatibility
     
 [[headers]]
   for = "/.well-known/farcaster.json"
