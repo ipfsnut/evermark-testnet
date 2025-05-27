@@ -5,105 +5,56 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Evermark - Content Curation</title>
 
-<!-- Immediate ready signal - before anything else loads -->
-<script>
-  // Ultra-early ready signal
-  (function() {
-    const isInFarcaster = window.parent !== window;
-    console.log('🚀 Ultra-early check - In Farcaster?', isInFarcaster);
-    
-    if (isInFarcaster) {
-      console.log('📱 Sending ultra-early ready signals...');
-      
-      // Send multiple postMessage variants immediately
-      const messages = [
-        { type: 'ready' },
-        { type: 'frame_ready' },
-        { type: 'sdk_ready' },
-        { action: 'ready' },
-        'ready'
-      ];
-      
-      messages.forEach(msg => {
-        try {
-          window.parent.postMessage(msg, '*');
-        } catch (e) {}
-      });
-      
-      console.log('✅ Ultra-early signals sent');
-    }
-  })();
-</script>
+<!-- More permissive CSP for Farcaster mini apps -->
+<meta http-equiv="Content-Security-Policy" content="
+      default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
+      connect-src 'self' https: wss: data: blob:;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https:;
+      img-src 'self' https: data: blob:;
+      font-src 'self' data: https:;
+      media-src 'self' blob: https:;
+      worker-src 'self' blob:;
+      child-src 'self' blob:;
+      frame-src 'self' https:;
+      object-src 'none';
+      base-uri 'self';
+    ">
 
-<!-- All your meta tags -->
+<!-- Farcaster Mini App Frame Embed -->
 <meta name="fc:frame" content='{"version":"next","imageUrl":"https://evermarks.net/og-image.png","button":{"title":"📖 Open Evermark","action":{"type":"launch_frame","name":"Evermark","url":"https://evermarks.net","splashImageUrl":"https://evermarks.net/splash.png","splashBackgroundColor":"#7c3aed"}}}' />
+
+<!-- Legacy Farcaster Frame Support -->
 <meta name="fc:frame:image" content="https://evermarks.net/og-image.png" />
 <meta name="fc:frame:button:1" content="📖 Open Evermark" />
 <meta name="fc:frame:button:1:action" content="link" />
 <meta name="fc:frame:button:1:target" content="https://evermarks.net" />
+
+<!-- Open Graph Meta Tags -->
 <meta property="og:title" content="Evermark - Content Curation on Blockchain" />
 <meta property="og:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
 <meta property="og:image" content="https://evermarks.net/og-image.png" />
 <meta property="og:url" content="https://evermarks.net" />
 <meta property="og:type" content="website" />
 <meta property="og:site_name" content="Evermark" />
+
+<!-- Twitter Card Meta Tags -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Evermark - Content Curation on Blockchain" />
 <meta name="twitter:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
 <meta name="twitter:image" content="https://evermarks.net/og-image.png" />
+
+<!-- App-specific Meta Tags -->
 <meta name="description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
 <meta name="keywords" content="blockchain, content curation, voting, farcaster, web3, evermark" />
 <meta name="author" content="Evermark" />
+
+<!-- Theme and App Icons -->
 <meta name="theme-color" content="#7c3aed" />
 <link rel="icon" type="image/png" href="/icon.png" />
 <link rel="apple-touch-icon" href="/icon.png" />
-<link rel="manifest" href="/manifest.json" />
 
-<!-- Load SDK and send proper ready signal -->
-<script>
-  // Load SDK as soon as possible
-  (function() {
-    const isInFarcaster = window.parent !== window;
-    
-    if (isInFarcaster) {
-      console.log('📱 Loading SDK immediately...');
-      
-      // Create script tag to load SDK
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/@farcaster/frame-sdk@latest/dist/index.umd.js';
-      script.onload = function() {
-        console.log('✅ SDK loaded, sending ready signal');
-        
-        // Try multiple SDK ready methods
-        try {
-          if (window.FrameSDK && window.FrameSDK.actions) {
-            window.FrameSDK.actions.ready();
-            console.log('✅ FrameSDK.actions.ready() called');
-          }
-          
-          if (window.farcaster && window.farcaster.actions) {
-            window.farcaster.actions.ready();
-            console.log('✅ farcaster.actions.ready() called');
-          }
-          
-          // Also send postMessage as backup
-          window.parent.postMessage({ type: 'sdk_loaded_ready' }, '*');
-          
-        } catch (error) {
-          console.error('❌ SDK ready error:', error);
-        }
-      };
-      
-      script.onerror = function() {
-        console.error('❌ Failed to load SDK');
-        // Send ready anyway via postMessage
-        window.parent.postMessage({ type: 'fallback_ready' }, '*');
-      };
-      
-      document.head.appendChild(script);
-    }
-  })();
-</script>
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json" />
 </head>
 <body>
 <div id="root"></div>
