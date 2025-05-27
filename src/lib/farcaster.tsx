@@ -1,22 +1,37 @@
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
 import sdk from '@farcaster/frame-sdk';
 
+// Proper Farcaster user type based on the Frame SDK
+interface FarcasterUser {
+  fid: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
+  custodyAddress?: string;
+  verifications?: string[];
+  bio?: string;
+  followerCount?: number;
+  followingCount?: number;
+}
+
 interface FarcasterContextType {
   isSDKLoaded: boolean;
-  user: any | null;  // Explicitly allow null
+  user: FarcasterUser | null;
   isInFarcaster: boolean;
+  isAuthenticated: boolean;
 }
 
 const FarcasterContext = createContext<FarcasterContextType>({
   isSDKLoaded: false,
   user: null,
   isInFarcaster: false,
+  isAuthenticated: false,
 });
 
 export function FarcasterProvider({ children }: PropsWithChildren) {
-  const [isSDKLoaded, setIsSDKLoaded] = useState<boolean>(false);
-  const [user, setUser] = useState<any | null>(null);  // Explicitly type as any | null
-  const [isInFarcaster, setIsInFarcaster] = useState<boolean>(false);
+  const [isSDKLoaded, setIsSDKLoaded] = useState(false);
+  const [user, setUser] = useState<FarcasterUser | null>(null);
+  const [isInFarcaster, setIsInFarcaster] = useState(false);
 
   useEffect(() => {
     const initSDK = async () => {
@@ -33,6 +48,40 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
           // Initialize the SDK
           const result = await sdk.actions.ready();
           console.log('✅ Farcaster SDK ready:', result);
+          
+          // Get user info if available - be very defensive about the typing
+          if (result !== null && result !== undefined && typeof result === 'object') {
+            // Now safely check if user property exists and has value
+            const hasUser = 'user' in result;
+            if (hasUser) {
+              const userValue = (result as any).user;
+              if (userValue !== null && userValue !== undefined && typeof userValue === 'object') {
+                // Extract user data safely
+                const userData = userValue;
+                
+                // Helper function to safely get property values
+                const safeGet = (obj: any, key: string) => {
+                  const value = obj?.[key];
+                  return (value !== undefined && value !== null && typeof value !== 'function') ? value : undefined;
+                };
+                
+                const farcasterUser: FarcasterUser = {
+                  fid: safeGet(userData, 'fid') ?? 0,
+                  username: safeGet(userData, 'username'),
+                  displayName: safeGet(userData, 'displayName') ?? safeGet(userData, 'display_name'),
+                  pfpUrl: safeGet(userData, 'pfpUrl') ?? safeGet(userData, 'pfp_url'),
+                  custodyAddress: safeGet(userData, 'custodyAddress') ?? safeGet(userData, 'custody_address'),
+                  verifications: safeGet(userData, 'verifications'),
+                  bio: safeGet(userData, 'bio'),
+                  followerCount: safeGet(userData, 'followerCount') ?? safeGet(userData, 'follower_count'),
+                  followingCount: safeGet(userData, 'followingCount') ?? safeGet(userData, 'following_count'),
+                };
+                
+                setUser(farcasterUser);
+                console.log('👤 Farcaster user:', farcasterUser);
+              }
+            }
+          }
           
           setIsSDKLoaded(true);
         } else {
@@ -66,10 +115,11 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
     };
   }, [isInFarcaster, isSDKLoaded]);
 
-  const contextValue: FarcasterContextType = {
+  const value: FarcasterContextType = {
     isSDKLoaded,
     user,
     isInFarcaster,
+    isAuthenticated: user !== null,
   };
 
   // Show loading screen while SDK initializes
@@ -85,13 +135,13 @@ export function FarcasterProvider({ children }: PropsWithChildren) {
   }
 
   return (
-    <FarcasterContext.Provider value={contextValue}>
+    <FarcasterContext.Provider value={value}>
       {children}
     </FarcasterContext.Provider>
   );
 }
 
-export function useFarcaster(): FarcasterContextType {
+export function useFarcaster() {
   const context = useContext(FarcasterContext);
   if (!context) {
     throw new Error('useFarcaster must be used within FarcasterProvider');
@@ -126,5 +176,45 @@ export function useFarcasterActions() {
     }
   };
 
-  return { openUrl, close };
+  const openWarpcastProfile = (username?: string) => {
+    if (username) {
+      openUrl(`https://warpcast.com/${username}`);
+    }
+  };
+
+  return { openUrl, close, openWarpcastProfile };
+}
+
+// Helper hook for Farcaster user utilities
+export function useFarcasterUser() {
+  const { user, isAuthenticated, isInFarcaster } = useFarcaster();
+  
+  const getDisplayName = () => {
+    if (!user) return null;
+    return user.displayName || user.username || `User ${user.fid}`;
+  };
+  
+  const getProfileUrl = () => {
+    if (!user?.username) return null;
+    return `https://warpcast.com/${user.username}`;
+  };
+  
+  const getAvatarUrl = () => {
+    return user?.pfpUrl || null;
+  };
+  
+  const getUserHandle = () => {
+    if (!user?.username) return null;
+    return `@${user.username}`;
+  };
+
+  return {
+    user,
+    isAuthenticated,
+    isInFarcaster,
+    getDisplayName,
+    getProfileUrl,
+    getAvatarUrl,
+    getUserHandle,
+  };
 }

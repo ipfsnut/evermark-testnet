@@ -1,6 +1,7 @@
+// src/components/layout/Sidebar.tsx - UPDATED with unified profile
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useWallet } from '../../hooks/useWallet';
+import { useProfile } from '../../hooks/useProfile';
 import { 
   X as CloseIcon, 
   Home as HomeIcon, 
@@ -19,7 +20,17 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
   const location = useLocation();
-  const { isConnected, account, displayAddress } = useWallet();
+  const {
+    displayName,
+    avatar,
+    handle,
+    isAuthenticated,
+    isWalletConnected,
+    walletAddress,
+    isInFarcaster,
+    isFarcasterAuthenticated,
+    farcasterUser
+  } = useProfile();
   
   // Define navigation items
   const navItems = [
@@ -40,6 +51,11 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     return location.pathname.startsWith(path);
   };
   
+  // Determine what to show in profile section
+  const shouldShowProfile = isAuthenticated;
+  const profileDisplayName = displayName;
+  const profileAvatar = avatar;
+  
   return (
     <>
       {/* Sidebar */}
@@ -58,21 +74,52 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
         </div>
         
         {/* User Profile Section */}
-        {isConnected && (
+        {shouldShowProfile && (
           <div className="px-6 py-6 border-b border-gray-200">
             <Link to="/profile" className="flex flex-col items-center" onClick={() => closeSidebar()}>
-              <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center mb-2">
-                <span className="text-2xl font-bold text-purple-600">
-                  {displayAddress.charAt(0).toUpperCase()}
-                </span>
+              <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center mb-2 overflow-hidden">
+                {profileAvatar ? (
+                  <img 
+                    src={profileAvatar} 
+                    alt={profileDisplayName} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-2xl font-bold text-purple-600">
+                    {profileDisplayName.charAt(0).toUpperCase()}
+                  </span>
+                )}
               </div>
               <div className="text-center">
-                <h3 className="font-medium text-gray-900">{displayAddress}</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  {account?.address.slice(0, 6)}...{account?.address.slice(-4)}
-                </p>
+                <h3 className="font-medium text-gray-900">{profileDisplayName}</h3>
+                <div className="text-sm text-gray-500 mt-1 space-y-1">
+                  {/* Show Farcaster handle if available */}
+                  {handle && (
+                    <p className="text-purple-600">{handle}</p>
+                  )}
+                  {/* Show wallet address if connected */}
+                  {walletAddress && (
+                    <p className="font-mono">
+                      {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
+                    </p>
+                  )}
+                  {/* Show Farcaster FID if available */}
+                  {farcasterUser?.fid && (
+                    <p className="text-xs">FID: {farcasterUser.fid}</p>
+                  )}
+                </div>
               </div>
             </Link>
+          </div>
+        )}
+        
+        {/* Frame-specific messaging */}
+        {isInFarcaster && (
+          <div className="px-6 py-3 bg-purple-50 border-b border-purple-100">
+            <div className="flex items-center justify-center">
+              <div className="w-2 h-2 bg-purple-500 rounded-full mr-2 animate-pulse"></div>
+              <p className="text-xs text-purple-700 font-medium">Running in Farcaster</p>
+            </div>
           </div>
         )}
         
