@@ -16,7 +16,7 @@ interface FarcasterUser {
 interface FarcasterContextType {
   isInFarcaster: boolean;
   isReady: boolean;
-  context: any; // Use any for the SDK context to avoid type conflicts
+  context: any;
   user?: FarcasterUser;
   isAuthenticated: boolean;
   error?: string;
@@ -37,92 +37,42 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [isInFarcaster] = useState(() => {
-    const inFrame = typeof window !== 'undefined' && window.parent !== window;
-    console.log('🔍 Detecting Farcaster environment:', {
-      inFrame,
-      userAgent: navigator.userAgent,
-      hasFrameSDK: typeof sdk !== 'undefined'
-    });
-    return inFrame;
+    return typeof window !== 'undefined' && window.parent !== window;
   });
 
   useEffect(() => {
     const initializeFarcaster = async () => {
-      console.log('🔄 Starting Farcaster initialization...');
-      console.log('- Is in Farcaster?', isInFarcaster);
-      console.log('- SDK available?', typeof sdk);
-      console.log('- Window parent check:', window.parent !== window);
+      console.log('🔄 Farcaster provider initializing...');
       
       try {
         if (isInFarcaster) {
-          console.log('📱 In Farcaster environment - initializing SDK...');
+          console.log('📱 Getting Farcaster context...');
           
-          // Add timeout to prevent hanging
-          const initPromise = Promise.race([
-            (async () => {
-              const farcasterContext = await sdk.context;
-              console.log('✅ Farcaster context received:', farcasterContext);
-              return farcasterContext;
-            })(),
-            new Promise<never>((_, reject) => 
-              setTimeout(() => reject(new Error('SDK initialization timeout')), 10000)
-            )
-          ]);
-          
-          const farcasterContext = await initPromise;
+          // Get context but don't send ready signal (already sent in HTML)
+          const farcasterContext = await sdk.context;
+          console.log('✅ Farcaster context received:', farcasterContext);
           setContext(farcasterContext);
           
-          // Extract user info if available - handle different possible structures
-          const contextUser = (farcasterContext as any)?.user;
-          if (contextUser) {
-            console.log('👤 User found in context:', contextUser);
-            // Map the SDK user to our interface
-            const mappedUser: FarcasterUser = {
-              fid: contextUser.fid,
-              username: contextUser.username,
-              displayName: contextUser.displayName,
-              pfpUrl: contextUser.pfpUrl,
-              custodyAddress: contextUser.custodyAddress,
-              verifications: contextUser.verifications,
-              bio: contextUser.bio,
-              followerCount: contextUser.followerCount,
-              followingCount: contextUser.followingCount,
-            };
-            setUser(mappedUser);
+          // Extract user info if available
+          if (farcasterContext?.user) {
+            console.log('👤 User found:', farcasterContext.user);
+            setUser(farcasterContext.user);
             setIsAuthenticated(true);
           }
           
-          // CRITICAL: Tell Farcaster the app is ready
-          console.log('📢 Sending ready signal to Farcaster...');
-          sdk.actions.ready();
-          console.log('✅ Farcaster SDK ready signal sent successfully');
-          
         } else {
-          console.log('🌐 Not in Farcaster environment, proceeding normally');
+          console.log('🌐 Not in Farcaster environment');
         }
       } catch (error) {
-        console.error('❌ Farcaster SDK initialization failed:', error);
+        console.error('❌ Farcaster context failed:', error);
         setError(error instanceof Error ? error.message : 'Unknown error');
-        
-        // Still try to send ready signal even if context fails
-        if (isInFarcaster) {
-          try {
-            console.log('🔄 Attempting to send ready signal despite error...');
-            sdk.actions.ready();
-            console.log('✅ Ready signal sent despite context error');
-          } catch (readyError) {
-            console.error('❌ Failed to send ready signal:', readyError);
-          }
-        }
       } finally {
-        // Always set ready to true so app loads
-        console.log('🏁 Setting app as ready');
         setIsReady(true);
       }
     };
 
-    // Add a small delay to ensure DOM is ready
-    const timer = setTimeout(initializeFarcaster, 100);
+    // Small delay to let the ready signal from HTML take effect first
+    const timer = setTimeout(initializeFarcaster, 500);
     return () => clearTimeout(timer);
   }, [isInFarcaster]);
 
