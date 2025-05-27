@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { useActiveAccount } from "thirdweb/react";
+import { useProfile, useContractAuth } from "../../hooks/useProfile";
 import { useEvermarkCreation, type EvermarkMetadata } from "../../hooks/useEvermarkCreation";
 import { 
   PlusIcon, 
@@ -13,11 +13,12 @@ import {
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import PageContainer from '../layout/PageContainer';
+import { ContractRequired } from '../auth/AuthGuard';
 
 export function EnhancedCreateEvermark() {
   const navigate = useNavigate();
-  const account = useActiveAccount();
-  const isConnected = !!account;
+  const profile = useProfile();
+  const contractAuth = useContractAuth();
   const { createEvermark, isCreating, error, success } = useEvermarkCreation();
   
   const [title, setTitle] = useState("");
@@ -30,6 +31,13 @@ export function EnhancedCreateEvermark() {
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Auto-populate author if we have Farcaster info
+  React.useEffect(() => {
+    if (profile.farcasterUser && !author) {
+      setAuthor(profile.farcasterUser.displayName || profile.farcasterUser.username || '');
+    }
+  }, [profile.farcasterUser, author]);
   
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -109,210 +117,253 @@ export function EnhancedCreateEvermark() {
     }, 500);
   };
   
-  if (!isConnected) {
-    return (
-      <PageContainer title="Create New Evermark">
-        <div className="text-center py-8">
-          <PlusIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Your Wallet</h3>
-          <p className="text-gray-600">Please connect your wallet to create an Evermark</p>
-        </div>
-      </PageContainer>
-    );
-  }
-  
   return (
     <PageContainer title="Create New Evermark">
-      {/* Status Messages */}
-      {error && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
-          <AlertCircleIcon className="h-5 w-5 text-red-600 mr-3 mt-0.5" />
-          <div>
-            <p className="text-red-700 font-medium">Error</p>
-            <p className="text-red-600 text-sm">{error}</p>
-          </div>
-        </div>
-      )}
-      
-      {success && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start">
-          <CheckCircleIcon className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
-          <div>
-            <p className="text-green-700 font-medium">Success!</p>
-            <p className="text-green-600 text-sm">{success}</p>
-            <p className="text-green-600 text-sm mt-1">
-              Redirecting to your collection...
-            </p>
-          </div>
-        </div>
-      )}
-      
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        {/* Image Upload Section */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-            <ImageIcon className="h-4 w-4 mr-2" />
-            Cover Image (Optional)
+      {/* Authentication-aware UI */}
+      <ContractRequired fallback={
+        <div className="text-center py-8">
+          <PlusIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {profile.isInFarcaster ? "Link Wallet to Create" : "Connect to Create"}
           </h3>
+          <p className="text-gray-600 mb-4">
+            {profile.isInFarcaster 
+              ? "Creating Evermarks requires blockchain interaction. Link a wallet to continue."
+              : "Please connect your wallet to create an Evermark"
+            }
+          </p>
           
-          {!imagePreview ? (
-            <div 
-              onClick={() => fileInputRef.current?.click()}
-              className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-600 mb-2">Click to upload an image</p>
-              <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
-            </div>
-          ) : (
-            <div className="relative">
-              <img
-                src={imagePreview}
-                alt="Preview"
-                className="w-full h-48 object-cover rounded-lg"
-              />
-              <button
-                type="button"
-                onClick={removeImage}
-                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
-              >
-                <XIcon className="h-4 w-4" />
-              </button>
-              <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
-                {selectedImage?.name}
+          {/* Show Farcaster user info if available */}
+          {profile.isFarcasterAuthenticated && (
+            <div className="mb-4 p-3 bg-purple-50 rounded-lg max-w-sm mx-auto">
+              <div className="flex items-center justify-center space-x-2">
+                {profile.avatar && (
+                  <img src={profile.avatar} alt="Profile" className="w-6 h-6 rounded-full" />
+                )}
+                <span className="text-sm text-purple-700">
+                  Authenticated as {profile.displayName}
+                </span>
               </div>
             </div>
           )}
-          
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleImageSelect}
-            className="hidden"
-          />
-          
-          {imageUploadError && (
-            <p className="mt-2 text-sm text-red-600">{imageUploadError}</p>
-          )}
-          
-          {isUploadingImage && (
-            <div className="mt-2 flex items-center text-sm text-purple-600">
-              <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
-              Uploading image to IPFS...
+        </div>
+      }>
+        {/* Status Messages */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
+            <AlertCircleIcon className="h-5 w-5 text-red-600 mr-3 mt-0.5" />
+            <div>
+              <p className="text-red-700 font-medium">Error</p>
+              <p className="text-red-600 text-sm">{error}</p>
             </div>
-          )}
-        </div>
+          </div>
+        )}
         
-        {/* Source URL with Auto-Detect */}
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-            <LinkIcon className="h-4 w-4 mr-2" />
-            Source URL (Optional)
-          </h3>
-          
-          <div className="flex gap-3">
-            <input
-              type="url"
-              value={sourceUrl}
-              onChange={(e) => setSourceUrl(e.target.value)}
-              placeholder="https://example.com/article"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
-            <button
-              type="button"
-              onClick={handleAutoDetect}
-              disabled={!sourceUrl || isCreating}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Auto-Detect
-            </button>
+        {success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-start">
+            <CheckCircleIcon className="h-5 w-5 text-green-600 mr-3 mt-0.5" />
+            <div>
+              <p className="text-green-700 font-medium">Success!</p>
+              <p className="text-green-600 text-sm">{success}</p>
+              <p className="text-green-600 text-sm mt-1">
+                Redirecting to your collection...
+              </p>
+            </div>
           </div>
-          <p className="mt-2 text-xs text-gray-600">
-            Enter a URL to auto-detect title, author, and description
-          </p>
-        </div>
+        )}
         
-        {/* Main Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
-          <div>
-            <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-              Title *
-            </label>
-            <input
-              id="title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Enter the title of this content"
-            />
+        {/* Auth status indicator for debugging */}
+        {profile.isInFarcaster && (
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-blue-700">
+                📱 Running in Farcaster • {profile.authMethod === 'both' ? '✅ Wallet linked' : '⚠️ Wallet needed for blockchain'}
+              </span>
+              {profile.primaryAddress && (
+                <span className="text-blue-600 font-mono text-xs">
+                  {profile.primaryAddress.slice(0, 6)}...{profile.primaryAddress.slice(-4)}
+                </span>
+              )}
+            </div>
           </div>
-          
-          {/* Author */}
-          <div>
-            <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-2">
-              Author
-            </label>
-            <input
-              id="author"
-              type="text"
-              value={author}
-              onChange={(e) => setAuthor(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              placeholder="Who created this content?"
-            />
-          </div>
-          
-          {/* Description */}
-          <div>
-            <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-              placeholder="Briefly describe why this content is worth preserving"
-            />
-          </div>
-          
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isCreating || !title.trim() || isUploadingImage}
-            className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isCreating ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                Creating Evermark...
-              </>
+        )}
+        
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          {/* Image Upload Section */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Cover Image (Optional)
+            </h3>
+            
+            {!imagePreview ? (
+              <div 
+                onClick={() => fileInputRef.current?.click()}
+                className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <p className="text-gray-600 mb-2">Click to upload an image</p>
+                <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
+              </div>
             ) : (
-              <>
-                <UploadIcon className="h-5 w-5 mr-2" />
-                Create Evermark
-              </>
+              <div className="relative">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-full h-48 object-cover rounded-lg"
+                />
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+                <div className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded text-xs">
+                  {selectedImage?.name}
+                </div>
+              </div>
             )}
-          </button>
-        </form>
-      </div>
-      
-      {/* Help Text */}
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">Tips:</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Add a cover image to make your Evermark more visually appealing</li>
-          <li>• Use descriptive titles that capture the essence of your content</li>
-          <li>• Include the original author's name when preserving others' work</li>
-          <li>• Add a description explaining why this content is valuable</li>
-          <li>• Your Evermark will be permanently stored on the blockchain</li>
-        </ul>
-      </div>
+            
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            
+            {imageUploadError && (
+              <p className="mt-2 text-sm text-red-600">{imageUploadError}</p>
+            )}
+            
+            {isUploadingImage && (
+              <div className="mt-2 flex items-center text-sm text-purple-600">
+                <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
+                Uploading image to IPFS...
+              </div>
+            )}
+          </div>
+          
+          {/* Source URL with Auto-Detect */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
+              <LinkIcon className="h-4 w-4 mr-2" />
+              Source URL (Optional)
+            </h3>
+            
+            <div className="flex gap-3">
+              <input
+                type="url"
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
+                placeholder="https://example.com/article"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <button
+                type="button"
+                onClick={handleAutoDetect}
+                disabled={!sourceUrl || isCreating}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Auto-Detect
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-600">
+              Enter a URL to auto-detect title, author, and description
+            </p>
+          </div>
+          
+          {/* Main Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Title */}
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                Title *
+              </label>
+              <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Enter the title of this content"
+              />
+            </div>
+            
+            {/* Author */}
+            <div>
+              <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-2">
+                Author
+              </label>
+              <input
+                id="author"
+                type="text"
+                value={author}
+                onChange={(e) => setAuthor(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Who created this content?"
+              />
+              {profile.farcasterUser && !author && (
+                <button
+                  type="button"
+                  onClick={() => setAuthor(profile.farcasterUser?.displayName || profile.farcasterUser?.username || '')}
+                  className="mt-1 text-xs text-purple-600 hover:text-purple-700"
+                >
+                  Use my Farcaster name: {profile.farcasterUser.displayName || profile.farcasterUser.username}
+                </button>
+              )}
+            </div>
+            
+            {/* Description */}
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                placeholder="Briefly describe why this content is worth preserving"
+              />
+            </div>
+            
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isCreating || !title.trim() || isUploadingImage || !contractAuth.canInteract}
+              className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreating ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Creating Evermark...
+                </>
+              ) : (
+                <>
+                  <UploadIcon className="h-5 w-5 mr-2" />
+                  Create Evermark
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+        
+        {/* Help Text */}
+        <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Tips:</h4>
+          <ul className="text-sm text-blue-800 space-y-1">
+            <li>• Add a cover image to make your Evermark more visually appealing</li>
+            <li>• Use descriptive titles that capture the essence of your content</li>
+            <li>• Include the original author's name when preserving others' work</li>
+            <li>• Add a description explaining why this content is valuable</li>
+            <li>• Your Evermark will be permanently stored on the blockchain</li>
+          </ul>
+        </div>
+      </ContractRequired>
     </PageContainer>
   );
 }
