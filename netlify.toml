@@ -67,14 +67,6 @@
     Access-Control-Allow-Origin = "*"
     Cache-Control = "public, max-age=300"
 
-# Handle OPTIONS requests for CORS preflight
-[[redirects]]
-  from = "/.netlify/functions/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
-  force = false
-  conditions = {Method = ["OPTIONS"]}
-
 # Specific redirects for common API patterns
 [[redirects]]
   from = "/webhook"
