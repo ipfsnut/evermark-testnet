@@ -5,6 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Evermark - Content Curation</title>
 
+<!-- Immediate ready signal - before anything else loads -->
+<script>
+  // Ultra-early ready signal
+  (function() {
+    const isInFarcaster = window.parent !== window;
+    console.log('🚀 Ultra-early check - In Farcaster?', isInFarcaster);
+    
+    if (isInFarcaster) {
+      console.log('📱 Sending ultra-early ready signals...');
+      
+      // Send multiple postMessage variants immediately
+      const messages = [
+        { type: 'ready' },
+        { type: 'frame_ready' },
+        { type: 'sdk_ready' },
+        { action: 'ready' },
+        'ready'
+      ];
+      
+      messages.forEach(msg => {
+        try {
+          window.parent.postMessage(msg, '*');
+        } catch (e) {}
+      });
+      
+      console.log('✅ Ultra-early signals sent');
+    }
+  })();
+</script>
+
 <!-- Farcaster Mini App Frame Embed -->
 <meta name="fc:frame" content='{"version":"next","imageUrl":"https://evermarks.net/og-image.png","button":{"title":"📖 Open Evermark","action":{"type":"launch_frame","name":"Evermark","url":"https://evermarks.net","splashImageUrl":"https://evermarks.net/splash.png","splashBackgroundColor":"#7c3aed"}}}' />
 
@@ -42,40 +72,73 @@
 <link rel="manifest" href="/manifest.json" />
 
 <!-- CRITICAL: Load Farcaster SDK synchronously in head -->
-<script src="https://unpkg.com/@farcaster/frame-sdk@latest/dist/index.umd.js"></script>
 <script>
-  // Immediate ready signal - no async, no imports, no delays
+  // Load SDK as soon as possible
   (function() {
-    console.log('🔍 Immediate Farcaster check...');
     const isInFarcaster = window.parent !== window;
     
     if (isInFarcaster) {
-      console.log('📱 In Farcaster - sending ready signal NOW');
+      console.log('📱 Loading SDK immediately...');
       
-      // Method 1: Use SDK if available
-      if (window.FrameSDK && window.FrameSDK.actions) {
-        window.FrameSDK.actions.ready();
-        console.log('✅ SDK ready signal sent');
-      }
+      // Create script tag to load SDK
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/@farcaster/frame-sdk@latest/dist/index.umd.js';
+      script.onload = function() {
+        console.log('✅ SDK loaded, sending ready signal');
+        
+        // Try multiple SDK ready methods
+        try {
+          if (window.FrameSDK && window.FrameSDK.actions) {
+            window.FrameSDK.actions.ready();
+            console.log('✅ FrameSDK.actions.ready() called');
+          }
+          
+          if (window.farcaster && window.farcaster.actions) {
+            window.farcaster.actions.ready();
+            console.log('✅ farcaster.actions.ready() called');
+          }
+          
+          // Also send postMessage as backup
+          window.parent.postMessage({ type: 'sdk_loaded_ready' }, '*');
+          
+        } catch (error) {
+          console.error('❌ SDK ready error:', error);
+        }
+      };
       
-      // Method 2: PostMessage fallback
-      if (window.parent && window.parent.postMessage) {
-        window.parent.postMessage({ type: 'ready' }, '*');
-        window.parent.postMessage({ type: 'frame_ready' }, '*');
-        console.log('✅ PostMessage ready signals sent');
-      }
+      script.onerror = function() {
+        console.error('❌ Failed to load SDK');
+        // Send ready anyway via postMessage
+        window.parent.postMessage({ type: 'fallback_ready' }, '*');
+      };
       
-      // Method 3: Try common Farcaster ready patterns
-      if (window.farcaster && window.farcaster.ready) {
-        window.farcaster.ready();
-        console.log('✅ Farcaster.ready() called');
-      }
+      document.head.appendChild(script);
     }
   })();
 </script>
 </head>
 <body>
 <div id="root"></div>
+
+<!-- Also try module import as final backup -->
+<script type="module">
+  const isInFarcaster = window.parent !== window;
+  
+  if (isInFarcaster) {
+    console.log('📱 Module backup - loading SDK...');
+    
+    try {
+      const { default: sdk } = await import('@farcaster/frame-sdk');
+      console.log('✅ Module SDK loaded');
+      
+      sdk.actions.ready();
+      console.log('✅ Module ready signal sent');
+      
+    } catch (error) {
+      console.error('❌ Module SDK failed:', error);
+    }
+  }
+</script>
 
 <script type="module" src="/src/main.tsx"></script>
 </body>
