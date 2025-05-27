@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { AppThirdwebProvider } from './lib/thirdweb';
+import { AppThirdwebProvider } from './lib/ThirdwebProvider';
 import { FarcasterProvider } from './lib/farcaster';
 import Layout from './components/layout/Layout';
 

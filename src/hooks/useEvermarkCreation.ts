@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useActiveAccount } from "thirdweb/react";
-import { prepareContractCall, sendTransaction } from "thirdweb";
+import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
 import { upload } from "thirdweb/storage";
 import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
-import { getContract } from "thirdweb";
+import { CHAIN, CONTRACTS } from "../lib/contracts";
+import { EVERMARK_NFT_ABI } from "../lib/abis/";
 
 export interface EvermarkMetadata {
   title: string;
@@ -18,7 +18,6 @@ export const useEvermarkCreation = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
   const account = useActiveAccount();
 
   const clearMessages = () => {
@@ -26,13 +25,12 @@ export const useEvermarkCreation = () => {
     setSuccess(null);
   };
 
-  const createEvermark = async (
-    metadata: EvermarkMetadata
-  ): Promise<{
-    success: boolean;
-    message?: string;
-    error?: string;
-    txHash?: string;
+  const createEvermark = async (metadata: EvermarkMetadata): Promise<{ 
+    success: boolean; 
+    message?: string; 
+    error?: string; 
+    txHash?: string; 
+    evermarkId?: string;
   }> => {
     setIsCreating(true);
     setError(null);
@@ -44,72 +42,23 @@ export const useEvermarkCreation = () => {
       }
 
       // Upload image to IPFS if it exists
-      let metadataURI: string = "";
+      let imageUrl: string = "";
       if (metadata.imageFile) {
         try {
-          // Create metadata object for IPFS
-          const metadataObject = {
-            name: metadata.title,
-            description: metadata.description,
-            external_url: metadata.sourceUrl,
-            creator: metadata.author,
-          };
-
-          // Upload image first
-          const imageUploadResult = await upload({
+          const uploadResult = await upload({
             client,
             files: [metadata.imageFile],
           });
-
-          // Add image to metadata
-          const metadataWithImage = {
-            ...metadataObject,
-            image: imageUploadResult,
-          };
-
-          // Upload complete metadata
-          const metadataUploadResult = await upload({
-            client,
-            files: [new File([JSON.stringify(metadataWithImage)], "metadata.json", { type: "application/json" })],
-          });
-
-          metadataURI = metadataUploadResult;
+          imageUrl = uploadResult;
         } catch (uploadError: any) {
-          console.error("Failed to upload to IPFS:", uploadError);
-          setError(`Upload failed: ${uploadError.message || "Unknown error"}`);
+          console.error("Failed to upload image to IPFS:", uploadError);
+          setError(`Image upload failed: ${uploadError.message || "Unknown error"}`);
           setIsCreating(false);
-          return {
-            success: false,
-            error: `Upload failed: ${uploadError.message || "Unknown error"}`,
-          };
-        }
-      } else {
-        // Create metadata without image
-        const metadataObject = {
-          name: metadata.title,
-          description: metadata.description,
-          external_url: metadata.sourceUrl,
-          creator: metadata.author,
-        };
-
-        try {
-          const metadataUploadResult = await upload({
-            client,
-            files: [new File([JSON.stringify(metadataObject)], "metadata.json", { type: "application/json" })],
-          });
-          metadataURI = metadataUploadResult;
-        } catch (uploadError: any) {
-          console.error("Failed to upload metadata to IPFS:", uploadError);
-          setError(`Metadata upload failed: ${uploadError.message || "Unknown error"}`);
-          setIsCreating(false);
-          return {
-            success: false,
-            error: `Metadata upload failed: ${uploadError.message || "Unknown error"}`,
-          };
+          return { success: false, error: `Image upload failed: ${uploadError.message || "Unknown error"}` };
         }
       }
 
-      // Get contract instance using our centralized source of truth
+      // Get contract instance
       const contract = getContract({
         client,
         chain: CHAIN,
@@ -117,12 +66,18 @@ export const useEvermarkCreation = () => {
         abi: EVERMARK_NFT_ABI,
       });
 
-      // Prepare the contract call using the correct method name from ABI
+      // Prepare the transaction
       const transaction = prepareContractCall({
         contract,
         method: "mintEvermark",
         params: [
-          metadataURI,
+          JSON.stringify({
+            title: metadata.title,
+            description: metadata.description,
+            sourceUrl: metadata.sourceUrl,
+            author: metadata.author,
+            image: imageUrl,
+          }),
           metadata.title,
           metadata.author,
         ],
@@ -137,19 +92,18 @@ export const useEvermarkCreation = () => {
       setIsCreating(false);
       setSuccess("Evermark created successfully!");
 
-      return {
-        success: true,
-        message: "Evermark created successfully!",
+      return { 
+        success: true, 
+        message: "Evermark created successfully!", 
         txHash: result.transactionHash,
+        evermarkId: result.transactionHash // You might want to parse this from logs
       };
+
     } catch (contractError: any) {
       console.error("Failed to create Evermark:", contractError);
       setError(`Contract interaction failed: ${contractError.message || "Unknown error"}`);
       setIsCreating(false);
-      return {
-        success: false,
-        error: `Contract interaction failed: ${contractError.message || "Unknown error"}`,
-      };
+      return { success: false, error: `Contract interaction failed: ${contractError.message || "Unknown error"}` };
     }
   };
 

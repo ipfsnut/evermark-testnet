@@ -8,22 +8,22 @@ export default defineConfig({
     allowedHosts: true,
   },
   build: {
-    // Ensure compatibility with mobile environments
-    target: 'es2015',
-    // Reduce chunk size for mobile
+    target: 'es2020', // Support BigInt literals
     rollupOptions: {
       output: {
         manualChunks: {
-          vendor: ['react', 'react-dom'],
+          // Split thirdweb into its own chunk to reduce main bundle size
           thirdweb: ['thirdweb'],
-        }
-      }
-    }
+        },
+      },
+    },
   },
-  // Ensure proper base path
-  base: './',
-  // Define for mobile compatibility
-  define: {
-    global: 'globalThis',
-  }
+  esbuild: {
+    target: 'es2020', // Ensure esbuild also targets ES2020
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2020', // For dependency pre-bundling
+    },
+  },
 });
