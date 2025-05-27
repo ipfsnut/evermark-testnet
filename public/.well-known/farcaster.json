@@ -8,14 +8,27 @@
     "version": "1",
     "name": "Evermark",
     "iconUrl": "https://evermarks.net/icon.png",
-    "homeUrl": "https://evermarks.net",
-    "imageUrl": "https://evermarks.net/og-image.png",
-    "buttonTitle": "📖 Open",
     "splashImageUrl": "https://evermarks.net/splash.png",
     "splashBackgroundColor": "#7c3aed",
+    "homeUrl": "https://evermarks.net",
+    "webhookUrl": "https://evermarks.net/.netlify/functions/webhook",
     "subtitle": "Content Curation",
-    "description": "Curate your favorite content by evermarking it",
-    "requiredChains": ["eip155:84532"],
-    "webhookUrl": "https://evermarks.net/.netlify/functions/webhook"
+    "description": "Preserve important references and participate in social curation to earn rewards",
+    "screenshotUrls": [
+      "https://evermarks.net/og-image.png"
+    ],
+    "primaryCategory": "social",
+    "tags": [
+      "content",
+      "curation",
+      "blockchain",
+      "voting",
+      "web3"
+    ],
+    "heroImageUrl": "https://evermarks.net/og-image.png",
+    "tagline": "Preserve valuable content forever",
+    "ogTitle": "Evermark - Content Curation",
+    "ogDescription": "Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards.",
+    "ogImageUrl": "https://evermarks.net/og-image.png"
   }
 }
