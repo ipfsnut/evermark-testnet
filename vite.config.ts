@@ -8,22 +8,35 @@ export default defineConfig({
     allowedHosts: true,
   },
   build: {
-    target: 'es2020', // Support BigInt literals
+    target: 'es2020',
     rollupOptions: {
       output: {
         manualChunks: {
-          // Split thirdweb into its own chunk to reduce main bundle size
-          thirdweb: ['thirdweb'],
+          // React ecosystem
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          
+          // Thirdweb and crypto libraries
+          'thirdweb': ['thirdweb'],
+          
+          // UI libraries
+          'ui-vendor': ['lucide-react', 'classnames'],
+          
+          // Utility libraries
+          'utils': ['date-fns', '@tanstack/react-query'],
+          
+          // Farcaster
+          'farcaster': ['@farcaster/frame-sdk'],
         },
       },
     },
+    chunkSizeWarningLimit: 1000, // Increase warning limit to 1MB
   },
   esbuild: {
-    target: 'es2020', // Ensure esbuild also targets ES2020
+    target: 'es2020',
   },
   optimizeDeps: {
     esbuildOptions: {
-      target: 'es2020', // For dependency pre-bundling
+      target: 'es2020',
     },
   },
 });
