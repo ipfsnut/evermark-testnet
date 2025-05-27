@@ -1,54 +1,106 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Evermark - Content Curation on Blockchain</title>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Evermark - Content Curation</title>
+
+<!-- Farcaster Mini App Frame Embed -->
+<meta name="fc:frame" content='{"version":"next","imageUrl":"https://evermarks.net/og-image.png","button":{"title":"📖 Open Evermark","action":{"type":"launch_frame","name":"Evermark","url":"https://evermarks.net","splashImageUrl":"https://evermarks.net/splash.png","splashBackgroundColor":"#7c3aed"}}}' />
+
+<!-- Legacy Farcaster Frame Support -->
+<meta name="fc:frame:image" content="https://evermarks.net/og-image.png" />
+<meta name="fc:frame:button:1" content="📖 Open Evermark" />
+<meta name="fc:frame:button:1:action" content="link" />
+<meta name="fc:frame:button:1:target" content="https://evermarks.net" />
+
+<!-- Open Graph Meta Tags -->
+<meta property="og:title" content="Evermark - Content Curation on Blockchain" />
+<meta property="og:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+<meta property="og:image" content="https://evermarks.net/og-image.png" />
+<meta property="og:url" content="https://evermarks.net" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Evermark" />
+
+<!-- Twitter Card Meta Tags -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Evermark - Content Curation on Blockchain" />
+<meta name="twitter:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+<meta name="twitter:image" content="https://evermarks.net/og-image.png" />
+
+<!-- App-specific Meta Tags -->
+<meta name="description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+<meta name="keywords" content="blockchain, content curation, voting, farcaster, web3, evermark" />
+<meta name="author" content="Evermark" />
+
+<!-- Theme and App Icons -->
+<meta name="theme-color" content="#7c3aed" />
+<link rel="icon" type="image/png" href="/icon.png" />
+<link rel="apple-touch-icon" href="/icon.png" />
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="/manifest.json" />
+
+<!-- Farcaster Mobile SDK Initialization -->
+<script type="module">
+  // Early detection and SDK initialization for Farcaster mobile
+  const isInFarcaster = window.parent !== window;
+  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
+  console.log('🔍 Environment check:', {
+    isInFarcaster,
+    isMobile,
+    userAgent: navigator.userAgent
+  });
+  
+  if (isInFarcaster) {
+    console.log('📱 Detected Farcaster environment - initializing SDK early...');
     
-    <!-- Farcaster Mini App Frame Embed -->
-    <meta name="fc:frame" content='{"version":"next","imageUrl":"https://evermarks.net/og-image.png","button":{"title":"📖 Open Evermark","action":{"type":"launch_frame","name":"Evermark","url":"https://evermarks.net","splashImageUrl":"https://evermarks.net/splash.png","splashBackgroundColor":"#7c3aed"}}}' />
-    
-    <!-- Legacy Farcaster Frame Support -->
-    <meta name="fc:frame:image" content="https://evermarks.net/og-image.png" />
-    <meta name="fc:frame:button:1" content="📖 Open Evermark" />
-    <meta name="fc:frame:button:1:action" content="link" />
-    <meta name="fc:frame:button:1:target" content="https://evermarks.net" />
-    
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:title" content="Evermark - Content Curation on Blockchain" />
-    <meta property="og:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
-    <meta property="og:image" content="https://evermarks.net/og-image.png" />
-    <meta property="og:url" content="https://evermarks.net" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Evermark" />
-    
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Evermark - Content Curation on Blockchain" />
-    <meta name="twitter:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
-    <meta name="twitter:image" content="https://evermarks.net/og-image.png" />
-    
-    <!-- App-specific Meta Tags -->
-    <meta name="description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
-    <meta name="keywords" content="blockchain, content curation, voting, farcaster, web3, evermark" />
-    <meta name="author" content="Evermark" />
-    
-    <!-- Theme and App Icons -->
-    <meta name="theme-color" content="#7c3aed" />
-    <link rel="icon" type="image/png" href="/icon.png" />
-    <link rel="apple-touch-icon" href="/icon.png" />
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
-    
-    <!-- Remove preload links until assets exist -->
-    <!-- 
-    <link rel="preload" href="/splash.png" as="image" />
-    <link rel="preload" href="/og-image.png" as="image" />
-    -->
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+    try {
+      // Import the SDK
+      const { default: sdk } = await import('@farcaster/frame-sdk');
+      
+      console.log('✅ Farcaster SDK imported successfully');
+      
+      // Set up a timeout to ensure we send ready signal
+      const readyTimeout = setTimeout(() => {
+        console.log('⏰ Timeout reached - sending ready signal anyway');
+        sdk.actions.ready();
+      }, 5000);
+      
+      // Try to get context with timeout
+      Promise.race([
+        sdk.context,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Context timeout')), 3000)
+        )
+      ]).then(context => {
+        console.log('✅ Farcaster context loaded:', context);
+        clearTimeout(readyTimeout);
+        sdk.actions.ready();
+        console.log('✅ Ready signal sent to Farcaster');
+      }).catch(error => {
+        console.warn('⚠️ Context failed, sending ready anyway:', error);
+        clearTimeout(readyTimeout);
+        sdk.actions.ready();
+        console.log('✅ Ready signal sent despite context error');
+      });
+      
+    } catch (error) {
+      console.error('❌ Failed to initialize Farcaster SDK:', error);
+      // Still try to signal ready in case the app can work without full SDK
+      setTimeout(() => {
+        console.log('🔄 Attempting basic ready signal...');
+        if (window.parent && window.parent.postMessage) {
+          window.parent.postMessage({ type: 'ready' }, '*');
+        }
+      }, 1000);
+    }
+  }
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="/src/main.tsx"></script>
+</body>
 </html>
