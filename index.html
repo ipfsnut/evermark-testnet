@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
 <title>Evermark - Content Curation</title>
 
-<!-- MOBILE WEBVIEW OPTIMIZED CSP -->
+<!-- FIXED: MOBILE WEBVIEW OPTIMIZED CSP FOR FARCASTER -->
 <meta http-equiv="Content-Security-Policy" content="
-      default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
+      default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:;
       connect-src 'self' https: wss: data: blob:;
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net https://esm.sh;
       img-src 'self' https: data: blob:;
@@ -15,8 +15,8 @@
       media-src 'self' blob: https:;
       worker-src 'self' blob:;
       child-src 'self' blob: https:;
-      frame-src 'self' https:;
-      frame-ancestors * data: blob:;
+      frame-src 'self' https: data: blob:;
+      frame-ancestors *;
       object-src 'none';
       base-uri 'self';
     ">
@@ -57,15 +57,15 @@
 <!-- PWA Manifest -->
 <link rel="manifest" href="/manifest.json" />
 
-<!-- MOBILE WEBVIEW: Preload critical resources -->
-<link rel="preload" href="https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js" as="script" crossorigin>
+<!-- FIXED: Preload critical resources with crossorigin -->
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js" as="script" crossorigin="anonymous">
 </head>
 <body>
 <div id="root"></div>
 
-<!-- CRITICAL: Mobile WebView-specific SDK initialization -->
+<!-- FIXED: Enhanced Mobile WebView-specific SDK initialization -->
 <script>
-// Mobile WebView Detection and SDK Initialization
+// Enhanced mobile WebView detection and SDK initialization
 (function() {
   console.log('🚀 Mobile WebView SDK initialization starting...');
   
@@ -95,7 +95,8 @@
       isWarpcast,
       isWebView,
       isFramed,
-      isMobileApp
+      isMobileApp,
+      href: window.location.href
     });
     
     return isMobileApp;
@@ -104,83 +105,77 @@
   if (isMobileWebView) {
     console.log('📱 Mobile WebView detected - initializing SDK...');
     
-    // CRITICAL: Load SDK synchronously for mobile
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
-    script.async = false; // Synchronous loading for mobile reliability
+    // FIXED: Better SDK loading strategy for mobile
+    const loadSDK = () => {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
+        script.crossOrigin = 'anonymous'; // FIXED: Add crossorigin
+        script.async = true;
+        
+        script.onload = () => {
+          console.log('✅ SDK script loaded');
+          resolve(true);
+        };
+        
+        script.onerror = (error) => {
+          console.error('❌ SDK script failed to load:', error);
+          reject(error);
+        };
+        
+        document.head.appendChild(script);
+      });
+    };
     
-    script.onload = function() {
-      console.log('✅ SDK loaded, sending ready signal...');
-      
-      // Multiple ready signal attempts for mobile WebView reliability
-      const sendReady = () => {
-        try {
-          if (window.FrameSDK && window.FrameSDK.actions) {
-            // MOBILE: Disable native gestures that might interfere
-            window.FrameSDK.actions.ready({ 
-              disableNativeGestures: true 
-            });
-            console.log('✅ Ready signal sent with disabled gestures');
-            return true;
-          }
-        } catch (error) {
-          console.warn('⚠️ Ready signal failed:', error);
-          return false;
+    const initializeSDK = async () => {
+      try {
+        await loadSDK();
+        
+        // Wait for SDK to be available with timeout
+        let attempts = 0;
+        const maxAttempts = 50;
+        
+        while (!window.FrameSDK && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
         }
-        return false;
-      };
-      
-      // Immediate attempt
-      if (!sendReady()) {
-        // Retry with delays for stubborn mobile WebViews
-        const retryIntervals = [100, 250, 500, 1000, 2000];
-        retryIntervals.forEach(delay => {
-          setTimeout(() => {
-            if (sendReady()) {
-              console.log(`✅ Ready signal succeeded after ${delay}ms`);
-            }
-          }, delay);
-        });
-      }
-    };
-    
-    script.onerror = function(error) {
-      console.error('❌ SDK loading failed:', error);
-      // Fallback: try alternative CDN
-      const fallbackScript = document.createElement('script');
-      fallbackScript.src = 'https://esm.sh/@farcaster/frame-sdk@latest';
-      fallbackScript.type = 'module';
-      fallbackScript.onload = () => {
-        console.log('✅ Fallback SDK loaded');
-        // Try ready signal with fallback
-        setTimeout(() => {
-          try {
-            import('https://esm.sh/@farcaster/frame-sdk@latest').then(sdk => {
-              sdk.default.actions.ready({ disableNativeGestures: true });
-              console.log('✅ Fallback ready signal sent');
+        
+        if (!window.FrameSDK) {
+          console.log('⚠️ SDK not available after loading - continuing anyway');
+          return;
+        }
+        
+        console.log('✅ SDK available, sending ready signal...');
+        
+        // FIXED: Better ready signal handling
+        try {
+          if (window.FrameSDK.actions && typeof window.FrameSDK.actions.ready === 'function') {
+            await window.FrameSDK.actions.ready({
+              disableNativeGestures: true // For mobile
             });
-          } catch (e) {
-            console.error('❌ Fallback failed:', e);
+            console.log('✅ Ready signal sent successfully');
+          } else {
+            console.log('⚠️ SDK actions not available');
           }
-        }, 100);
-      };
-      document.head.appendChild(fallbackScript);
+        } catch (readyError) {
+          console.log('⚠️ Ready signal failed:', readyError);
+        }
+        
+      } catch (error) {
+        console.error('❌ SDK initialization failed:', error);
+      }
     };
     
-    document.head.appendChild(script);
+    // Initialize after a short delay
+    setTimeout(initializeSDK, 100);
     
-    // MOBILE: Listen for postMessage events that might indicate WebView issues
+    // FIXED: Better message handling
     window.addEventListener('message', function(event) {
-      console.log('📨 PostMessage received:', event.origin, event.data);
-    }, false);
-    
-    // MOBILE: Prevent default touch behaviors that might interfere
-    document.addEventListener('touchstart', function(e) {
-      // Allow normal scrolling but prevent some gestures that might close the app
-      if (e.touches.length > 1) {
-        e.preventDefault();
+      // Only log non-spam messages
+      if (event.data && typeof event.data === 'object' && event.data.type) {
+        console.log('📨 PostMessage received:', event.origin, event.data);
       }
-    }, { passive: false });
+    }, false);
     
   } else {
     console.log('🖥️ Desktop/Browser detected - standard initialization');
