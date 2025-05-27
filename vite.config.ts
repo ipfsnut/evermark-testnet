@@ -9,7 +9,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
-    chunkSizeWarningLimit: 2000, // Just suppress warnings
+    chunkSizeWarningLimit: 2000,
   },
   esbuild: {
     target: 'es2020',
