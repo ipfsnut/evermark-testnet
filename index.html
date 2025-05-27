@@ -41,80 +41,41 @@
 <!-- PWA Manifest -->
 <link rel="manifest" href="/manifest.json" />
 
-<!-- Immediate Farcaster Ready Signal -->
+<!-- CRITICAL: Load Farcaster SDK synchronously in head -->
+<script src="https://unpkg.com/@farcaster/frame-sdk@latest/dist/index.umd.js"></script>
 <script>
-  // Send ready signal immediately if in Farcaster
+  // Immediate ready signal - no async, no imports, no delays
   (function() {
+    console.log('🔍 Immediate Farcaster check...');
     const isInFarcaster = window.parent !== window;
-    console.log('🔍 Immediate check - In Farcaster?', isInFarcaster);
     
     if (isInFarcaster) {
-      console.log('📱 Sending immediate ready signal...');
+      console.log('📱 In Farcaster - sending ready signal NOW');
       
-      // Try multiple methods to signal ready
-      const sendReady = () => {
-        try {
-          // Method 1: PostMessage
-          if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({ type: 'ready' }, '*');
-            window.parent.postMessage({ type: 'frame_ready' }, '*');
-            console.log('✅ PostMessage ready signals sent');
-          }
-          
-          // Method 2: Try to access Farcaster SDK if available
-          if (window.farcaster && window.farcaster.actions) {
-            window.farcaster.actions.ready();
-            console.log('✅ Farcaster SDK ready called');
-          }
-          
-        } catch (error) {
-          console.warn('⚠️ Error sending ready signal:', error);
-        }
-      };
+      // Method 1: Use SDK if available
+      if (window.FrameSDK && window.FrameSDK.actions) {
+        window.FrameSDK.actions.ready();
+        console.log('✅ SDK ready signal sent');
+      }
       
-      // Send immediately
-      sendReady();
+      // Method 2: PostMessage fallback
+      if (window.parent && window.parent.postMessage) {
+        window.parent.postMessage({ type: 'ready' }, '*');
+        window.parent.postMessage({ type: 'frame_ready' }, '*');
+        console.log('✅ PostMessage ready signals sent');
+      }
       
-      // Send again after a short delay
-      setTimeout(sendReady, 100);
-      setTimeout(sendReady, 500);
-      setTimeout(sendReady, 1000);
+      // Method 3: Try common Farcaster ready patterns
+      if (window.farcaster && window.farcaster.ready) {
+        window.farcaster.ready();
+        console.log('✅ Farcaster.ready() called');
+      }
     }
   })();
 </script>
 </head>
 <body>
 <div id="root"></div>
-
-<!-- Load Farcaster SDK and send proper ready signal -->
-<script type="module">
-  (async function() {
-    const isInFarcaster = window.parent !== window;
-    
-    if (isInFarcaster) {
-      console.log('📱 Loading Farcaster SDK...');
-      
-      try {
-        const { default: sdk } = await import('@farcaster/frame-sdk');
-        console.log('✅ SDK loaded, sending proper ready signal');
-        
-        // Get context but don't wait for it
-        sdk.context.then(context => {
-          console.log('✅ Context received:', context);
-        }).catch(error => {
-          console.warn('⚠️ Context error (but continuing):', error);
-        });
-        
-        // Send ready signal
-        sdk.actions.ready();
-        console.log('✅ SDK ready signal sent');
-        
-      } catch (error) {
-        console.error('❌ SDK load failed:', error);
-      }
-    }
-  })();
-</script>
 
 <script type="module" src="/src/main.tsx"></script>
 </body>
