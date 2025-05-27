@@ -110,8 +110,18 @@ export function useFarcasterUser() {
     return user.displayName || user.username || `User ${user.fid}`;
   };
   
+  const getProfileUrl = () => {
+    if (!user?.username) return null;
+    return `https://warpcast.com/${user.username}`;
+  };
+  
   const getAvatarUrl = () => {
     return user?.pfpUrl || null;
+  };
+  
+  const getUserHandle = () => {
+    if (!user?.username) return null;
+    return `@${user.username}`;
   };
 
   return {
@@ -119,6 +129,8 @@ export function useFarcasterUser() {
     isAuthenticated,
     isInFarcaster,
     getDisplayName,
+    getProfileUrl,
     getAvatarUrl,
+    getUserHandle,
   };
 }

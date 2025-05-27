@@ -1,4 +1,4 @@
-import { useWallet } from './useWallet';
+import { useActiveAccount } from "thirdweb/react";
 import { useFarcasterUser } from '../lib/farcaster';
 
 export interface UnifiedProfile {
@@ -29,12 +29,13 @@ export interface UnifiedProfile {
 }
 
 export function useProfile(): UnifiedProfile {
-  // Get wallet data
-  const { 
-    isConnected: isWalletConnected, 
-    address: walletAddress, 
-    displayAddress: walletDisplayAddress 
-  } = useWallet();
+  // Get wallet data using Thirdweb v5
+  const account = useActiveAccount();
+  const isWalletConnected = !!account;
+  const walletAddress = account?.address;
+  const walletDisplayAddress = account?.address ? 
+    `${account.address.slice(0, 6)}...${account.address.slice(-4)}` : 
+    undefined;
   
   // Get Farcaster data
   const {
@@ -68,7 +69,7 @@ export function useProfile(): UnifiedProfile {
   
   // Determine the best handle
   const handle = (() => {
-    if (isFarcasterAuthenticated) {
+    if (isFarcasterAuthenticated && getUserHandle) {
       return getUserHandle() || undefined;
     }
     return undefined;
@@ -91,7 +92,7 @@ export function useProfile(): UnifiedProfile {
     avatar,
     handle,
     isAuthenticated,
-    profileUrl: getProfileUrl() || undefined,
+    profileUrl: getProfileUrl() || undefined, // Convert null to undefined
   };
 }
 
