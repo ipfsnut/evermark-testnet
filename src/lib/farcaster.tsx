@@ -16,9 +16,10 @@ interface FarcasterUser {
 interface FarcasterContextType {
   isInFarcaster: boolean;
   isReady: boolean;
-  context: any;
+  context: any; // Use any for the SDK context to avoid type conflicts
   user?: FarcasterUser;
   isAuthenticated: boolean;
+  error?: string;
 }
 
 const FarcasterContext = createContext<FarcasterContextType>({
@@ -34,44 +35,95 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
   const [context, setContext] = useState<any>(null);
   const [user, setUser] = useState<FarcasterUser | undefined>(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [isInFarcaster] = useState(() => {
-    return typeof window !== 'undefined' && window.parent !== window;
+    const inFrame = typeof window !== 'undefined' && window.parent !== window;
+    console.log('🔍 Detecting Farcaster environment:', {
+      inFrame,
+      userAgent: navigator.userAgent,
+      hasFrameSDK: typeof sdk !== 'undefined'
+    });
+    return inFrame;
   });
 
   useEffect(() => {
     const initializeFarcaster = async () => {
-      console.log('🔄 Initializing Farcaster SDK...');
+      console.log('🔄 Starting Farcaster initialization...');
       console.log('- Is in Farcaster?', isInFarcaster);
+      console.log('- SDK available?', typeof sdk);
+      console.log('- Window parent check:', window.parent !== window);
       
-      if (isInFarcaster) {
-        try {
-          // Get the context
-          const farcasterContext = await sdk.context;
-          console.log('✅ Farcaster context loaded:', farcasterContext);
+      try {
+        if (isInFarcaster) {
+          console.log('📱 In Farcaster environment - initializing SDK...');
+          
+          // Add timeout to prevent hanging
+          const initPromise = Promise.race([
+            (async () => {
+              const farcasterContext = await sdk.context;
+              console.log('✅ Farcaster context received:', farcasterContext);
+              return farcasterContext;
+            })(),
+            new Promise<never>((_, reject) => 
+              setTimeout(() => reject(new Error('SDK initialization timeout')), 10000)
+            )
+          ]);
+          
+          const farcasterContext = await initPromise;
           setContext(farcasterContext);
           
-          // Extract user info if available
-          if (farcasterContext?.user) {
-            setUser(farcasterContext.user);
+          // Extract user info if available - handle different possible structures
+          const contextUser = (farcasterContext as any)?.user;
+          if (contextUser) {
+            console.log('👤 User found in context:', contextUser);
+            // Map the SDK user to our interface
+            const mappedUser: FarcasterUser = {
+              fid: contextUser.fid,
+              username: contextUser.username,
+              displayName: contextUser.displayName,
+              pfpUrl: contextUser.pfpUrl,
+              custodyAddress: contextUser.custodyAddress,
+              verifications: contextUser.verifications,
+              bio: contextUser.bio,
+              followerCount: contextUser.followerCount,
+              followingCount: contextUser.followingCount,
+            };
+            setUser(mappedUser);
             setIsAuthenticated(true);
           }
           
           // CRITICAL: Tell Farcaster the app is ready
+          console.log('📢 Sending ready signal to Farcaster...');
           sdk.actions.ready();
-          console.log('✅ Farcaster SDK ready signal sent');
+          console.log('✅ Farcaster SDK ready signal sent successfully');
           
-        } catch (error) {
-          console.error('❌ Farcaster SDK initialization failed:', error);
+        } else {
+          console.log('🌐 Not in Farcaster environment, proceeding normally');
         }
-      } else {
-        console.log('ℹ️ Not in Farcaster environment, skipping SDK init');
+      } catch (error) {
+        console.error('❌ Farcaster SDK initialization failed:', error);
+        setError(error instanceof Error ? error.message : 'Unknown error');
+        
+        // Still try to send ready signal even if context fails
+        if (isInFarcaster) {
+          try {
+            console.log('🔄 Attempting to send ready signal despite error...');
+            sdk.actions.ready();
+            console.log('✅ Ready signal sent despite context error');
+          } catch (readyError) {
+            console.error('❌ Failed to send ready signal:', readyError);
+          }
+        }
+      } finally {
+        // Always set ready to true so app loads
+        console.log('🏁 Setting app as ready');
+        setIsReady(true);
       }
-      
-      // Always set ready to true so app loads
-      setIsReady(true);
     };
 
-    initializeFarcaster();
+    // Add a small delay to ensure DOM is ready
+    const timer = setTimeout(initializeFarcaster, 100);
+    return () => clearTimeout(timer);
   }, [isInFarcaster]);
 
   return (
@@ -80,7 +132,8 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
       isReady, 
       context, 
       user, 
-      isAuthenticated 
+      isAuthenticated,
+      error
     }}>
       {children}
     </FarcasterContext.Provider>

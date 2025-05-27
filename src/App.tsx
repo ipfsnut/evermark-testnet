@@ -43,7 +43,7 @@ function DebugInfo() {
 }
 
 function AppContent() {
-  const { isReady } = useFarcaster();
+  const { isReady, error, isInFarcaster } = useFarcaster();
   
   // Show loading until Farcaster is ready
   if (!isReady) {
@@ -52,9 +52,17 @@ function AppContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading Evermark...</p>
+          {isInFarcaster && (
+            <p className="text-sm text-gray-500 mt-2">Connecting to Farcaster...</p>
+          )}
         </div>
       </div>
     );
+  }
+
+  // Show error if Farcaster failed but still render app
+  if (error && isInFarcaster) {
+    console.warn('Farcaster error but continuing:', error);
   }
 
   return (
