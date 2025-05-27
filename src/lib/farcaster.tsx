@@ -1,13 +1,25 @@
-// Fixed src/lib/farcaster.tsx with better cross-origin handling
-
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren, useRef } from 'react';
 import sdk from "@farcaster/frame-sdk";
+
+interface FarcasterUser {
+  fid: number;
+  username?: string;
+  displayName?: string;
+  pfpUrl?: string;
+  bio?: string;
+  followerCount?: number;
+  followingCount?: number;
+  verifiedAddresses?: {
+    eth_addresses: string[];
+    sol_addresses: string[];
+  };
+}
 
 interface FarcasterContextType {
   isInFarcaster: boolean;
   isReady: boolean;
   context: any;
-  user?: any;
+  user?: FarcasterUser;
   isAuthenticated: boolean;
   error?: string;
 }
@@ -114,7 +126,7 @@ function detectFarcasterEnvironment() {
 export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [isReady, setIsReady] = useState(false);
   const [context, setContext] = useState<any>(null);
-  const [user, setUser] = useState<any>(undefined);
+  const [user, setUser] = useState<FarcasterUser | undefined>(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [detectedFromPostMessage, setDetectedFromPostMessage] = useState(false);
@@ -213,10 +225,26 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
             
             setContext(frameContext);
             
+            // ENHANCED: Better user data extraction with verified addresses
             if (frameContext && typeof frameContext === 'object' && 'user' in frameContext) {
-              setUser(frameContext.user);
+              const userData: FarcasterUser = {
+                fid: frameContext.user.fid,
+                username: frameContext.user.username,
+                displayName: frameContext.user.displayName,
+                pfpUrl: frameContext.user.pfpUrl,
+                bio: frameContext.user.bio,
+                followerCount: frameContext.user.followerCount,
+                followingCount: frameContext.user.followingCount,
+                // CRITICAL: Extract verified addresses for contract interactions
+                verifiedAddresses: frameContext.user.verifiedAddresses || {
+                  eth_addresses: [],
+                  sol_addresses: []
+                }
+              };
+              
+              console.log('✅ User authenticated with verified addresses:', userData.verifiedAddresses);
+              setUser(userData);
               setIsAuthenticated(true);
-              console.log('✅ User authenticated:', frameContext.user);
             }
           } else {
             console.log('⚠️ No SDK context available');
@@ -290,6 +318,10 @@ export const useFarcasterUser = () => {
     getAvatarUrl: () => context.user?.pfpUrl || '',
     getUserHandle: () => context.user?.username ? `@${context.user.username}` : '',
     getProfileUrl: () => context.user?.username ? `https://farcaster.com/${context.user.username}` : '',
+    // CRITICAL: Expose verified addresses for contract interactions
+    getVerifiedAddresses: () => context.user?.verifiedAddresses?.eth_addresses || [],
+    hasVerifiedAddress: () => (context.user?.verifiedAddresses?.eth_addresses?.length || 0) > 0,
+    getPrimaryAddress: () => context.user?.verifiedAddresses?.eth_addresses?.[0] || null,
   };
 };
 
