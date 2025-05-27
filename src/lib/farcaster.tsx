@@ -1,23 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
 import sdk from "@farcaster/frame-sdk";
 
-interface FarcasterUser {
-  fid: number;
-  username?: string;
-  displayName?: string;
-  pfpUrl?: string;
-  custodyAddress?: string;
-  verifications?: string[];
-  bio?: string;
-  followerCount?: number;
-  followingCount?: number;
-}
-
 interface FarcasterContextType {
   isInFarcaster: boolean;
   isReady: boolean;
   context: any;
-  user?: FarcasterUser;
+  user?: any;
   isAuthenticated: boolean;
   error?: string;
 }
@@ -26,14 +14,14 @@ const FarcasterContext = createContext<FarcasterContextType>({
   isInFarcaster: false,
   isReady: false,
   context: null,
-  user: undefined,
   isAuthenticated: false,
+  error: undefined,
 });
 
 export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => {
   const [isReady, setIsReady] = useState(false);
   const [context, setContext] = useState<any>(null);
-  const [user, setUser] = useState<FarcasterUser | undefined>(undefined);
+  const [user, setUser] = useState<any>(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [isInFarcaster] = useState(() => {
@@ -42,38 +30,41 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
 
   useEffect(() => {
     const initializeFarcaster = async () => {
-      console.log('🔄 Farcaster provider initializing...');
-      
-      try {
-        if (isInFarcaster) {
-          console.log('📱 Getting Farcaster context...');
-          
-          // Get context but don't send ready signal (already sent in HTML)
+      if (isInFarcaster) {
+        try {
+          console.log('🔄 Getting Farcaster context...');
           const farcasterContext = await sdk.context;
-          console.log('✅ Farcaster context received:', farcasterContext);
+          console.log('✅ Context received:', farcasterContext);
+          
           setContext(farcasterContext);
           
-          // Extract user info if available
           if (farcasterContext?.user) {
-            console.log('👤 User found:', farcasterContext.user);
             setUser(farcasterContext.user);
             setIsAuthenticated(true);
           }
           
-        } else {
-          console.log('🌐 Not in Farcaster environment');
+          // Send ready signal AFTER getting context
+          console.log('📢 Sending ready signal...');
+          sdk.actions.ready();
+          console.log('✅ Ready signal sent');
+          
+        } catch (error) {
+          console.error('❌ Farcaster init failed:', error);
+          setError(error instanceof Error ? error.message : 'Unknown error');
+          
+          // Still send ready signal even if context fails
+          try {
+            sdk.actions.ready();
+          } catch (e) {
+            console.error('❌ Ready signal failed:', e);
+          }
         }
-      } catch (error) {
-        console.error('❌ Farcaster context failed:', error);
-        setError(error instanceof Error ? error.message : 'Unknown error');
-      } finally {
-        setIsReady(true);
       }
+      
+      setIsReady(true);
     };
 
-    // Small delay to let the ready signal from HTML take effect first
-    const timer = setTimeout(initializeFarcaster, 500);
-    return () => clearTimeout(timer);
+    initializeFarcaster();
   }, [isInFarcaster]);
 
   return (
@@ -100,7 +91,7 @@ export function useFarcasterActions() {
       try {
         await sdk.actions.openUrl(url);
       } catch (error) {
-        console.error('Failed to open URL via Farcaster:', error);
+        console.error('Failed to open URL:', error);
         window.open(url, '_blank');
       }
     } else {
@@ -108,23 +99,7 @@ export function useFarcasterActions() {
     }
   };
 
-  const close = async () => {
-    if (isInFarcaster) {
-      try {
-        await sdk.actions.close();
-      } catch (error) {
-        console.error('Failed to close via Farcaster:', error);
-      }
-    }
-  };
-
-  const openWarpcastProfile = (username?: string) => {
-    if (username) {
-      openUrl(`https://warpcast.com/${username}`);
-    }
-  };
-
-  return { openUrl, close, openWarpcastProfile };
+  return { openUrl };
 }
 
 export function useFarcasterUser() {
@@ -135,18 +110,8 @@ export function useFarcasterUser() {
     return user.displayName || user.username || `User ${user.fid}`;
   };
   
-  const getProfileUrl = () => {
-    if (!user?.username) return null;
-    return `https://warpcast.com/${user.username}`;
-  };
-  
   const getAvatarUrl = () => {
     return user?.pfpUrl || null;
-  };
-  
-  const getUserHandle = () => {
-    if (!user?.username) return null;
-    return `@${user.username}`;
   };
 
   return {
@@ -154,8 +119,6 @@ export function useFarcasterUser() {
     isAuthenticated,
     isInFarcaster,
     getDisplayName,
-    getProfileUrl,
     getAvatarUrl,
-    getUserHandle,
   };
 }
