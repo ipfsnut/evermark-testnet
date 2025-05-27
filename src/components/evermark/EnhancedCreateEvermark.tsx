@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { useWallet } from "../../hooks/useWallet";
+import { useActiveAccount } from "thirdweb/react";
 import { useEvermarkCreation, type EvermarkMetadata } from "../../hooks/useEvermarkCreation";
 import { 
   PlusIcon, 
@@ -9,13 +9,15 @@ import {
   UploadIcon,
   ImageIcon,
   XIcon,
+  LoaderIcon,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import PageContainer from '../layout/PageContainer';
 
 export function EnhancedCreateEvermark() {
   const navigate = useNavigate();
-  const { isConnected } = useWallet();
+  const account = useActiveAccount();
+  const isConnected = !!account;
   const { createEvermark, isCreating, error, success } = useEvermarkCreation();
   
   const [title, setTitle] = useState("");
@@ -24,6 +26,7 @@ export function EnhancedCreateEvermark() {
   const [author, setAuthor] = useState("");
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -137,6 +140,9 @@ export function EnhancedCreateEvermark() {
           <div>
             <p className="text-green-700 font-medium">Success!</p>
             <p className="text-green-600 text-sm">{success}</p>
+            <p className="text-green-600 text-sm mt-1">
+              Redirecting to your collection...
+            </p>
           </div>
         </div>
       )}
@@ -188,6 +194,13 @@ export function EnhancedCreateEvermark() {
           
           {imageUploadError && (
             <p className="mt-2 text-sm text-red-600">{imageUploadError}</p>
+          )}
+          
+          {isUploadingImage && (
+            <div className="mt-2 flex items-center text-sm text-purple-600">
+              <LoaderIcon className="h-4 w-4 mr-2 animate-spin" />
+              Uploading image to IPFS...
+            </div>
           )}
         </div>
         
@@ -271,7 +284,7 @@ export function EnhancedCreateEvermark() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isCreating || !title.trim()}
+            disabled={isCreating || !title.trim() || isUploadingImage}
             className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isCreating ? (
