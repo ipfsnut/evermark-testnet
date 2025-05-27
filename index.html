@@ -43,60 +43,63 @@
 
 <!-- Farcaster Mobile SDK Initialization -->
 <script type="module">
-  // Early detection and SDK initialization for Farcaster mobile
-  const isInFarcaster = window.parent !== window;
-  const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  
-  console.log('🔍 Environment check:', {
-    isInFarcaster,
-    isMobile,
-    userAgent: navigator.userAgent
-  });
-  
-  if (isInFarcaster) {
-    console.log('📱 Detected Farcaster environment - initializing SDK early...');
+  // Wrap in IIFE to avoid top-level await
+  (async function initializeFarcaster() {
+    // Early detection and SDK initialization for Farcaster mobile
+    const isInFarcaster = window.parent !== window;
+    const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
-    try {
-      // Import the SDK
-      const { default: sdk } = await import('@farcaster/frame-sdk');
+    console.log('🔍 Environment check:', {
+      isInFarcaster,
+      isMobile,
+      userAgent: navigator.userAgent
+    });
+    
+    if (isInFarcaster) {
+      console.log('📱 Detected Farcaster environment - initializing SDK early...');
       
-      console.log('✅ Farcaster SDK imported successfully');
-      
-      // Set up a timeout to ensure we send ready signal
-      const readyTimeout = setTimeout(() => {
-        console.log('⏰ Timeout reached - sending ready signal anyway');
-        sdk.actions.ready();
-      }, 5000);
-      
-      // Try to get context with timeout
-      Promise.race([
-        sdk.context,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Context timeout')), 3000)
-        )
-      ]).then(context => {
-        console.log('✅ Farcaster context loaded:', context);
-        clearTimeout(readyTimeout);
-        sdk.actions.ready();
-        console.log('✅ Ready signal sent to Farcaster');
-      }).catch(error => {
-        console.warn('⚠️ Context failed, sending ready anyway:', error);
-        clearTimeout(readyTimeout);
-        sdk.actions.ready();
-        console.log('✅ Ready signal sent despite context error');
-      });
-      
-    } catch (error) {
-      console.error('❌ Failed to initialize Farcaster SDK:', error);
-      // Still try to signal ready in case the app can work without full SDK
-      setTimeout(() => {
-        console.log('🔄 Attempting basic ready signal...');
-        if (window.parent && window.parent.postMessage) {
-          window.parent.postMessage({ type: 'ready' }, '*');
-        }
-      }, 1000);
+      try {
+        // Import the SDK
+        const { default: sdk } = await import('@farcaster/frame-sdk');
+        
+        console.log('✅ Farcaster SDK imported successfully');
+        
+        // Set up a timeout to ensure we send ready signal
+        const readyTimeout = setTimeout(() => {
+          console.log('⏰ Timeout reached - sending ready signal anyway');
+          sdk.actions.ready();
+        }, 5000);
+        
+        // Try to get context with timeout
+        Promise.race([
+          sdk.context,
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Context timeout')), 3000)
+          )
+        ]).then(context => {
+          console.log('✅ Farcaster context loaded:', context);
+          clearTimeout(readyTimeout);
+          sdk.actions.ready();
+          console.log('✅ Ready signal sent to Farcaster');
+        }).catch(error => {
+          console.warn('⚠️ Context failed, sending ready anyway:', error);
+          clearTimeout(readyTimeout);
+          sdk.actions.ready();
+          console.log('✅ Ready signal sent despite context error');
+        });
+        
+      } catch (error) {
+        console.error('❌ Failed to initialize Farcaster SDK:', error);
+        // Still try to signal ready in case the app can work without full SDK
+        setTimeout(() => {
+          console.log('🔄 Attempting basic ready signal...');
+          if (window.parent && window.parent.postMessage) {
+            window.parent.postMessage({ type: 'ready' }, '*');
+          }
+        }, 1000);
+      }
     }
-  }
+  })();
 </script>
 </head>
 <body>
