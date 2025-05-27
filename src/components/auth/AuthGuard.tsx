@@ -2,7 +2,7 @@
 import React from 'react';
 import { useProfile, useContractAuth } from '../../hooks/useProfile';
 import { WalletConnect } from '../ConnectButton';
-import { UserIcon, LinkIcon, AlertCircleIcon } from 'lucide-react';
+import { UserIcon, LinkIcon } from 'lucide-react';
 
 interface AuthGuardProps {
   children: React.ReactNode;

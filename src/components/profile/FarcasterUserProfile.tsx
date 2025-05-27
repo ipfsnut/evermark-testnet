@@ -88,9 +88,9 @@ export const FarcasterUserProfile: React.FC<FarcasterUserProfileProps> = ({
             <p className={`${textSizeClasses[size]} font-medium text-gray-900 truncate`}>
               {displayName}
             </p>
-            {profileUrl && (
+            {profileUrl && user.username && (
               <button
-                onClick={() => openWarpcastProfile(user.username)}
+                onClick={() => openWarpcastProfile(user.username!)}
                 className="text-purple-600 hover:text-purple-700"
               >
                 <ExternalLinkIcon className="h-4 w-4" />
