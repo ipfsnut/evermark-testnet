@@ -2,21 +2,21 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
 <title>Evermark - Content Curation</title>
 
-<!-- FIXED CSP: Added frame-ancestors and removed conflicts -->
+<!-- MOBILE WEBVIEW OPTIMIZED CSP -->
 <meta http-equiv="Content-Security-Policy" content="
       default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:;
       connect-src 'self' https: wss: data: blob:;
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net https://esm.sh;
       img-src 'self' https: data: blob:;
       font-src 'self' data: https:;
       media-src 'self' blob: https:;
       worker-src 'self' blob:;
-      child-src 'self' blob:;
+      child-src 'self' blob: https:;
       frame-src 'self' https:;
-      frame-ancestors *;
+      frame-ancestors * data: blob:;
       object-src 'none';
       base-uri 'self';
     ">
@@ -41,7 +41,7 @@
 <!-- Twitter Card Meta Tags -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="Evermark - Content Curation on Blockchain" />
-<meta name="twitter:description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
+<meta name="twitter:description" content="Preserve and curate your friendly content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
 <meta name="twitter:image" content="https://evermarks.net/og-image.png" />
 
 <!-- App-specific Meta Tags -->
@@ -56,52 +56,136 @@
 
 <!-- PWA Manifest -->
 <link rel="manifest" href="/manifest.json" />
+
+<!-- MOBILE WEBVIEW: Preload critical resources -->
+<link rel="preload" href="https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js" as="script" crossorigin>
 </head>
 <body>
 <div id="root"></div>
 
-<!-- FIXED: Mobile-first Farcaster SDK initialization -->
+<!-- CRITICAL: Mobile WebView-specific SDK initialization -->
 <script>
-  // Early detection and immediate ready signal for mobile
-  (function() {
-    console.log('🔄 Early SDK check...');
+// Mobile WebView Detection and SDK Initialization
+(function() {
+  console.log('🚀 Mobile WebView SDK initialization starting...');
+  
+  // Enhanced mobile WebView detection
+  const isMobileWebView = (() => {
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = ua.includes('android');
+    const isIOS = ua.includes('iphone') || ua.includes('ipad');
+    const isWarpcast = ua.includes('warpcast') || ua.includes('farcaster');
+    const isWebView = ua.includes('wv') || ua.includes('webview');
     
-    const isInFarcaster = (() => {
-      try {
-        return window.parent !== window || 
-               window.location !== window.parent.location ||
-               window.frameElement !== null ||
-               navigator.userAgent.includes('Farcaster') ||
-               document.referrer.includes('warpcast.com');
-      } catch (e) {
-        return true; // If we can't check, assume we're in frame
-      }
-    })();
+    // Check for iframe context
+    let isFramed = false;
+    try {
+      isFramed = window.self !== window.top;
+    } catch (e) {
+      isFramed = true; // Cross-origin frame
+    }
     
-    console.log('📱 Is in Farcaster:', isInFarcaster);
+    // Check for mobile app context
+    const isMobileApp = (isAndroid || isIOS) && (isWebView || isWarpcast || isFramed);
     
-    if (isInFarcaster) {
-      // Mobile-optimized SDK loading
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
-      script.async = true;
-      script.onload = function() {
-        console.log('✅ SDK loaded via script tag');
+    console.log('📱 WebView Detection:', {
+      userAgent: ua,
+      isAndroid,
+      isIOS,
+      isWarpcast,
+      isWebView,
+      isFramed,
+      isMobileApp
+    });
+    
+    return isMobileApp;
+  })();
+  
+  if (isMobileWebView) {
+    console.log('📱 Mobile WebView detected - initializing SDK...');
+    
+    // CRITICAL: Load SDK synchronously for mobile
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
+    script.async = false; // Synchronous loading for mobile reliability
+    
+    script.onload = function() {
+      console.log('✅ SDK loaded, sending ready signal...');
+      
+      // Multiple ready signal attempts for mobile WebView reliability
+      const sendReady = () => {
         try {
-          if (window.FrameSDK) {
-            window.FrameSDK.actions.ready();
-            console.log('✅ Ready signal sent immediately');
+          if (window.FrameSDK && window.FrameSDK.actions) {
+            // MOBILE: Disable native gestures that might interfere
+            window.FrameSDK.actions.ready({ 
+              disableNativeGestures: true 
+            });
+            console.log('✅ Ready signal sent with disabled gestures');
+            return true;
           }
         } catch (error) {
-          console.error('❌ Ready signal failed:', error);
+          console.warn('⚠️ Ready signal failed:', error);
+          return false;
         }
+        return false;
       };
-      script.onerror = function(error) {
-        console.error('❌ SDK script loading failed:', error);
+      
+      // Immediate attempt
+      if (!sendReady()) {
+        // Retry with delays for stubborn mobile WebViews
+        const retryIntervals = [100, 250, 500, 1000, 2000];
+        retryIntervals.forEach(delay => {
+          setTimeout(() => {
+            if (sendReady()) {
+              console.log(`✅ Ready signal succeeded after ${delay}ms`);
+            }
+          }, delay);
+        });
+      }
+    };
+    
+    script.onerror = function(error) {
+      console.error('❌ SDK loading failed:', error);
+      // Fallback: try alternative CDN
+      const fallbackScript = document.createElement('script');
+      fallbackScript.src = 'https://esm.sh/@farcaster/frame-sdk@latest';
+      fallbackScript.type = 'module';
+      fallbackScript.onload = () => {
+        console.log('✅ Fallback SDK loaded');
+        // Try ready signal with fallback
+        setTimeout(() => {
+          try {
+            import('https://esm.sh/@farcaster/frame-sdk@latest').then(sdk => {
+              sdk.default.actions.ready({ disableNativeGestures: true });
+              console.log('✅ Fallback ready signal sent');
+            });
+          } catch (e) {
+            console.error('❌ Fallback failed:', e);
+          }
+        }, 100);
       };
-      document.head.appendChild(script);
-    }
-  })();
+      document.head.appendChild(fallbackScript);
+    };
+    
+    document.head.appendChild(script);
+    
+    // MOBILE: Listen for postMessage events that might indicate WebView issues
+    window.addEventListener('message', function(event) {
+      console.log('📨 PostMessage received:', event.origin, event.data);
+    }, false);
+    
+    // MOBILE: Prevent default touch behaviors that might interfere
+    document.addEventListener('touchstart', function(e) {
+      // Allow normal scrolling but prevent some gestures that might close the app
+      if (e.touches.length > 1) {
+        e.preventDefault();
+      }
+    }, { passive: false });
+    
+  } else {
+    console.log('🖥️ Desktop/Browser detected - standard initialization');
+  }
+})();
 </script>
 
 <script type="module" src="/src/main.tsx"></script>

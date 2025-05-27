@@ -8,6 +8,7 @@ interface FarcasterContextType {
   user?: any;
   isAuthenticated: boolean;
   error?: string;
+  isMobileWebView: boolean;
 }
 
 const FarcasterContext = createContext<FarcasterContextType>({
@@ -16,6 +17,7 @@ const FarcasterContext = createContext<FarcasterContextType>({
   context: null,
   isAuthenticated: false,
   error: undefined,
+  isMobileWebView: false,
 });
 
 export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => {
@@ -25,12 +27,31 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   
-  // IMPROVED: More robust mobile detection
+  // Enhanced mobile WebView detection
+  const [isMobileWebView] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    
+    const ua = navigator.userAgent.toLowerCase();
+    const isAndroid = ua.includes('android');
+    const isIOS = ua.includes('iphone') || ua.includes('ipad');
+    const isWarpcast = ua.includes('warpcast') || ua.includes('farcaster');
+    const isWebView = ua.includes('wv') || ua.includes('webview');
+    
+    let isFramed = false;
+    try {
+      isFramed = window.self !== window.top;
+    } catch (e) {
+      isFramed = true;
+    }
+    
+    return (isAndroid || isIOS) && (isWebView || isWarpcast || isFramed);
+  });
+  
+  // Standard Farcaster detection
   const [isInFarcaster] = useState(() => {
     if (typeof window === 'undefined') return false;
     
     try {
-      // Multiple detection methods for mobile webviews
       const parentCheck = window.parent !== window;
       const frameCheck = window.frameElement !== null;
       const userAgentCheck = navigator.userAgent.includes('Farcaster') || 
@@ -38,23 +59,16 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
       const referrerCheck = document.referrer.includes('warpcast.com') || 
                            document.referrer.includes('farcaster');
       
-      // Special check for mobile webviews
       const locationCheck = (() => {
         try {
           return window.location !== window.parent.location;
         } catch (e) {
-          return true; // Cross-origin frame
+          return true;
         }
       })();
       
-      const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      
-      // Fix TypeScript error for standalone property
-      const isWebView = (navigator as any).standalone || 
-                       window.matchMedia('(display-mode: standalone)').matches;
-      
       const detected = parentCheck || frameCheck || userAgentCheck || 
-                      referrerCheck || locationCheck || (isMobile && isWebView);
+                      referrerCheck || locationCheck || isMobileWebView;
       
       console.log('🔍 Farcaster detection:', {
         parentCheck,
@@ -62,8 +76,7 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
         userAgentCheck,
         referrerCheck,
         locationCheck,
-        isMobile,
-        isWebView,
+        isMobileWebView,
         detected
       });
       
@@ -76,21 +89,34 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
 
   useEffect(() => {
     const initializeFarcaster = async () => {
-      console.log('🔄 Initializing Farcaster...', { isInFarcaster });
+      console.log('🔄 Initializing Farcaster...', { 
+        isInFarcaster, 
+        isMobileWebView,
+        userAgent: navigator.userAgent
+      });
       
       if (isInFarcaster) {
         try {
-          // FIXED: Send ready signal immediately for mobile compatibility
-          console.log('📢 Sending immediate ready signal...');
-          sdk.actions.ready();
-          console.log('✅ Immediate ready signal sent');
+          // MOBILE WEBVIEW: Send ready signal immediately, context later
+          console.log('📢 Sending immediate ready signal for mobile compatibility...');
           
-          // Then try to get context (with timeout for mobile)
+          if (isMobileWebView) {
+            // Mobile WebView: Disable native gestures and send ready immediately
+            await sdk.actions.ready({ disableNativeGestures: true });
+            console.log('✅ Mobile ready signal sent with disabled gestures');
+          } else {
+            // Desktop: Standard ready signal
+            await sdk.actions.ready();
+            console.log('✅ Desktop ready signal sent');
+          }
+          
+          // Now try to get context with mobile-specific timeout
           console.log('🔄 Getting Farcaster context...');
           
+          const contextTimeout = isMobileWebView ? 3000 : 5000; // Shorter timeout for mobile
           const contextPromise = sdk.context;
           const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Context timeout')), 5000);
+            setTimeout(() => reject(new Error('Context timeout')), contextTimeout);
           });
           
           try {
@@ -99,7 +125,6 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
             
             setContext(farcasterContext);
             
-            // Fix TypeScript error for user property
             if (farcasterContext && (farcasterContext as any).user) {
               setUser((farcasterContext as any).user);
               setIsAuthenticated(true);
@@ -107,16 +132,44 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
             }
           } catch (contextError) {
             console.warn('⚠️ Context failed (continuing anyway):', contextError);
-            // Continue without context - mobile webviews sometimes don't provide context immediately
+            
+            // Mobile WebView: Context might not be immediately available
+            if (isMobileWebView) {
+              console.log('📱 Mobile WebView detected - context may load later');
+              // Set up listener for delayed context
+              const contextRetry = setInterval(async () => {
+                try {
+                  const retryContext = await sdk.context;
+                  if (retryContext) {
+                    console.log('✅ Delayed context received:', retryContext);
+                    setContext(retryContext);
+                    if ((retryContext as any).user) {
+                      setUser((retryContext as any).user);
+                      setIsAuthenticated(true);
+                    }
+                    clearInterval(contextRetry);
+                  }
+                } catch (e) {
+                  // Continue trying
+                }
+              }, 1000);
+              
+              // Stop trying after 10 seconds
+              setTimeout(() => clearInterval(contextRetry), 10000);
+            }
           }
           
         } catch (error) {
           console.error('❌ Farcaster init failed:', error);
           setError(error instanceof Error ? error.message : 'Unknown error');
           
-          // Still try to send ready signal
+          // Still try to send ready signal for mobile compatibility
           try {
-            sdk.actions.ready();
+            if (isMobileWebView) {
+              await sdk.actions.ready({ disableNativeGestures: true });
+            } else {
+              await sdk.actions.ready();
+            }
             console.log('✅ Fallback ready signal sent');
           } catch (e) {
             console.error('❌ Fallback ready signal failed:', e);
@@ -124,39 +177,60 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
         }
       }
       
-      // Always mark as ready to prevent infinite loading
       setIsReady(true);
     };
 
-    // Add a small delay for mobile webviews to fully load
-    const timer = setTimeout(initializeFarcaster, 100);
+    // Mobile WebView: Immediate initialization
+    // Desktop: Small delay to let everything load
+    const delay = isMobileWebView ? 0 : 100;
+    const timer = setTimeout(initializeFarcaster, delay);
     return () => clearTimeout(timer);
-  }, [isInFarcaster]);
+  }, [isInFarcaster, isMobileWebView]);
 
-  // ADDED: Periodic ready signal for stubborn mobile webviews
+  // MOBILE WEBVIEW: Periodic ready signals for stubborn WebViews
   useEffect(() => {
-    if (isInFarcaster && !context) {
-      const interval = setInterval(() => {
+    if (isInFarcaster && isMobileWebView && !context) {
+      console.log('📱 Starting periodic ready signals for mobile WebView...');
+      
+      const interval = setInterval(async () => {
         try {
-          console.log('🔄 Periodic ready signal...');
-          sdk.actions.ready();
+          await sdk.actions.ready({ disableNativeGestures: true });
+          console.log('🔄 Periodic mobile ready signal sent');
         } catch (e) {
           console.warn('⚠️ Periodic ready failed:', e);
         }
-      }, 2000);
+      }, 1500); // Every 1.5 seconds
       
-      // Stop after 10 seconds
       const timeout = setTimeout(() => {
         clearInterval(interval);
         console.log('🛑 Stopped periodic ready signals');
-      }, 10000);
+      }, 12000); // Stop after 12 seconds
       
       return () => {
         clearInterval(interval);
         clearTimeout(timeout);
       };
     }
-  }, [isInFarcaster, context]);
+  }, [isInFarcaster, isMobileWebView, context]);
+
+  // MOBILE WEBVIEW: Listen for postMessage events
+  useEffect(() => {
+    if (isMobileWebView) {
+      const handleMessage = (event: MessageEvent) => {
+        console.log('📨 Mobile WebView message:', event.origin, event.data);
+        
+        // Handle Farcaster-specific messages
+        if (event.data && typeof event.data === 'object') {
+          if (event.data.type === 'farcaster_ready') {
+            console.log('📱 Farcaster ready message received');
+          }
+        }
+      };
+      
+      window.addEventListener('message', handleMessage, false);
+      return () => window.removeEventListener('message', handleMessage, false);
+    }
+  }, [isMobileWebView]);
 
   return (
     <FarcasterContext.Provider value={{ 
@@ -165,7 +239,8 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
       context, 
       user, 
       isAuthenticated,
-      error
+      error,
+      isMobileWebView
     }}>
       {children}
     </FarcasterContext.Provider>
@@ -175,7 +250,7 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
 export const useFarcaster = () => useContext(FarcasterContext);
 
 export function useFarcasterActions() {
-  const { isInFarcaster } = useFarcaster();
+  const { isInFarcaster, isMobileWebView } = useFarcaster();
   
   const openUrl = async (url: string) => {
     if (isInFarcaster) {
@@ -183,7 +258,14 @@ export function useFarcasterActions() {
         await sdk.actions.openUrl(url);
       } catch (error) {
         console.error('Failed to open URL:', error);
-        window.open(url, '_blank');
+        // Mobile WebView fallback
+        if (isMobileWebView) {
+          console.log('📱 Mobile WebView URL fallback');
+          // Some mobile WebViews handle this differently
+          window.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
       }
     } else {
       window.open(url, '_blank');
