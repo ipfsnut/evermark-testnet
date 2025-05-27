@@ -252,20 +252,20 @@ export const useFarcasterUser = () => {
     getDisplayName: () => context.user?.displayName || context.user?.username || '',
     getAvatarUrl: () => context.user?.pfpUrl || '',
     getUserHandle: () => context.user?.username ? `@${context.user.username}` : '',
-    getProfileUrl: () => context.user?.username ? `https://warpcast.com/${context.user.username}` : '',
+    getProfileUrl: () => context.user?.username ? `https://farcaster.com/${context.user.username}` : '',
   };
 };
 
 export const useFarcasterActions = () => {
   return {
     openWarpcastProfile: (username: string) => {
-      const url = `https://warpcast.com/${username}`;
+      const url = `https://farcaster.com/${username}`;
       if (typeof window !== 'undefined') {
         window.open(url, '_blank', 'noopener,noreferrer');
       }
     },
     shareFrame: (frameUrl: string) => {
-      const shareUrl = `https://warpcast.com/~/compose?text=Check%20out%20this%20frame%3A%20${encodeURIComponent(frameUrl)}`;
+      const shareUrl = `https://farcaster.com/~/compose?text=Check%20out%20this%20frame%3A%20${encodeURIComponent(frameUrl)}`;
       if (typeof window !== 'undefined') {
         window.open(shareUrl, '_blank', 'noopener,noreferrer');
       }
