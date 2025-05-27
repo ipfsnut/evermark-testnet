@@ -1,4 +1,4 @@
-// Replace your entire src/lib/farcaster.tsx with this mobile-ready version:
+// Fixed src/lib/farcaster.tsx with better cross-origin handling
 
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren, useRef } from 'react';
 import sdk from "@farcaster/frame-sdk";
@@ -20,7 +20,7 @@ const FarcasterContext = createContext<FarcasterContextType>({
   error: undefined,
 });
 
-// Enhanced mobile-ready frame detection
+// Enhanced mobile-ready frame detection with better cross-origin handling
 function detectFarcasterEnvironment() {
   if (typeof window === 'undefined') {
     return { isInFarcaster: false, confidence: 'high', methods: ['no-window'] };
@@ -32,13 +32,13 @@ function detectFarcasterEnvironment() {
 
   // Method 1: User Agent Detection (HIGH CONFIDENCE)
   const userAgent = navigator.userAgent.toLowerCase();
-  if (userAgent.includes('farcaster')) {
+  if (userAgent.includes('farcaster') || userAgent.includes('warpcast')) {
     isInFarcaster = true;
     confidence = 'high';
     methods.push('user-agent');
   }
 
-  // Method 2: Mobile WebView Detection
+  // Method 2: Enhanced WebView Detection
   const isWebView = (
     (userAgent.includes('mobile') && !userAgent.includes('safari')) ||
     userAgent.includes('wkwebview') ||
@@ -64,45 +64,49 @@ function detectFarcasterEnvironment() {
       methods.push('referrer');
     }
 
-    // Method 5: Mobile-specific window properties
-    const mobileChecks = {
-      noOpener: !window.opener,
-      limitedHistory: window.history.length <= 2,
-      noFrameElement: !window.frameElement
-    };
+    // Method 5: Window properties (with cross-origin safety)
+    try {
+      const windowChecks = {
+        noOpener: !window.opener,
+        limitedHistory: window.history.length <= 3,
+        hasParent: window.parent !== window
+      };
 
-    if (Object.values(mobileChecks).filter(Boolean).length >= 2) {
-      methods.push('mobile-window');
-      if (!isInFarcaster && isWebView) {
-        // High confidence this is a mobile webview
+      if (Object.values(windowChecks).filter(Boolean).length >= 2) {
+        methods.push('window-properties');
+        if (!isInFarcaster && isWebView) {
+          isInFarcaster = true;
+          confidence = 'medium';
+        }
+      }
+    } catch (e) {
+      // Cross-origin access blocked - this is actually a good sign for frames
+      methods.push('cross-origin-blocked');
+      if (isWebView) {
         isInFarcaster = true;
         confidence = 'medium';
       }
     }
   }
 
-  // Method 6: Traditional iframe (for web)
-  if (!isInFarcaster) {
-    const isIframe = window.parent !== window || !!window.frameElement;
-    if (isIframe) {
-      methods.push('iframe');
+  // Method 6: SDK availability check (with safety)
+  try {
+    if ((window as any).FrameSDK || (window as any).frameSDK) {
       isInFarcaster = true;
-      confidence = 'medium';
+      confidence = 'high';
+      methods.push('sdk-available');
     }
+  } catch (e) {
+    // Ignore cross-origin errors
   }
 
-  // Method 7: SDK availability
-  if ((window as any).frameSDK || (window as any).parent?.frameSDK) {
-    isInFarcaster = true;
-    confidence = 'high';
-    methods.push('sdk-available');
-  }
-
-  // Fallback: If we detect mobile webview but no other signals, assume Farcaster
-  if (isWebView && !isInFarcaster && methods.includes('webview')) {
-    isInFarcaster = true;
-    confidence = 'low';
-    methods.push('webview-fallback');
+  // Method 7: Additional WebView indicators
+  if (isWebView || userAgent.includes('farcaster')) {
+    methods.push('additional-indicators');
+    if (!isInFarcaster) {
+      isInFarcaster = true;
+      confidence = 'low';
+    }
   }
 
   return { isInFarcaster, confidence, methods };
@@ -125,7 +129,8 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
     confidence: detection.confidence,
     methods: detection.methods,
     userAgent: navigator.userAgent,
-    url: window.location.href
+    url: window.location.href,
+    referrer: document.referrer
   });
 
   useEffect(() => {
@@ -138,92 +143,106 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
         return;
       }
 
-      console.log('📱 Initializing Farcaster SDK for mobile...');
+      console.log('📱 Initializing Farcaster SDK...');
       initializationRef.current = true;
 
       try {
-        // Mobile-optimized SDK loading
+        // FIXED: Better SDK waiting strategy
         let attempts = 0;
-        const maxAttempts = 30; // Longer timeout for mobile
-        const delay = 200; // Slower polling for mobile
+        const maxAttempts = 60; // 6 seconds total
+        const delay = 100;
 
-        // Set a maximum timeout
-        const timeout = setTimeout(() => {
-          console.log('⏰ SDK timeout - proceeding without SDK');
+        // Global timeout to prevent hanging
+        const globalTimeout = setTimeout(() => {
+          console.log('⏰ Global timeout - proceeding without full SDK');
           setIsReady(true);
-        }, 6000); // 6 second max timeout
+        }, 8000);
 
-        while (!sdk.actions && attempts < maxAttempts) {
+        // Wait for SDK with better error handling
+        while (attempts < maxAttempts) {
+          try {
+            if (sdk && sdk.actions) {
+              console.log('✅ SDK found after', attempts * delay, 'ms');
+              break;
+            }
+          } catch (e) {
+            // SDK access error - continue waiting
+          }
+          
           await new Promise(resolve => setTimeout(resolve, delay));
           attempts++;
           
-          if (attempts % 10 === 0) {
-            console.log(`⏳ Waiting for SDK... attempt ${attempts}/${maxAttempts}`);
+          if (attempts % 20 === 0) {
+            console.log(`⏳ Still waiting for SDK... ${attempts * delay}ms`);
           }
         }
 
-        clearTimeout(timeout);
+        clearTimeout(globalTimeout);
 
-        if (!sdk.actions) {
-          console.log('❌ SDK not available - proceeding without it');
-          setIsReady(true);
-          return;
-        }
-
-        console.log('✅ SDK available, getting context...');
-
-        // Get context with timeout
-        const contextPromise = sdk.context;
-        const contextTimeout = setTimeout(() => {
-          console.log('⏰ Context timeout - proceeding anyway');
-          setIsReady(true);
-        }, 3000);
-
+        // Try to get context with extensive error handling
         try {
-          const frameContext = await contextPromise;
-          clearTimeout(contextTimeout);
-          
-          console.log('✅ Got context:', frameContext);
-          setContext(frameContext);
-          
-          if (frameContext?.user) {
-            setUser(frameContext.user);
-            setIsAuthenticated(true);
-            console.log('✅ User authenticated:', frameContext.user);
+          if (sdk && sdk.context) {
+            console.log('📋 Getting context...');
+            
+            // Use Promise.race for timeout
+            const contextPromise = Promise.resolve(sdk.context);
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Context timeout')), 3000)
+            );
+            
+            const frameContext = await Promise.race([contextPromise, timeoutPromise]) as any;
+            console.log('✅ Got context:', frameContext);
+            
+            setContext(frameContext);
+            
+            if (frameContext && typeof frameContext === 'object' && 'user' in frameContext) {
+              setUser(frameContext.user);
+              setIsAuthenticated(true);
+              console.log('✅ User authenticated:', frameContext.user);
+            }
+          } else {
+            console.log('⚠️ No SDK context available');
           }
+        } catch (contextError) {
+          console.log('⚠️ Context failed:', contextError);
+          // Continue without context
+        }
 
-          // Send ready signal with retries for mobile
-          try {
-            await sdk.actions.ready();
+        // Send ready signal with extensive error handling
+        try {
+          if (sdk?.actions?.ready) {
+            await sdk.actions.ready({ 
+              disableNativeGestures: true 
+            });
             console.log('✅ Ready signal sent');
             
-            // Extra ready signal for mobile apps (they sometimes need it)
+            // Additional ready signal for stubborn mobile apps
             setTimeout(() => {
-              if (sdk.actions) {
-                sdk.actions.ready();
-                console.log('✅ Extra ready signal sent');
+              try {
+                sdk?.actions?.ready?.({ disableNativeGestures: true });
+                console.log('✅ Backup ready signal sent');
+              } catch (e) {
+                // Ignore errors in backup signal
               }
-            }, 500);
-          } catch (readyError) {
-            console.log('⚠️ Ready signal failed, but continuing:', readyError);
+            }, 1000);
+          } else {
+            console.log('⚠️ Ready signal not available');
           }
-          
-        } catch (contextError) {
-          clearTimeout(contextTimeout);
-          console.log('⚠️ Context failed, but continuing:', contextError);
+        } catch (readyError) {
+          console.log('⚠️ Ready signal failed:', readyError);
         }
         
       } catch (error) {
         console.error('❌ Farcaster initialization error:', error);
         setError(error instanceof Error ? error.message : 'Unknown error');
       } finally {
-        console.log('✅ Farcaster initialization complete - setting ready');
+        console.log('✅ Farcaster initialization complete');
         setIsReady(true);
       }
     };
 
-    // Immediate initialization for mobile
-    const timer = setTimeout(initializeFarcaster, 100);
+    // Start initialization after brief delay
+    const timer = setTimeout(initializeFarcaster, 200);
     return () => clearTimeout(timer);
   }, [isInFarcaster]);
 

@@ -149,7 +149,7 @@
         
         // FIXED: Better ready signal handling
         try {
-          if (window.FrameSDK.actions && typeof window.FrameSDK.actions.ready === 'function') {
+          if (window.FrameSDK?.actions?.ready) {
             await window.FrameSDK.actions.ready({
               disableNativeGestures: true // For mobile
             });
