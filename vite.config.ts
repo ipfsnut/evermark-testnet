@@ -17,24 +17,35 @@ export default defineConfig({
             return 'react-vendor';
           }
           
-          // Thirdweb - split into smaller chunks
+          // Split thirdweb wallets more granularly
           if (id.includes('thirdweb')) {
+            if (id.includes('wallets')) {
+              if (id.includes('metamask')) return 'wallet-metamask';
+              if (id.includes('coinbase')) return 'wallet-coinbase';
+              if (id.includes('walletconnect')) return 'wallet-connect';
+              if (id.includes('injected')) return 'wallet-injected';
+              if (id.includes('embedded')) return 'wallet-embedded';
+              return 'thirdweb-wallets';
+            }
             if (id.includes('react')) return 'thirdweb-react';
-            if (id.includes('wallets') || id.includes('wallet')) return 'thirdweb-wallets';
             if (id.includes('chains')) return 'thirdweb-chains';
             if (id.includes('extensions')) return 'thirdweb-extensions';
             return 'thirdweb-core';
           }
           
-          // Crypto and web3 related
-          if (id.includes('viem') || id.includes('abitype') || id.includes('ox')) {
-            return 'web3-vendor';
+          // Split wallet libraries more granularly
+          if (id.includes('walletconnect')) {
+            if (id.includes('modal')) return 'wc-modal';
+            if (id.includes('ethereum')) return 'wc-ethereum';
+            return 'walletconnect-core';
           }
           
-          // Wallet libraries
-          if (id.includes('walletconnect') || id.includes('coinbase') || id.includes('metamask')) {
-            return 'wallet-vendor';
-          }
+          if (id.includes('coinbase')) return 'coinbase-wallet';
+          if (id.includes('metamask')) return 'metamask-wallet';
+          
+          // Crypto and web3 related
+          if (id.includes('viem') || id.includes('abitype')) return 'web3-core';
+          if (id.includes('ox')) return 'web3-ox';
           
           // UI libraries
           if (id.includes('lucide-react') || id.includes('classnames')) {
@@ -58,7 +69,7 @@ export default defineConfig({
         },
       },
     },
-    chunkSizeWarningLimit: 500, // Back to 500KB to catch any remaining large chunks
+    chunkSizeWarningLimit: 1000, // Increase to 1MB since wallet chunks are inherently large
   },
   esbuild: {
     target: 'es2020',
