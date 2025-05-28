@@ -427,22 +427,22 @@ export function useUserEvermarks(userAddress?: string) {
             
             if (owner.toLowerCase() !== userAddress.toLowerCase()) continue;
 
-            // Use actual deployed contract method names
+            // FIXED: Use correct "getEvermark*" method names (not "getBookmark*")
             const [title, creator, metadataURI] = await readContract({
               contract,
-              method: "getBookmarkMetadata", // Use actual deployed contract method name
+              method: "getEvermarkMetadata", // ✅ FIXED: Correct method name
               params: [BigInt(i)],
             });
 
             const minter = await readContract({
               contract,
-              method: "getBookmarkCreator", // Use actual deployed contract method name
+              method: "getEvermarkCreator", // ✅ FIXED: Correct method name
               params: [BigInt(i)],
             });
 
             const creationTime = await readContract({
               contract,
-              method: "getBookmarkCreationTime", // Use actual deployed contract method name
+              method: "getEvermarkCreationTime", // ✅ FIXED: Correct method name
               params: [BigInt(i)],
             });
 
@@ -489,7 +489,7 @@ export function useUserEvermarks(userAddress?: string) {
     return () => {
       isMounted = false;
     };
-  }, [userAddress, contract]); // Remove lastFetch and evermarks.length from dependencies
+  }, [userAddress, contract]);
 
   return { evermarks, isLoading, error };
 }
