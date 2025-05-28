@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useActiveAccount } from "thirdweb/react";
 import { BookmarkIcon, PlusIcon, ImageIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -6,7 +6,6 @@ import PageContainer from '../components/layout/PageContainer';
 import { useUserEvermarks } from '../hooks/useEvermarks';
 import { ProfileStatsWidget } from '../components/profile/ProfileStatsWidget';
 
-// Individual Evermark Card Component
 const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
@@ -22,7 +21,6 @@ const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
       to={`/evermark/${evermark.id}`}
       className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden group"
     >
-      {/* Image section - takes up about 1/3 of the card height */}
       <div className="w-full h-32 bg-gray-100 overflow-hidden">
         {evermark.image && !imageError ? (
           <div className="relative w-full h-full">
@@ -44,7 +42,6 @@ const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
         )}
       </div>
       
-      {/* Content section - 2/3 of the card */}
       <div className="p-4">
         <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
           {evermark.title}
@@ -59,7 +56,7 @@ const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
         
         <div className="flex justify-between items-center">
           <span className="text-xs text-gray-500">
-            {new Date(evermark.creationTime * 1000).toLocaleDateString()}
+            {new Date(evermark.creationTime).toLocaleDateString()}
           </span>
           <BookmarkIcon className="h-4 w-4 text-purple-600" />
         </div>
@@ -71,10 +68,20 @@ const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
 const MyEvermarksPage: React.FC = () => {
   const account = useActiveAccount();
   const address = account?.address;
-  const { evermarks, isLoading, error } = useUserEvermarks(address || "");
+  const { evermarks, isLoading, error } = useUserEvermarks(address);
 
-  // Handle disconnected wallet state
+  useEffect(() => {
+    console.log('🔍 MyEvermarksPage Debug:', {
+      address,
+      isLoading,
+      error,
+      evermarksCount: evermarks?.length,
+      evermarks: evermarks?.slice(0, 10) 
+    });
+  }, [address, isLoading, error, evermarks]);
+
   if (!address) {
+    console.log('❌ No address - wallet not connected');
     return (
       <PageContainer title="My Collection">
         <div className="text-center py-12">
@@ -85,13 +92,11 @@ const MyEvermarksPage: React.FC = () => {
           <p className="text-gray-600 mb-6">
             Connect your wallet to view your Evermarks collection.
           </p>
-          {/* In a real app, you'd add wallet connection button here */}
         </div>
       </PageContainer>
     );
   }
 
-  // Robust error message extraction
   const getErrorMessage = (err: unknown): string => {
     if (typeof err === 'string') return err;
     if (err instanceof Error) return err.message;
@@ -118,23 +123,32 @@ const MyEvermarksPage: React.FC = () => {
           </Link>
         </div>
 
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="w-full h-32 bg-gray-200 animate-pulse"></div>
-                <div className="p-4 space-y-3">
-                  <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
-                  <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse"></div>
-                  <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-                </div>
-              </div>
-            ))}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="bg-yellow-50 border border-yellow-200 p-3 rounded text-xs">
+            <strong>Debug Info:</strong> Loading: {isLoading.toString()}, Error: {error || 'none'}, 
+            Evermarks: {evermarks?.length || 0}, Address: {address?.slice(0, 8)}...
           </div>
+        )}
+
+        {isLoading ? (
+          <>
+            <p className="text-sm text-gray-500">🔄 Loading your evermarks...</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="w-full h-32 bg-gray-200 animate-pulse"></div>
+                  <div className="p-4 space-y-3">
+                    <div className="h-5 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         ) : error ? (
           <div className="bg-white rounded-lg shadow-sm p-6 border border-red-200">
             <div className="text-center py-4">
-              {/* Safe error message extraction */}
               <p className="text-red-600">
                 Error: {getErrorMessage(error)}
               </p>
@@ -146,12 +160,20 @@ const MyEvermarksPage: React.FC = () => {
               </button>
             </div>
           </div>
-        ) : evermarks.length === 0 ? (
+        ) : !evermarks || evermarks.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="text-center py-12">
               <BookmarkIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Evermarks Yet</h3>
-              <p className="text-gray-600 mb-6">Start building your collection by creating your first Evermark or by voting on someone else's</p>
+              <p className="text-gray-600 mb-6">Start building your collection by creating your first Evermark</p>
+              {process.env.NODE_ENV === 'development' && (
+                <div className="mt-4 p-3 bg-gray-50 rounded text-xs">
+                  <strong>Debug:</strong> evermarks = {JSON.stringify(evermarks)}<br/>
+                  <strong>Type:</strong> {typeof evermarks}<br/>
+                  <strong>Is Array:</strong> {Array.isArray(evermarks).toString()}<br/>
+                  <strong>Length:</strong> {evermarks?.length}
+                </div>
+              )}
               <Link
                 to="/create"
                 className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -165,7 +187,7 @@ const MyEvermarksPage: React.FC = () => {
           <>
             <div className="flex justify-between items-center">
               <h2 className="text-lg font-medium text-gray-900">
-                {evermarks.length} Evermark{evermarks.length !== 1 ? 's' : ''}
+                ✅ {evermarks.length} Evermark{evermarks.length !== 1 ? 's' : ''} Found
               </h2>
             </div>
             
