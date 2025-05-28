@@ -1,3 +1,4 @@
+// Updated App.tsx with share route
 import { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { AppThirdwebProvider } from './lib/thirdweb';
@@ -14,6 +15,7 @@ import MyEvermarksPage from './pages/MyEvermarksPage';
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import { EvermarkDetail } from './components/evermark/EvermarkDetail';
 import BookshelfPage from './pages/BookshelfPage';
+import { ShareRedirect } from './components/sharing/ShareButton';
 
 function DebugInfo() {
   const { isInFarcaster, isReady } = useFarcasterUser();
@@ -57,6 +59,9 @@ function AppContent() {
           <Route path="/create" element={<EnhancedCreateEvermark />} />
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
           <Route path="/bookshelf" element={<BookshelfPage />} />
+          
+          {/* NEW: Share redirect route */}
+          <Route path="/share/:id" element={<ShareRedirect />} />
         </Routes>
       </Layout>
     </ErrorBoundary>

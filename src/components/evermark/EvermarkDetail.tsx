@@ -1,7 +1,10 @@
+// Updated src/components/evermark/EvermarkDetail.tsx
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ArrowLeftIcon, ShieldIcon } from 'lucide-react';
+import { BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ArrowLeftIcon, ShieldIcon, EyeIcon } from 'lucide-react';
 import { useEvermarkDetail } from '../../hooks/useEvermarks';
+import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
+import { ShareButton } from '../sharing/ShareButton';
 import { VotingPanel } from '../voting/VotingPanel';
 import { useWallet } from '../../hooks/useWallet';
 import PageContainer from '../layout/PageContainer';
@@ -17,6 +20,9 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
   const { address } = useWallet();
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  
+  // Track views for this Evermark
+  const { viewStats, isLoading: isLoadingViews } = useViewTracking(id);
   
   // Format date
   const formatDate = (timestamp: number) => {
@@ -147,39 +153,80 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
             </div>
           )}
           
-          {/* Meta information */}
-          <div className="flex flex-wrap items-center text-sm text-gray-600 gap-4 mb-6">
-            <div className="flex items-center">
-              <CalendarIcon className="h-4 w-4 mr-1" />
-              <span>{formatDate(evermark.creationTime)}</span>
+          {/* Enhanced Meta Information with Views and Share */}
+          <div className="flex flex-wrap items-center justify-between text-sm text-gray-600 gap-4 mb-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center">
+                <CalendarIcon className="h-4 w-4 mr-1" />
+                <span>{formatDate(evermark.creationTime)}</span>
+              </div>
+              
+              {/* View Counter */}
+              <div className="flex items-center">
+                <EyeIcon className="h-4 w-4 mr-1" />
+                <span>
+                  {isLoadingViews ? "..." : viewStats ? formatViewCount(viewStats.totalViews) : "0"} views
+                </span>
+              </div>
+              
+              {evermark.metadataURI && (
+                <div className="flex items-center">
+                  <ExternalLinkIcon className="h-4 w-4 mr-1" />
+                  <a 
+                    href={evermark.metadataURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-purple-600 hover:underline"
+                  >
+                    Metadata
+                  </a>
+                </div>
+              )}
+              
+              {evermark.sourceUrl && (
+                <div className="flex items-center">
+                  <ExternalLinkIcon className="h-4 w-4 mr-1" />
+                  <a 
+                    href={evermark.sourceUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-purple-600 hover:underline"
+                  >
+                    Source
+                  </a>
+                </div>
+              )}
             </div>
-            {evermark.metadataURI && (
-              <div className="flex items-center">
-                <ExternalLinkIcon className="h-4 w-4 mr-1" />
-                <a 
-                  href={evermark.metadataURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-purple-600 hover:underline"
-                >
-                  Metadata
-                </a>
-              </div>
-            )}
-            {evermark.sourceUrl && (
-              <div className="flex items-center">
-                <ExternalLinkIcon className="h-4 w-4 mr-1" />
-                <a 
-                  href={evermark.sourceUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-purple-600 hover:underline"
-                >
-                  Source
-                </a>
-              </div>
-            )}
+            
+            {/* Share Button */}
+            <ShareButton 
+              evermarkId={evermark.id}
+              title={evermark.title}
+              description={evermark.description}
+              author={evermark.author}
+            />
           </div>
+          
+          {/* View Stats Details */}
+          {viewStats && viewStats.totalViews > 0 && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">📊 Engagement Stats</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Total Views:</span>
+                  <span className="ml-2 font-semibold">{formatViewCount(viewStats.totalViews)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">Today:</span>
+                  <span className="ml-2 font-semibold">{formatViewCount(viewStats.viewsToday)}</span>
+                </div>
+                <div>
+                  <span className="text-gray-600">This Week:</span>
+                  <span className="ml-2 font-semibold">{formatViewCount(viewStats.viewsThisWeek)}</span>
+                </div>
+              </div>
+            </div>
+          )}
           
           {/* Description */}
           {evermark.description && (
