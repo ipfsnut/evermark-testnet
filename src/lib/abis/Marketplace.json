@@ -1,0 +1,210 @@
+[
+  {
+    "type": "function",
+    "name": "createListing",
+    "inputs": [
+      {
+        "name": "_params",
+        "type": "tuple",
+        "components": [
+          { "name": "assetContract", "type": "address" },
+          { "name": "tokenId", "type": "uint256" },
+          { "name": "quantity", "type": "uint256" },
+          { "name": "currency", "type": "address" },
+          { "name": "pricePerToken", "type": "uint256" },
+          { "name": "startTimestamp", "type": "uint128" },
+          { "name": "endTimestamp", "type": "uint128" },
+          { "name": "reserved", "type": "bool" }
+        ]
+      }
+    ],
+    "outputs": [{ "name": "listingId", "type": "uint256" }],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "buyFromListing",
+    "inputs": [
+      { "name": "_listingId", "type": "uint256" },
+      { "name": "_buyFor", "type": "address" },
+      { "name": "_quantity", "type": "uint256" },
+      { "name": "_currency", "type": "address" },
+      { "name": "_expectedTotalPrice", "type": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "makeOffer",
+    "inputs": [
+      { "name": "_listingId", "type": "uint256" },
+      { "name": "_quantityWanted", "type": "uint256" },
+      { "name": "_currency", "type": "address" },
+      { "name": "_pricePerToken", "type": "uint256" },
+      { "name": "_expirationTimestamp", "type": "uint256" }
+    ],
+    "outputs": [{ "name": "offerId", "type": "uint256" }],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "acceptOffer",
+    "inputs": [
+      { "name": "_listingId", "type": "uint256" },
+      { "name": "_offeror", "type": "address" },
+      { "name": "_currency", "type": "address" },
+      { "name": "_pricePerToken", "type": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "cancelListing",
+    "inputs": [{ "name": "_listingId", "type": "uint256" }],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateListing",
+    "inputs": [
+      { "name": "_listingId", "type": "uint256" },
+      { "name": "_quantityToList", "type": "uint256" },
+      { "name": "_reservePricePerToken", "type": "uint256" },
+      { "name": "_buyoutPricePerToken", "type": "uint256" },
+      { "name": "_currencyToAccept", "type": "address" },
+      { "name": "_startTime", "type": "uint256" },
+      { "name": "_secondsUntilEndTime", "type": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getAllListings",
+    "inputs": [
+      { "name": "_startId", "type": "uint256" },
+      { "name": "_endId", "type": "uint256" }
+    ],
+    "outputs": [
+      {
+        "name": "listings",
+        "type": "tuple[]",
+        "components": [
+          { "name": "listingId", "type": "uint256" },
+          { "name": "tokenOwner", "type": "address" },
+          { "name": "assetContract", "type": "address" },
+          { "name": "tokenId", "type": "uint256" },
+          { "name": "quantity", "type": "uint256" },
+          { "name": "currency", "type": "address" },
+          { "name": "pricePerToken", "type": "uint256" },
+          { "name": "saleStart", "type": "uint128" },
+          { "name": "saleEnd", "type": "uint128" },
+          { "name": "tokensPerBuyer", "type": "uint256" },
+          { "name": "tokenType", "type": "uint8" }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getAllValidListings",
+    "inputs": [
+      { "name": "_startId", "type": "uint256" },
+      { "name": "_endId", "type": "uint256" }
+    ],
+    "outputs": [
+      {
+        "name": "listings",
+        "type": "tuple[]",
+        "components": [
+          { "name": "listingId", "type": "uint256" },
+          { "name": "tokenOwner", "type": "address" },
+          { "name": "assetContract", "type": "address" },
+          { "name": "tokenId", "type": "uint256" },
+          { "name": "quantity", "type": "uint256" },
+          { "name": "currency", "type": "address" },
+          { "name": "pricePerToken", "type": "uint256" },
+          { "name": "saleStart", "type": "uint128" },
+          { "name": "saleEnd", "type": "uint128" },
+          { "name": "tokensPerBuyer", "type": "uint256" },
+          { "name": "tokenType", "type": "uint8" }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getListing",
+    "inputs": [{ "name": "_listingId", "type": "uint256" }],
+    "outputs": [
+      {
+        "name": "listing",
+        "type": "tuple",
+        "components": [
+          { "name": "listingId", "type": "uint256" },
+          { "name": "tokenOwner", "type": "address" },
+          { "name": "assetContract", "type": "address" },
+          { "name": "tokenId", "type": "uint256" },
+          { "name": "quantity", "type": "uint256" },
+          { "name": "currency", "type": "address" },
+          { "name": "pricePerToken", "type": "uint256" },
+          { "name": "saleStart", "type": "uint128" },
+          { "name": "saleEnd", "type": "uint128" },
+          { "name": "tokensPerBuyer", "type": "uint256" },
+          { "name": "tokenType", "type": "uint8" }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalListings",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "event",
+    "name": "ListingAdded",
+    "inputs": [
+      { "name": "listingId", "type": "uint256", "indexed": true },
+      { "name": "assetContract", "type": "address", "indexed": true },
+      { "name": "lister", "type": "address", "indexed": true },
+      {
+        "name": "listing",
+        "type": "tuple",
+        "components": [
+          { "name": "listingId", "type": "uint256" },
+          { "name": "tokenOwner", "type": "address" },
+          { "name": "assetContract", "type": "address" },
+          { "name": "tokenId", "type": "uint256" },
+          { "name": "quantity", "type": "uint256" },
+          { "name": "currency", "type": "address" },
+          { "name": "pricePerToken", "type": "uint256" },
+          { "name": "saleStart", "type": "uint128" },
+          { "name": "saleEnd", "type": "uint128" },
+          { "name": "tokensPerBuyer", "type": "uint256" },
+          { "name": "tokenType", "type": "uint8" }
+        ]
+      }
+    ]
+  },
+  {
+    "type": "event",
+    "name": "NewSale",
+    "inputs": [
+      { "name": "listingId", "type": "uint256", "indexed": true },
+      { "name": "assetContract", "type": "address", "indexed": true },
+      { "name": "lister", "type": "address", "indexed": true },
+      { "name": "buyer", "type": "address", "indexed": false },
+      { "name": "quantityBought", "type": "uint256", "indexed": false },
+      { "name": "totalPricePaid", "type": "uint256", "indexed": false }
+    ]
+  }
+]

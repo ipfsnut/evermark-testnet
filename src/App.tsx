@@ -10,7 +10,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import EnhancedHomePage from './pages/EnhancedHomePage';
 import ProfilePage from './pages/ProfilePage';
 import LeaderboardPage from './pages/LeaderboardPage';
-import EnhancedAuctionPage from './pages/EnhancedAuctionPage';
+import { MarketplacePage } from './pages/MarketplacePage';
 import MyEvermarksPage from './pages/MyEvermarksPage';
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import { EvermarkDetail } from './components/evermark/EvermarkDetail';
@@ -54,7 +54,7 @@ function AppContent() {
           <Route path="/" element={<EnhancedHomePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/auctions" element={<EnhancedAuctionPage />} />
+          <Route path="/auctions" element={<MarketplacePage />} />
           <Route path="/my-evermarks" element={<MyEvermarksPage />} />
           <Route path="/create" element={<EnhancedCreateEvermark />} />
           <Route path="/evermark/:id" element={<EvermarkDetail />} />

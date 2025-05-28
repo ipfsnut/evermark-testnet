@@ -33,7 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
   const navItems = [
     { path: '/', label: 'Home', icon: <HomeIcon className="h-5 w-5" /> },
     { path: '/leaderboard', label: 'Leaderboard', icon: <TrophyIcon className="h-5 w-5" /> },
-    { path: '/auctions', label: 'Auctions', icon: <AuctionIcon className="h-5 w-5" /> },
+    { path: '/Market', label: 'Market', icon: <AuctionIcon className="h-5 w-5" /> },
     { path: '/create', label: 'Create', icon: <CreateIcon className="h-5 w-5" /> },
     { path: '/my-evermarks', label: 'My Collection', icon: <BookOpenIcon className="h-5 w-5" /> },
     { path: '/profile', label: 'Profile', icon: <UserIcon className="h-5 w-5" /> },

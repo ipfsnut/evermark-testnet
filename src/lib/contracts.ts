@@ -8,7 +8,7 @@ export const CONTRACTS = {
   EVERMARK_NFT: import.meta.env.VITE_EVERMARK_NFT_ADDRESS as string,
   VOTING: import.meta.env.VITE_EVERMARK_VOTING_ADDRESS as string,
   REWARDS: import.meta.env.VITE_EVERMARK_REWARDS_ADDRESS as string,
-  AUCTION: import.meta.env.VITE_EVERMARK_AUCTION_ADDRESS as string,
+  MARKETPLACE: import.meta.env.VITE_MARKETPLACE_ADDRESS as string, // NEW: Replace AUCTION with MARKETPLACE
   LEADERBOARD: import.meta.env.VITE_EVERMARK_LEADERBOARD_ADDRESS as string,
   CARD_CATALOG: import.meta.env.VITE_CARD_CATALOG_ADDRESS as string,
   NFT_STAKING: import.meta.env.VITE_NFT_STAKING_ADDRESS as string,
