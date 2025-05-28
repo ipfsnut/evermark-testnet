@@ -113,32 +113,34 @@ export function useLeaderboard(weekNumber?: number) {
         setIsLoading(true);
         setError(null);
         
-        console.log(`Fetching leaderboard for week ${targetWeek}...`);
+        console.log(`🔍 Fetching leaderboard for week ${targetWeek}...`);
         
         // STRATEGY 1: Try to get finalized leaderboard data first
         let leaderboardData;
         try {
           leaderboardData = await readContract({
             contract: leaderboardContract,
-            method: "getWeeklyTopEvermarks", // FIXED: Use redeployed contract method name
+            method: "getWeeklyTopBookmarks", // ✅ Using bookmark method name
             params: [BigInt(targetWeek), BigInt(10)], // Get top 10
           });
-          console.log("Found finalized leaderboard data:", leaderboardData);
+          console.log("✅ Found finalized leaderboard data:", leaderboardData);
         } catch (leaderboardError) {
-          console.log("No finalized leaderboard data, building from live voting data...");
+          console.log("⚠️ No finalized leaderboard data, building from live voting data...");
           
           // STRATEGY 2: Fallback - Build leaderboard from current voting data
           try {
+            console.log("📋 Fetching bookmarks with votes for cycle:", targetWeek);
             const bookmarksWithVotes = await readContract({
               contract: votingContract,
-              method: "getEvermarksWithVotesInCycle", // FIXED: Use redeployed contract method name
+              method: "getBookmarksWithVotesInCycle", // ✅ Using bookmark method name
               params: [BigInt(targetWeek)],
             });
             
-            console.log("Bookmarks with votes:", bookmarksWithVotes);
+            console.log("📋 Bookmarks with votes result:", bookmarksWithVotes);
+            console.log("📋 Type:", typeof bookmarksWithVotes, "Length:", bookmarksWithVotes?.length);
             
             if (!bookmarksWithVotes || bookmarksWithVotes.length === 0) {
-              console.log("No bookmarks with votes found");
+              console.log("📭 No bookmarks with votes found for cycle", targetWeek);
               if (isMounted) {
                 setEntries([]);
                 setIsLoading(false);
@@ -147,22 +149,25 @@ export function useLeaderboard(weekNumber?: number) {
             }
             
             // Get vote counts for each bookmark
+            console.log("🔢 Fetching vote counts for", bookmarksWithVotes.length, "bookmarks...");
             const bookmarkVoteData = await Promise.all(
               bookmarksWithVotes.map(async (bookmarkId: bigint) => {
                 try {
+                  console.log("🗳️ Fetching votes for bookmark:", bookmarkId.toString());
                   const votes = await readContract({
                     contract: votingContract,
-                    method: "getEvermarkVotesInCycle", // FIXED: Use redeployed contract method name
+                    method: "getBookmarkVotesInCycle", // ✅ Using bookmark method name
                     params: [BigInt(targetWeek), bookmarkId],
                   });
                   
+                  console.log("📊 Bookmark", bookmarkId.toString(), "has", votes.toString(), "votes");
                   return {
                     tokenId: bookmarkId,
                     votes: votes,
                     rank: BigInt(0),
                   };
                 } catch (err) {
-                  console.error(`Error fetching votes for bookmark ${bookmarkId}:`, err);
+                  console.error(`❌ Error fetching votes for bookmark ${bookmarkId}:`, err);
                   return null;
                 }
               })
@@ -178,11 +183,12 @@ export function useLeaderboard(weekNumber?: number) {
                 rank: BigInt(index + 1),
               }));
             
-            console.log("Built leaderboard from voting data:", leaderboardData);
+            console.log("📈 Built leaderboard from voting data:", leaderboardData.length, "entries");
           } catch (votingError) {
-            console.error("Error fetching voting data:", votingError);
+            console.error("❌ Error fetching voting data:", votingError);
             if (isMounted) {
-              setEntries([]);
+              const errorMessage = votingError instanceof Error ? votingError.message : 'Unknown voting error';
+              setError(`Failed to fetch voting data: ${errorMessage}`);
               setIsLoading(false);
             }
             return;
@@ -190,7 +196,7 @@ export function useLeaderboard(weekNumber?: number) {
         }
         
         if (!leaderboardData || leaderboardData.length === 0) {
-          console.log("No leaderboard data found");
+          console.log("📭 No leaderboard data found for week", targetWeek);
           if (isMounted) {
             setEntries([]);
             setIsLoading(false);
@@ -198,11 +204,13 @@ export function useLeaderboard(weekNumber?: number) {
           return;
         }
         
-        // ENHANCED: Get complete Evermark metadata
-        console.log("Enhancing with complete metadata...");
+        // Get complete Evermark metadata
+        console.log("🎨 Enhancing", leaderboardData.length, "entries with complete metadata...");
         const enhancedEntries = await Promise.all(
           leaderboardData.map(async (bookmark: any) => {
             try {
+              console.log("🔍 Processing bookmark:", bookmark.tokenId.toString());
+              
               // Check if bookmark exists
               const exists = await readContract({
                 contract: evermarkContract,
@@ -211,37 +219,43 @@ export function useLeaderboard(weekNumber?: number) {
               });
               
               if (!exists) {
-                console.log(`Bookmark ${bookmark.tokenId} does not exist`);
+                console.log(`⚠️ Bookmark ${bookmark.tokenId} does not exist`);
                 return null;
               }
               
               // Get metadata using correct deployed contract method names
+              console.log("📖 Fetching metadata for bookmark:", bookmark.tokenId.toString());
               const [title, author, metadataURI] = await readContract({
                 contract: evermarkContract,
-                method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
+                method: "getBookmarkMetadata", // ✅ Using bookmark method name
                 params: [bookmark.tokenId],
               });
+              
+              console.log("📝 Bookmark metadata:", { title, author, metadataURI });
               
               // Get creator address
               const creator = await readContract({
                 contract: evermarkContract,
-                method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
+                method: "getBookmarkCreator", // ✅ Using bookmark method name
                 params: [bookmark.tokenId],
               });
               
               // Get creation time
               const creationTime = await readContract({
                 contract: evermarkContract,
-                method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
+                method: "getBookmarkCreationTime", // ✅ Using bookmark method name
                 params: [bookmark.tokenId],
               });
               
-              // ENHANCED: Fetch IPFS metadata for description, image, etc.
+              // Fetch IPFS metadata for description, image, etc.
+              console.log("🌐 Fetching IPFS metadata for:", metadataURI);
               const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
               
-              console.log(`Enhanced bookmark ${bookmark.tokenId}:`, { 
-                title, author, creator, description: description ? 'present' : 'missing',
-                image: image ? 'present' : 'missing'
+              console.log(`✅ Enhanced bookmark ${bookmark.tokenId}:`, { 
+                title, author, creator, 
+                hasDescription: !!description, 
+                hasImage: !!image,
+                votes: bookmark.votes.toString()
               });
               
               return {
@@ -260,7 +274,7 @@ export function useLeaderboard(weekNumber?: number) {
                 rank: Number(bookmark.rank),
               };
             } catch (err) {
-              console.error(`Error fetching metadata for token ${bookmark.tokenId}:`, err);
+              console.error(`❌ Error fetching metadata for token ${bookmark.tokenId}:`, err);
               // Return basic entry even if metadata fails
               return {
                 evermark: {
@@ -283,7 +297,7 @@ export function useLeaderboard(weekNumber?: number) {
         
         // Filter out nulls and set entries
         const validEntries = enhancedEntries.filter(entry => entry !== null);
-        console.log(`Final leaderboard entries with complete data:`, validEntries.length);
+        console.log(`🎉 Final leaderboard: ${validEntries.length} valid entries`);
         
         if (isMounted) {
           setEntries(validEntries);
@@ -291,9 +305,10 @@ export function useLeaderboard(weekNumber?: number) {
         }
         
       } catch (err: any) {
-        console.error("Error fetching leaderboard:", err);
+        console.error("❌ Leaderboard fetch error:", err);
         if (isMounted) {
-          setError(err.message || "Failed to load leaderboard");
+          const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+          setError(errorMessage);
           setIsLoading(false);
         }
       }
@@ -346,7 +361,7 @@ export function useLeaderboardManagement() {
     try {
       const transaction = prepareContractCall({
         contract: leaderboardContract,
-        method: "finalizeWeeklyLeaderboard",
+        method: "finalizeWeeklyLeaderboard", // This might stay the same since it's about the leaderboard itself
         params: [BigInt(weekNumber)],
       });
       
@@ -357,7 +372,7 @@ export function useLeaderboardManagement() {
       return { success: true, message: successMsg };
     } catch (err: any) {
       console.error("Error finalizing leaderboard:", err);
-      const errorMsg = err.message || "Failed to finalize leaderboard";
+      const errorMsg = err instanceof Error ? err.message : "Failed to finalize leaderboard";
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
