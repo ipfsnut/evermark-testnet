@@ -71,13 +71,41 @@ const EvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
 const MyEvermarksPage: React.FC = () => {
   const account = useActiveAccount();
   const address = account?.address;
-  const { evermarks, isLoading, error } = useUserEvermarks(address);
+  const { evermarks, isLoading, error } = useUserEvermarks(address || "");
+
+  // Handle disconnected wallet state
+  if (!address) {
+    return (
+      <PageContainer title="My Collection">
+        <div className="text-center py-12">
+          <BookmarkIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Wallet Not Connected
+          </h3>
+          <p className="text-gray-600 mb-6">
+            Connect your wallet to view your Evermarks collection.
+          </p>
+          {/* In a real app, you'd add wallet connection button here */}
+        </div>
+      </PageContainer>
+    );
+  }
+
+  // Robust error message extraction
+  const getErrorMessage = (err: unknown): string => {
+    if (typeof err === 'string') return err;
+    if (err instanceof Error) return err.message;
+    if (err && typeof err === 'object' && 'message' in err) {
+      return String(err.message);
+    }
+    return 'Unknown error';
+  };
 
   return (
     <PageContainer title="My Collection">
       <div className="space-y-6">
-        {/* Profile Stats Widget - only show when user is connected */}
-        {address && <ProfileStatsWidget userAddress={address} />}
+        {/* Profile Stats Widget */}
+        <ProfileStatsWidget userAddress={address} />
         
         <div className="flex justify-between items-center">
           <p className="text-gray-600">Your personal library of Evermarks</p>
@@ -106,7 +134,16 @@ const MyEvermarksPage: React.FC = () => {
         ) : error ? (
           <div className="bg-white rounded-lg shadow-sm p-6 border border-red-200">
             <div className="text-center py-4">
-              <p className="text-red-600">Error: {error}</p>
+              {/* Safe error message extraction */}
+              <p className="text-red-600">
+                Error: {getErrorMessage(error)}
+              </p>
+              <button 
+                className="mt-4 text-sm text-purple-600 hover:underline"
+                onClick={() => window.location.reload()}
+              >
+                Try again
+              </button>
             </div>
           </div>
         ) : evermarks.length === 0 ? (

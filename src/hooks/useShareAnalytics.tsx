@@ -1,8 +1,6 @@
-// src/hooks/useShareAnalytics.ts - Enhanced with Supabase
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// Initialize Supabase client (same as your main app)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -34,7 +32,6 @@ interface EvermarkShareStats {
   lastShared: string;
 }
 
-// Main analytics hook
 export function useSupabaseShareAnalytics() {
   const [analytics, setAnalytics] = useState<ShareAnalytics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +42,6 @@ export function useSupabaseShareAnalytics() {
       setIsLoading(true);
       setError(null);
 
-      // Fetch from your Netlify function which queries Supabase
       const response = await fetch('/api/shares', {
         method: 'GET',
         headers: { 'Accept': 'application/json' }
@@ -82,7 +78,6 @@ export function useSupabaseShareAnalytics() {
   };
 }
 
-// Hook for specific evermark analytics
 export function useEvermarkShareAnalytics(evermarkId: string) {
   const [stats, setStats] = useState<EvermarkShareStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,7 +99,6 @@ export function useEvermarkShareAnalytics(evermarkId: string) {
 
         if (supabaseError) {
           if (supabaseError.code === 'PGRST116') {
-            // No data found - return zero stats
             setStats({
               evermarkId,
               totalShares: 0,
@@ -146,7 +140,6 @@ export function useEvermarkShareAnalytics(evermarkId: string) {
   return { stats, isLoading, error };
 }
 
-// Hook for top shared evermarks
 export function useTopSharedEvermarks(limit = 10, days = 30) {
   const [topEvermarks, setTopEvermarks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -181,7 +174,6 @@ export function useTopSharedEvermarks(limit = 10, days = 30) {
   return { topEvermarks, isLoading, error };
 }
 
-// Hook for sharing trends
 export function useSharingTrends(evermarkId?: string, days = 30) {
   const [trends, setTrends] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -216,7 +208,6 @@ export function useSharingTrends(evermarkId?: string, days = 30) {
   return { trends, isLoading, error };
 }
 
-// Enhanced Analytics Dashboard Component
 export const EnhancedShareAnalyticsDashboard: React.FC = () => {
   const { analytics, isLoading: loadingGeneral, error: generalError, refetch } = useSupabaseShareAnalytics();
   const { topEvermarks, isLoading: loadingTop } = useTopSharedEvermarks(5, 7);
@@ -257,7 +248,6 @@ export const EnhancedShareAnalyticsDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Main Stats */}
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-gray-900">Share Analytics</h2>
@@ -291,7 +281,6 @@ export const EnhancedShareAnalyticsDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Platform Breakdown */}
         {analytics?.platformBreakdown && analytics.platformBreakdown.length > 0 && (
           <div>
             <h3 className="text-lg font-medium text-gray-900 mb-4">Platform Breakdown</h3>
@@ -317,7 +306,6 @@ export const EnhancedShareAnalyticsDashboard: React.FC = () => {
         )}
       </div>
 
-      {/* Top Shared Evermarks */}
       {!loadingTop && topEvermarks.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 mb-4">Top Shared (Last 7 Days)</h3>
@@ -345,7 +333,6 @@ export const EnhancedShareAnalyticsDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Sharing Trends */}
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Sharing Trends (Last 14 Days)</h3>
         
