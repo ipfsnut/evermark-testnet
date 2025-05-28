@@ -220,6 +220,7 @@ export function useSharingTrends(evermarkId?: string, days = 30) {
 export const EnhancedShareAnalyticsDashboard: React.FC = () => {
   const { analytics, isLoading: loadingGeneral, error: generalError, refetch } = useSupabaseShareAnalytics();
   const { topEvermarks, isLoading: loadingTop } = useTopSharedEvermarks(5, 7);
+  const { trends, isLoading: loadingTrends } = useSharingTrends(undefined, 14);
 
   if (loadingGeneral) {
     return (
@@ -343,6 +344,40 @@ export const EnhancedShareAnalyticsDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Sharing Trends */}
+      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Sharing Trends (Last 14 Days)</h3>
+        
+        {loadingTrends ? (
+          <div className="animate-pulse">
+            <div className="h-40 bg-gray-200 rounded"></div>
+          </div>
+        ) : trends && trends.length > 0 ? (
+          <div className="space-y-3">
+            {trends.map((trend, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <div className="font-medium text-gray-900">
+                    {new Date(trend.date).toLocaleDateString()}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {trend.platforms_active} platforms active
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-gray-900">{trend.total_shares}</div>
+                  <div className="text-xs text-gray-500">shares</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            <div className="text-sm">No trending data available</div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
