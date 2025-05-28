@@ -220,7 +220,6 @@ export function useSharingTrends(evermarkId?: string, days = 30) {
 export const EnhancedShareAnalyticsDashboard: React.FC = () => {
   const { analytics, isLoading: loadingGeneral, error: generalError, refetch } = useSupabaseShareAnalytics();
   const { topEvermarks, isLoading: loadingTop } = useTopSharedEvermarks(5, 7);
-  const { trends, isLoading: loadingTrends } = useSharingTrends(undefined, 14);
 
   if (loadingGeneral) {
     return (
