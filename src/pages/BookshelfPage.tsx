@@ -38,9 +38,19 @@ interface Collection {
   updatedAt: Date;
 }
 
+interface Evermark {
+  id: string;
+  title: string;
+  author: string;
+  description?: string;
+  image?: string;
+  creationTime: number;
+  // Add any other properties your evermarks have
+}
+
 // Enhanced Evermark Card for Bookshelf
 const BookshelfEvermarkCard: React.FC<{ 
-  evermark: any; 
+  evermark: Evermark; 
   bookshelfItem: any;
   onRemove: () => void;
   onUpdateNotes: (notes: string) => void;
@@ -320,17 +330,21 @@ const EnhancedBookshelfPage: React.FC = () => {
 
   // Get evermark details for bookshelf items
   const getFavoriteEvermarks = () => {
-    return bookshelfData.favorites.map(item => ({
-      evermark: evermarks.find(e => e.id === item.evermarkId),
-      bookshelfItem: item
-    })).filter(item => item.evermark);
+    return bookshelfData.favorites
+      .map(item => {
+        const evermark = evermarks.find(e => e.id === item.evermarkId);
+        return evermark ? { evermark, bookshelfItem: item } : null;
+      })
+      .filter(Boolean) as { evermark: Evermark; bookshelfItem: any }[];
   };
 
   const getCurrentReadingEvermarks = () => {
-    return bookshelfData.currentReading.map(item => ({
-      evermark: evermarks.find(e => e.id === item.evermarkId),
-      bookshelfItem: item
-    })).filter(item => item.evermark);
+    return bookshelfData.currentReading
+      .map(item => {
+        const evermark = evermarks.find(e => e.id === item.evermarkId);
+        return evermark ? { evermark, bookshelfItem: item } : null;
+      })
+      .filter(Boolean) as { evermark: Evermark; bookshelfItem: any }[];
   };
 
   const saveCollections = (updatedCollections: Collection[]) => {
