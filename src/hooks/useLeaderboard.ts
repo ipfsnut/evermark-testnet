@@ -227,7 +227,7 @@ export function useLeaderboard(weekNumber?: number) {
               console.log("📖 Fetching metadata for bookmark:", bookmark.tokenId.toString());
               const [title, author, metadataURI] = await readContract({
                 contract: evermarkContract,
-                method: "getBookmarkMetadata", // ✅ Using bookmark method name
+                method: "getEvermarkMetadata", // ✅ NFT contract uses "evermark" method names
                 params: [bookmark.tokenId],
               });
               
@@ -236,14 +236,14 @@ export function useLeaderboard(weekNumber?: number) {
               // Get creator address
               const creator = await readContract({
                 contract: evermarkContract,
-                method: "getBookmarkCreator", // ✅ Using bookmark method name
+                method: "getEvermarkCreator", // ✅ NFT contract uses "evermark" method names
                 params: [bookmark.tokenId],
               });
               
               // Get creation time
               const creationTime = await readContract({
                 contract: evermarkContract,
-                method: "getBookmarkCreationTime", // ✅ Using bookmark method name
+                method: "getEvermarkCreationTime", // ✅ NFT contract uses "evermark" method names
                 params: [bookmark.tokenId],
               });
               
