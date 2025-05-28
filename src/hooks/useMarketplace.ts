@@ -255,17 +255,18 @@ export const useMarketplace = (marketplaceContractAddress: string) => {
   };
 };
 
-// UI component for marketplace actions using v5 useSendTransaction hook
 export function MarketplaceButton({ 
   contractAddress, 
   transaction, 
   className, 
+  style,
   children, 
   onSuccess 
 }: {
   contractAddress: string;
   transaction: () => any;
   className?: string;
+  style?: React.CSSProperties;
   children: React.ReactNode;
   onSuccess?: () => void;
 }) {
