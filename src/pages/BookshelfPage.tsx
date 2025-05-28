@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useWallet } from '../hooks/useWallet';
 import { useUserEvermarks } from '../hooks/useEvermarks';
+import { useBookshelf } from '../hooks/useBookshelf';
 import { 
   BookOpenIcon, 
   PlusIcon, 
@@ -13,10 +14,19 @@ import {
   GridIcon,
   ListIcon,
   ShareIcon,
-  DownloadIcon
+  DownloadIcon,
+  HeartIcon,
+  StarIcon,
+  ClockIcon,
+  ImageIcon,
+  UserIcon,
+  CalendarIcon,
+  StickyNoteIcon,
+  XIcon
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import PageContainer from '../components/layout/PageContainer';
+import { formatDistanceToNow } from 'date-fns';
 
 interface Collection {
   id: string;
@@ -28,51 +38,308 @@ interface Collection {
   updatedAt: Date;
 }
 
-interface DelegationRecord {
-  evermarkId: string;
-  amount: string;
-  timestamp: Date;
-}
+// Enhanced Evermark Card for Bookshelf
+const BookshelfEvermarkCard: React.FC<{ 
+  evermark: any; 
+  bookshelfItem: any;
+  onRemove: () => void;
+  onUpdateNotes: (notes: string) => void;
+  category: 'favorite' | 'currentReading';
+}> = ({ evermark, bookshelfItem, onRemove, onUpdateNotes, category }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  const [showNotesEdit, setShowNotesEdit] = useState(false);
+  const [notes, setNotes] = useState(bookshelfItem?.notes || '');
 
-const BookshelfPage: React.FC = () => {
+  const handleImageLoad = () => setImageLoading(false);
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoading(false);
+  };
+
+  const handleSaveNotes = () => {
+    onUpdateNotes(notes);
+    setShowNotesEdit(false);
+  };
+
+  const categoryConfig = {
+    favorite: {
+      icon: <HeartIcon className="h-4 w-4" />,
+      color: 'text-red-500',
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-200',
+      label: 'Favorite'
+    },
+    currentReading: {
+      icon: <BookOpenIcon className="h-4 w-4" />,
+      color: 'text-blue-500',
+      bgColor: 'bg-blue-50',
+      borderColor: 'border-blue-200',
+      label: 'Currently Reading'
+    }
+  };
+
+  const config = categoryConfig[category];
+
+  return (
+    <div className={`bg-white rounded-lg shadow-sm border-2 ${config.borderColor} overflow-hidden hover:shadow-md transition-all duration-200 group relative`}>
+      {/* Category Badge */}
+      <div className={`absolute top-3 right-3 z-10 px-2 py-1 ${config.bgColor} ${config.color} rounded-full text-xs font-medium flex items-center gap-1`}>
+        {config.icon}
+        <span>{config.label}</span>
+      </div>
+
+      {/* Remove Button */}
+      <button
+        onClick={onRemove}
+        className="absolute top-3 left-3 z-10 p-1 bg-white rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 hover:text-red-600"
+      >
+        <XIcon className="h-3 w-3" />
+      </button>
+
+      <Link to={`/evermark/${evermark.id}`} className="block">
+        {/* Image section */}
+        <div className="w-full h-40 bg-gray-100 overflow-hidden relative">
+          {evermark.image && !imageError ? (
+            <div className="relative w-full h-full">
+              {imageLoading && (
+                <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+              )}
+              <img
+                src={evermark.image}
+                alt={evermark.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+              />
+              {/* Gradient overlay for better badge visibility */}
+              <div className="absolute inset-0 bg-gradient-to-br from-black/20 via-transparent to-black/20"></div>
+            </div>
+          ) : (
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+              <ImageIcon className="h-12 w-12 text-gray-400" />
+            </div>
+          )}
+        </div>
+        
+        {/* Content section */}
+        <div className="p-4">
+          <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
+            {evermark.title}
+          </h3>
+          
+          <div className="text-sm text-gray-600 mb-3">
+            <div className="flex items-center mb-1">
+              <UserIcon className="h-3 w-3 mr-1" />
+              <span>by {evermark.author}</span>
+            </div>
+            <div className="flex items-center text-xs text-gray-500">
+              <CalendarIcon className="h-3 w-3 mr-1" />
+              <span>Added {formatDistanceToNow(bookshelfItem.addedAt, { addSuffix: true })}</span>
+            </div>
+          </div>
+          
+          {evermark.description && (
+            <p className="text-sm text-gray-500 mb-3 line-clamp-2">
+              {evermark.description}
+            </p>
+          )}
+        </div>
+      </Link>
+
+      {/* Notes section */}
+      <div className="p-4 pt-0 border-t border-gray-100">
+        {showNotesEdit ? (
+          <div className="space-y-2">
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add your personal notes..."
+              className="w-full px-2 py-1 text-xs border border-gray-300 rounded resize-none"
+              rows={2}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowNotesEdit(false)}
+                className="px-2 py-1 text-xs text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNotes}
+                className="px-2 py-1 text-xs bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowNotesEdit(true)}
+            className="w-full text-left"
+          >
+            <div className="flex items-start gap-2 text-xs text-gray-600 hover:text-gray-800">
+              <StickyNoteIcon className="h-3 w-3 mt-0.5 flex-shrink-0" />
+              <span className="line-clamp-2">
+                {bookshelfItem.notes || 'Add personal notes...'}
+              </span>
+            </div>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Quick Add Section
+const QuickAddSection: React.FC<{ userAddress: string }> = ({ userAddress }) => {
+  const { evermarks, isLoading } = useUserEvermarks(userAddress);
+  const { addToFavorites, addToCurrentReading, getBookshelfStatus, getStats } = useBookshelf(userAddress);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const stats = getStats();
+
+  const availableEvermarks = evermarks.filter(evermark => {
+    const status = getBookshelfStatus(evermark.id);
+    return !status.isFavorite && !status.isCurrentReading;
+  });
+
+  const handleQuickAdd = (evermarkId: string, category: 'favorite' | 'currentReading') => {
+    if (category === 'favorite') {
+      const result = addToFavorites(evermarkId);
+      if (!result.success) {
+        alert(result.error);
+      }
+    } else {
+      const result = addToCurrentReading(evermarkId);
+      if (!result.success) {
+        alert(result.error);
+      }
+    }
+  };
+
+  if (!showQuickAdd) {
+    return (
+      <div className="text-center">
+        <button
+          onClick={() => setShowQuickAdd(true)}
+          className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          <PlusIcon className="w-4 h-4 mr-2" />
+          Quick Add Evermarks
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-medium text-gray-900">Quick Add to Bookshelf</h3>
+        <button
+          onClick={() => setShowQuickAdd(false)}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          <XIcon className="h-5 w-5" />
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-4">Loading your Evermarks...</div>
+      ) : availableEvermarks.length === 0 ? (
+        <div className="text-center py-4 text-gray-500">
+          All your Evermarks are already on your bookshelf!
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+          {availableEvermarks.map(evermark => (
+            <div key={evermark.id} className="flex items-center p-3 border border-gray-200 rounded-lg">
+              <div className="w-12 h-12 bg-gray-100 rounded mr-3 overflow-hidden flex-shrink-0">
+                {evermark.image ? (
+                  <img src={evermark.image} alt={evermark.title} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon className="h-4 w-4 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex-1 min-w-0 mr-3">
+                <h4 className="text-sm font-medium text-gray-900 truncate">{evermark.title}</h4>
+                <p className="text-xs text-gray-500">by {evermark.author}</p>
+              </div>
+              
+              <div className="flex gap-1">
+                <button
+                  onClick={() => handleQuickAdd(evermark.id, 'favorite')}
+                  disabled={!stats.canAddFavorite}
+                  className="p-1 text-red-500 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Add to Favorites"
+                >
+                  <HeartIcon className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleQuickAdd(evermark.id, 'currentReading')}
+                  disabled={!stats.canAddCurrentReading}
+                  className="p-1 text-blue-500 hover:bg-blue-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Add to Current Reading"
+                >
+                  <BookOpenIcon className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const EnhancedBookshelfPage: React.FC = () => {
   const { address, isConnected } = useWallet();
   const { evermarks } = useUserEvermarks(address);
+  const { bookshelfData, isLoading, removeFromBookshelf, updateNotes, getStats } = useBookshelf(address);
   
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [delegationHistory, setDelegationHistory] = useState<DelegationRecord[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [newCollectionDescription, setNewCollectionDescription] = useState('');
   const [newCollectionIsPublic, setNewCollectionIsPublic] = useState(false);
-  const [, setEditingCollection] = useState<string | null>(null);
-  
-  // Load collections from localStorage (in production, this would be from blockchain/database)
-  useEffect(() => {
+
+  // Load collections from localStorage
+  React.useEffect(() => {
     if (address) {
       const savedCollections = localStorage.getItem(`collections_${address}`);
       if (savedCollections) {
         setCollections(JSON.parse(savedCollections));
       }
-      
-      // Load delegation history (mock data for now)
-      const mockDelegations: DelegationRecord[] = [
-        { evermarkId: '1', amount: '100', timestamp: new Date(Date.now() - 86400000) },
-        { evermarkId: '2', amount: '50', timestamp: new Date(Date.now() - 172800000) },
-      ];
-      setDelegationHistory(mockDelegations);
     }
   }, [address]);
-  
-  // Save collections to localStorage
+
+  const stats = getStats();
+
+  // Get evermark details for bookshelf items
+  const getFavoriteEvermarks = () => {
+    return bookshelfData.favorites.map(item => ({
+      evermark: evermarks.find(e => e.id === item.evermarkId),
+      bookshelfItem: item
+    })).filter(item => item.evermark);
+  };
+
+  const getCurrentReadingEvermarks = () => {
+    return bookshelfData.currentReading.map(item => ({
+      evermark: evermarks.find(e => e.id === item.evermarkId),
+      bookshelfItem: item
+    })).filter(item => item.evermark);
+  };
+
   const saveCollections = (updatedCollections: Collection[]) => {
     if (address) {
       localStorage.setItem(`collections_${address}`, JSON.stringify(updatedCollections));
       setCollections(updatedCollections);
     }
   };
-  
+
   const createCollection = () => {
     if (!newCollectionName.trim()) return;
     
@@ -92,45 +359,7 @@ const BookshelfPage: React.FC = () => {
     setNewCollectionIsPublic(false);
     setShowCreateModal(false);
   };
-  
-  const deleteCollection = (collectionId: string) => {
-    if (confirm('Are you sure you want to delete this collection?')) {
-      saveCollections(collections.filter(c => c.id !== collectionId));
-      if (selectedCollection === collectionId) {
-        setSelectedCollection(null);
-      }
-    }
-  };
-  
-  const exportCollection = (collection: Collection) => {
-    const data = {
-      collection: {
-        name: collection.name,
-        description: collection.description,
-        createdAt: collection.createdAt,
-        evermarks: evermarks.filter(e => collection.evermarkIds.includes(e.id))
-      }
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${collection.name.replace(/\s+/g, '_')}_collection.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-  
-  // Get supported evermarks from delegation history
-  const supportedEvermarkIds = [...new Set(delegationHistory.map(d => d.evermarkId))];
-  const supportedEvermarks = evermarks.filter(e => supportedEvermarkIds.includes(e.id));
-  
-  // Get staked/locked evermarks (mock data - in production from contract)
-  const lockedEvermarkIds = ['3', '4']; // Mock staked NFT IDs
-  const lockedEvermarks = evermarks.filter(e => lockedEvermarkIds.includes(e.id));
-  
+
   if (!isConnected) {
     return (
       <PageContainer title="My Bookshelf">
@@ -141,13 +370,19 @@ const BookshelfPage: React.FC = () => {
       </PageContainer>
     );
   }
-  
+
+  const favoriteEvermarks = getFavoriteEvermarks();
+  const currentReadingEvermarks = getCurrentReadingEvermarks();
+
   return (
     <PageContainer title="My Bookshelf">
-      <div className="space-y-6">
+      <div className="space-y-8">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <p className="text-gray-600">Organize your Evermarks into collections</p>
+          <div>
+            <h1 className="text-2xl font-serif font-bold text-gray-900 mb-2">My Bookshelf</h1>
+            <p className="text-gray-600">Curate your favorite content and current reading</p>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
@@ -155,6 +390,159 @@ const BookshelfPage: React.FC = () => {
             >
               {viewMode === 'grid' ? <ListIcon className="h-5 w-5" /> : <GridIcon className="h-5 w-5" />}
             </button>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <HeartIcon className="h-5 w-5 text-red-500 mr-2" />
+              <div>
+                <p className="text-sm text-gray-600">Favorites</p>
+                <p className="text-lg font-bold">{stats.totalFavorites}/{stats.maxFavorites}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <BookOpenIcon className="h-5 w-5 text-blue-500 mr-2" />
+              <div>
+                <p className="text-sm text-gray-600">Reading</p>
+                <p className="text-lg font-bold">{stats.totalCurrentReading}/{stats.maxCurrentReading}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <FolderIcon className="h-5 w-5 text-purple-500 mr-2" />
+              <div>
+                <p className="text-sm text-gray-600">Collections</p>
+                <p className="text-lg font-bold">{collections.length}</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center">
+              <StarIcon className="h-5 w-5 text-yellow-500 mr-2" />
+              <div>
+                <p className="text-sm text-gray-600">Total</p>
+                <p className="text-lg font-bold">{evermarks.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Add Section */}
+        <QuickAddSection userAddress={address!} />
+
+        {/* Favorites Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <HeartIcon className="h-6 w-6 text-red-500 mr-3" />
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Favorites</h2>
+                <p className="text-sm text-gray-600">Your most cherished Evermarks</p>
+              </div>
+            </div>
+            <span className="text-sm text-gray-500">{stats.totalFavorites}/{stats.maxFavorites}</span>
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="bg-gray-100 rounded-lg h-64 animate-pulse"></div>
+              ))}
+            </div>
+          ) : favoriteEvermarks.length === 0 ? (
+            <div className="text-center py-12 bg-red-50 rounded-lg border-2 border-dashed border-red-200">
+              <HeartIcon className="mx-auto h-12 w-12 text-red-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Favorites Yet</h3>
+              <p className="text-gray-600 mb-4">Mark your most loved Evermarks as favorites</p>
+              <Link
+                to="/my-evermarks"
+                className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                Browse Your Evermarks
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {favoriteEvermarks.map(({ evermark, bookshelfItem }) => (
+                <BookshelfEvermarkCard
+                  key={evermark.id}
+                  evermark={evermark}
+                  bookshelfItem={bookshelfItem}
+                  category="favorite"
+                  onRemove={() => removeFromBookshelf(evermark.id)}
+                  onUpdateNotes={(notes) => updateNotes(evermark.id, notes)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Current Reading Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <BookOpenIcon className="h-6 w-6 text-blue-500 mr-3" />
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Current Reading</h2>
+                <p className="text-sm text-gray-600">What you're exploring right now</p>
+              </div>
+            </div>
+            <span className="text-sm text-gray-500">{stats.totalCurrentReading}/{stats.maxCurrentReading}</span>
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[...Array(2)].map((_, i) => (
+                <div key={i} className="bg-gray-100 rounded-lg h-64 animate-pulse"></div>
+              ))}
+            </div>
+          ) : currentReadingEvermarks.length === 0 ? (
+            <div className="text-center py-12 bg-blue-50 rounded-lg border-2 border-dashed border-blue-200">
+              <BookOpenIcon className="mx-auto h-12 w-12 text-blue-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nothing Currently Reading</h3>
+              <p className="text-gray-600 mb-4">Add Evermarks you're actively exploring</p>
+              <Link
+                to="/my-evermarks"
+                className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Browse Your Evermarks
+              </Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {currentReadingEvermarks.map(({ evermark, bookshelfItem }) => (
+                <BookshelfEvermarkCard
+                  key={evermark.id}
+                  evermark={evermark}
+                  bookshelfItem={bookshelfItem}
+                  category="currentReading"
+                  onRemove={() => removeFromBookshelf(evermark.id)}
+                  onUpdateNotes={(notes) => updateNotes(evermark.id, notes)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Collections Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center">
+              <FolderIcon className="h-6 w-6 text-purple-500 mr-3" />
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">Collections</h2>
+                <p className="text-sm text-gray-600">Organize your Evermarks into custom groups</p>
+              </div>
+            </div>
             <button
               onClick={() => setShowCreateModal(true)}
               className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
@@ -163,121 +551,55 @@ const BookshelfPage: React.FC = () => {
               New Collection
             </button>
           </div>
-        </div>
-        
-        {/* Collections Grid */}
-        <div className={`grid ${viewMode === 'grid' ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1'} gap-4`}>
-          {/* My Collections */}
-          {collections.map(collection => (
-            <div 
-              key={collection.id} 
-              className={`bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:border-purple-300 transition-colors ${
-                selectedCollection === collection.id ? 'border-purple-500' : ''
-              }`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center">
-                  <FolderIcon className="h-5 w-5 text-purple-600 mr-2" />
-                  <h3 className="font-medium text-gray-900">{collection.name}</h3>
-                </div>
-                <div className="flex items-center gap-1">
-                  {collection.isPublic ? (
-                    <GlobeIcon className="h-4 w-4 text-green-600" aria-label="Public" />
-                  ) : (
-                    <LockIcon className="h-4 w-4 text-gray-400" aria-label="Private" />
+
+          {collections.length === 0 ? (
+            <div className="text-center py-12">
+              <FolderIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Collections Yet</h3>
+              <p className="text-gray-600">Create custom collections to organize your Evermarks</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {collections.map(collection => (
+                <div key={collection.id} className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center">
+                      <FolderIcon className="h-5 w-5 text-purple-600 mr-2" />
+                      <h3 className="font-medium text-gray-900">{collection.name}</h3>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {collection.isPublic ? (
+                        <GlobeIcon className="h-4 w-4 text-green-600" />
+                      ) : (
+                        <LockIcon className="h-4 w-4 text-gray-400" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {collection.description && (
+                    <p className="text-sm text-gray-600 mb-3">{collection.description}</p>
                   )}
+                  
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">{collection.evermarkIds.length} items</span>
+                    <div className="flex items-center gap-2">
+                      <button className="p-1 text-gray-500 hover:text-gray-700">
+                        <ShareIcon className="h-4 w-4" />
+                      </button>
+                      <button className="p-1 text-gray-500 hover:text-gray-700">
+                        <EditIcon className="h-4 w-4" />
+                      </button>
+                      <button className="p-1 text-red-500 hover:text-red-700">
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              {collection.description && (
-                <p className="text-sm text-gray-600 mb-3">{collection.description}</p>
-              )}
-              
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">
-                  {collection.evermarkIds.length} items
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => exportCollection(collection)}
-                    className="p-1 text-gray-500 hover:text-gray-700"
-                    aria-label="Export"
-                  >
-                    <DownloadIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => {/* TODO: Share functionality */}}
-                    className="p-1 text-gray-500 hover:text-gray-700"
-                    aria-label="Share"
-                  >
-                    <ShareIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setEditingCollection(collection.id)}
-                    className="p-1 text-gray-500 hover:text-gray-700"
-                    aria-label="Edit"
-                  >
-                    <EditIcon className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => deleteCollection(collection.id)}
-                    className="p-1 text-red-500 hover:text-red-700"
-                    aria-label="Delete"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-          
-          {/* Supported Evermarks */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm border border-blue-200 p-4">
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-blue-100 rounded-lg mr-3">
-                <ChevronRightIcon className="h-5 w-5 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900">Supported</h3>
-                <p className="text-sm text-gray-600">From your delegations</p>
-              </div>
-            </div>
-            <div className="text-sm text-gray-700">
-              <p className="font-medium">{supportedEvermarks.length} Evermarks</p>
-              <Link 
-                to="/my-evermarks?tab=supported" 
-                className="text-blue-600 hover:text-blue-700 inline-flex items-center mt-2"
-              >
-                View all
-                <ChevronRightIcon className="h-4 w-4 ml-1" />
-              </Link>
-            </div>
-          </div>
-          
-          {/* Locked In Evermarks */}
-          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-lg shadow-sm border border-amber-200 p-4">
-            <div className="flex items-center mb-3">
-              <div className="p-2 bg-amber-100 rounded-lg mr-3">
-                <LockIcon className="h-5 w-5 text-amber-600" />
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900">Locked In</h3>
-                <p className="text-sm text-gray-600">Staked for rewards</p>
-              </div>
-            </div>
-            <div className="text-sm text-gray-700">
-              <p className="font-medium">{lockedEvermarks.length} Evermarks</p>
-              <Link 
-                to="/my-evermarks?tab=locked" 
-                className="text-amber-600 hover:text-amber-700 inline-flex items-center mt-2"
-              >
-                View all
-                <ChevronRightIcon className="h-4 w-4 ml-1" />
-              </Link>
-            </div>
-          </div>
+          )}
         </div>
-        
+
         {/* Create Collection Modal */}
         {showCreateModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -353,4 +675,4 @@ const BookshelfPage: React.FC = () => {
   );
 };
 
-export default BookshelfPage;
+export default EnhancedBookshelfPage;
