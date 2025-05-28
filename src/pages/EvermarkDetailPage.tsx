@@ -42,24 +42,24 @@ const EvermarkDetailPage: React.FC = () => {
           abi: EVERMARK_NFT_ABI,
         });
 
-        // Get metadata from the contract
+        // Get metadata from the contract using FIXED method names
         const [title, author, metadataURI] = await readContract({
           contract,
-          method: "getBookmarkMetadata",
+          method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
           params: [BigInt(id)],
         });
 
         // Get creator address
         const creator = await readContract({
           contract,
-          method: "getBookmarkCreator",
+          method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
           params: [BigInt(id)],
         });
 
         // Get creation time
         const creationTime = await readContract({
           contract,
-          method: "getBookmarkCreationTime",
+          method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
           params: [BigInt(id)],
         });
 

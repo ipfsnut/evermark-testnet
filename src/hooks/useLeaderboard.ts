@@ -1,4 +1,3 @@
-// src/hooks/useLeaderboard.ts - FIXED VERSION FOR COMPLETE EVERMARK DATA
 import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, readContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
@@ -121,7 +120,7 @@ export function useLeaderboard(weekNumber?: number) {
         try {
           leaderboardData = await readContract({
             contract: leaderboardContract,
-            method: "getWeeklyTopBookmarks",
+            method: "getWeeklyTopEvermarks", // FIXED: Use redeployed contract method name
             params: [BigInt(targetWeek), BigInt(10)], // Get top 10
           });
           console.log("Found finalized leaderboard data:", leaderboardData);
@@ -132,7 +131,7 @@ export function useLeaderboard(weekNumber?: number) {
           try {
             const bookmarksWithVotes = await readContract({
               contract: votingContract,
-              method: "getBookmarksWithVotesInCycle",
+              method: "getEvermarksWithVotesInCycle", // FIXED: Use redeployed contract method name
               params: [BigInt(targetWeek)],
             });
             
@@ -153,7 +152,7 @@ export function useLeaderboard(weekNumber?: number) {
                 try {
                   const votes = await readContract({
                     contract: votingContract,
-                    method: "getBookmarkVotesInCycle",
+                    method: "getEvermarkVotesInCycle", // FIXED: Use redeployed contract method name
                     params: [BigInt(targetWeek), bookmarkId],
                   });
                   
@@ -216,24 +215,24 @@ export function useLeaderboard(weekNumber?: number) {
                 return null;
               }
               
-              // FIXED: Get metadata using correct method name for Evermark (not Bookmark)
+              // Get metadata using correct deployed contract method names
               const [title, author, metadataURI] = await readContract({
                 contract: evermarkContract,
-                method: "getEvermarkMetadata", // FIXED: Use Evermark instead of Bookmark
+                method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
                 params: [bookmark.tokenId],
               });
               
               // Get creator address
               const creator = await readContract({
                 contract: evermarkContract,
-                method: "getEvermarkCreator", // FIXED: Use Evermark instead of Bookmark
+                method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
                 params: [bookmark.tokenId],
               });
               
               // Get creation time
               const creationTime = await readContract({
                 contract: evermarkContract,
-                method: "getEvermarkCreationTime", // FIXED: Use Evermark instead of Bookmark
+                method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
                 params: [bookmark.tokenId],
               });
               

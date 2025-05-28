@@ -138,22 +138,22 @@ export function useEvermarks() {
           
           if (!exists) continue;
           
-          // FIXED: Use the correct method name from your ABI
+          // Use the redeployed contract method names
           const [title, creator, metadataURI] = await readContract({
             contract,
-            method: "getEvermarkMetadata", // Changed from getBookmarkMetadata
+            method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
             params: [BigInt(i)],
           });
           
           const minter = await readContract({
             contract,
-            method: "getEvermarkCreator", // Changed from getBookmarkCreator
+            method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
             params: [BigInt(i)],
           });
           
           const creationTime = await readContract({
             contract,
-            method: "getEvermarkCreationTime", // Changed from getBookmarkCreationTime
+            method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
             params: [BigInt(i)],
           });
 
@@ -271,22 +271,22 @@ export function useEvermarkDetail(id: string) {
           return;
         }
 
-        // FIXED: Use correct method names
+        // Use redeployed contract method names
         const [title, creator, metadataURI] = await readContract({
           contract,
-          method: "getEvermarkMetadata", // Changed from getBookmarkMetadata
+          method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
           params: [tokenId],
         });
 
         const minter = await readContract({
           contract,
-          method: "getEvermarkCreator", // Changed from getBookmarkCreator
+          method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
           params: [tokenId],
         });
 
         const creationTime = await readContract({
           contract,
-          method: "getEvermarkCreationTime", // Changed from getBookmarkCreationTime
+          method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
           params: [tokenId],
         });
 
@@ -427,21 +427,22 @@ export function useUserEvermarks(userAddress?: string) {
             
             if (owner.toLowerCase() !== userAddress.toLowerCase()) continue;
 
+            // Use actual deployed contract method names
             const [title, creator, metadataURI] = await readContract({
               contract,
-              method: "getEvermarkMetadata",
+              method: "getBookmarkMetadata", // Use actual deployed contract method name
               params: [BigInt(i)],
             });
 
             const minter = await readContract({
               contract,
-              method: "getEvermarkCreator",
+              method: "getBookmarkCreator", // Use actual deployed contract method name
               params: [BigInt(i)],
             });
 
             const creationTime = await readContract({
               contract,
-              method: "getEvermarkCreationTime",
+              method: "getBookmarkCreationTime", // Use actual deployed contract method name
               params: [BigInt(i)],
             });
 

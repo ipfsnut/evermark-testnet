@@ -1,4 +1,3 @@
-// src/components/voting/VotingPanel.tsx - CLEANED VERSION WITH DEBUG UI REMOVED
 import { useState, useEffect } from "react";
 import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
@@ -29,7 +28,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   // Get current votes for this Evermark
   const { data: currentVotes, isLoading: isLoadingVotes, refetch: refetchVotes } = useReadContract({
     contract: votingContract,
-    method: "getBookmarkVotes",
+    method: "getEvermarkVotes", // FIXED: Use redeployed contract method name
     params: [BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!evermarkId && evermarkId !== "0",
@@ -39,7 +38,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   // Get user votes for this Evermark
   const userVotesQuery = account ? useReadContract({
     contract: votingContract,
-    method: "getUserVotesForBookmark",
+    method: "getUserVotesForEvermark", // FIXED: Use redeployed contract method name
     params: [account.address, BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!evermarkId && evermarkId !== "0",
