@@ -1,7 +1,6 @@
-// src/hooks/useProfile.ts - UPDATED VERSION with proper wallet linking integration
+// src/hooks/useProfile.ts - Enhanced with Farcaster-first authentication
 import { useActiveAccount } from "thirdweb/react";
 import { useFarcasterUser } from '../lib/farcaster';
-import { useWalletLinking } from './useWalletLinking';
 
 export interface UnifiedProfile {
   // Authentication state
@@ -12,17 +11,6 @@ export interface UnifiedProfile {
   isWalletConnected: boolean;
   walletAddress?: string;
   walletDisplayAddress?: string;
-  
-  // Multi-wallet support
-  linkedWallets: Array<{
-    address: string;
-    label: string;
-    type: string;
-    isConnected: boolean;
-    isPrimary: boolean;
-  }>;
-  primaryWallet?: string;
-  hasMultipleWallets: boolean;
   
   // Farcaster data
   isFarcasterAuthenticated: boolean;
@@ -47,7 +35,6 @@ export interface UnifiedProfile {
   // For contract interactions
   canInteractWithContracts: boolean;
   primaryAddress?: string; // Best address for contract interactions
-  allAddresses: string[];  // All available addresses
 }
 
 export function useProfile(): UnifiedProfile {
@@ -58,14 +45,6 @@ export function useProfile(): UnifiedProfile {
   const walletDisplayAddress = account?.address ? 
     `${account.address.slice(0, 6)}...${account.address.slice(-4)}` : 
     undefined;
-  
-  // Get wallet linking data
-  const {
-    linkedWallets,
-    primaryWallet,
-    getWalletDisplayInfo,
-    getAllAddresses
-  } = useWalletLinking();
   
   // Get Farcaster data
   const {
@@ -79,15 +58,6 @@ export function useProfile(): UnifiedProfile {
     getVerifiedAddresses
   } = useFarcasterUser();
   
-  // Process linked wallets for display
-  const processedLinkedWallets = linkedWallets.map(wallet => ({
-    address: wallet.address,
-    label: getWalletDisplayInfo(wallet.address).label,
-    type: wallet.type,
-    isConnected: getWalletDisplayInfo(wallet.address).isConnected,
-    isPrimary: getWalletDisplayInfo(wallet.address).isPrimary,
-  }));
-  
   // Determine authentication method and state
   const authMethod: UnifiedProfile['authMethod'] = (() => {
     if (isFarcasterAuthenticated && isWalletConnected) return 'both';
@@ -96,40 +66,18 @@ export function useProfile(): UnifiedProfile {
     return 'none';
   })();
   
-  const isAuthenticated = isFarcasterAuthenticated || isWalletConnected || linkedWallets.length > 0;
+  const isAuthenticated = isFarcasterAuthenticated || isWalletConnected;
   
-  // For contract interactions, prioritize connected wallet, then primary, then first available
-  const allAddresses = getAllAddresses();
-  const verifiedAddresses = getVerifiedAddresses() || [];
+  // For contract interactions, prioritize wallet but allow Farcaster verified addresses
+  const verifiedAddresses = getVerifiedAddresses();
+  const canInteractWithContracts = isWalletConnected || 
+    (isFarcasterAuthenticated && verifiedAddresses && verifiedAddresses.length > 0);
   
-  // Determine best address for contract interactions
-  const contractAddress = (() => {
-    // 1. Currently connected wallet (can execute transactions immediately)
-    if (walletAddress) return walletAddress;
-    
-    // 2. Primary wallet if it's connected or can be connected
-    if (primaryWallet) {
-      const primaryInfo = getWalletDisplayInfo(primaryWallet);
-      if (primaryInfo.type !== 'manually-added') {
-        return primaryWallet;
-      }
-    }
-    
-    // 3. First verified Farcaster address (can be connected via Farcaster)
-    if (verifiedAddresses.length > 0) {
-      return verifiedAddresses[0];
-    }
-    
-    // 4. First non-watch-only wallet
-    const connectableWallet = linkedWallets.find(w => w.type !== 'manually-added');
-    if (connectableWallet) {
-      return connectableWallet.address;
-    }
-    
-    return undefined;
-  })();
-  
-  const canInteractWithContracts = !!contractAddress;
+  // Primary address for contract interactions
+  const primaryAddress = walletAddress || 
+    (verifiedAddresses && verifiedAddresses.length > 0 
+      ? verifiedAddresses[0] 
+      : undefined);
   
   // Determine the best display name (prioritize Farcaster in Farcaster environment)
   const displayName = (() => {
@@ -141,13 +89,6 @@ export function useProfile(): UnifiedProfile {
     }
     if (isWalletConnected && walletDisplayAddress) {
       return walletDisplayAddress;
-    }
-    if (primaryWallet) {
-      const primaryInfo = getWalletDisplayInfo(primaryWallet);
-      return primaryInfo.label;
-    }
-    if (linkedWallets.length > 0) {
-      return getWalletDisplayInfo(linkedWallets[0].address).label;
     }
     return 'User';
   })();
@@ -173,17 +114,10 @@ export function useProfile(): UnifiedProfile {
     isAuthenticated,
     authMethod,
     
-    // Single wallet data (for backward compatibility)
+    // Raw data
     isWalletConnected,
     walletAddress,
     walletDisplayAddress,
-    
-    // Multi-wallet data
-    linkedWallets: processedLinkedWallets,
-    primaryWallet,
-    hasMultipleWallets: linkedWallets.length > 1,
-    
-    // Farcaster data
     isFarcasterAuthenticated,
     isInFarcaster,
     farcasterUser: farcasterUser ? {
@@ -205,21 +139,19 @@ export function useProfile(): UnifiedProfile {
     
     // Contract interaction capability
     canInteractWithContracts,
-    primaryAddress: contractAddress,
-    allAddresses,
+    primaryAddress,
   };
 }
 
-// Enhanced contract auth hook
+// Convenience hook for just the display info
+export function useDisplayProfile() {
+  const { displayName, avatar, handle, isAuthenticated, authMethod } = useProfile();
+  return { displayName, avatar, handle, isAuthenticated, authMethod };
+}
+
+// Hook specifically for checking if user can interact with contracts
 export function useContractAuth() {
-  const { 
-    canInteractWithContracts, 
-    primaryAddress, 
-    authMethod, 
-    isInFarcaster,
-    linkedWallets,
-    isWalletConnected 
-  } = useProfile();
+  const { canInteractWithContracts, primaryAddress, authMethod, isInFarcaster } = useProfile();
   
   return {
     canInteract: canInteractWithContracts,
@@ -227,29 +159,12 @@ export function useContractAuth() {
     authMethod,
     needsWalletConnection: !canInteractWithContracts,
     isInFarcaster,
-    hasMultipleOptions: linkedWallets.length > 1,
-    
     // Helper message for users who need to connect
     getConnectionMessage: () => {
-      if (linkedWallets.length > 0 && !isWalletConnected) {
-        return "Connect one of your linked wallets to continue";
-      }
       if (isInFarcaster) {
         return "Link a wallet to interact with the blockchain";
       }
       return "Connect your wallet to continue";
-    },
-    
-    // Get recommended action
-    getRecommendedAction: () => {
-      if (!canInteractWithContracts) {
-        if (linkedWallets.length === 0) {
-          return { action: 'connect', message: 'Connect a wallet' };
-        } else {
-          return { action: 'activate', message: 'Activate a linked wallet' };
-        }
-      }
-      return { action: 'ready', message: 'Ready for transactions' };
     }
   };
 }
