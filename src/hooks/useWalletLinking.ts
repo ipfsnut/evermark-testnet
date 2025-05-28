@@ -1,8 +1,8 @@
+// src/hooks/useWalletLinking.ts - FIXED VERSION
 import { useState, useEffect, useCallback } from 'react';
 import { useActiveAccount, useConnect, useDisconnect } from "thirdweb/react";
 import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { useFarcasterUser } from '../lib/farcaster';
-
 
 export interface LinkedWallet {
   address: string;
@@ -49,27 +49,51 @@ export function useWalletLinking() {
     error: null,
   });
 
-  // Load linked wallets from storage
+  // Load linked wallets from storage and sync with current state
   const loadLinkedWallets = useCallback(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      const linkedWallets: LinkedWallet[] = stored ? JSON.parse(stored) : [];
+      const storedWallets: LinkedWallet[] = stored ? JSON.parse(stored) : [];
+      let linkedWallets = [...storedWallets];
       
-      // Add currently connected wallet if it exists and isn't already linked
-      if (account?.address && !linkedWallets.find(w => w.address.toLowerCase() === account.address.toLowerCase())) {
-        linkedWallets.unshift({
-          address: account.address,
-          type: 'connected',
-          label: 'Connected Wallet',
-          lastUsed: Date.now(),
-        });
+      // FIXED: Add currently connected wallet if it exists and isn't already linked
+      if (account?.address) {
+        const existingIndex = linkedWallets.findIndex(
+          w => w.address.toLowerCase() === account.address.toLowerCase()
+        );
+        
+        if (existingIndex >= 0) {
+          // Update existing wallet to mark as connected
+          linkedWallets[existingIndex] = {
+            ...linkedWallets[existingIndex],
+            type: 'connected',
+            lastUsed: Date.now(),
+          };
+        } else {
+          // Add new connected wallet
+          linkedWallets.unshift({
+            address: account.address,
+            type: 'connected',
+            label: 'Connected Wallet',
+            lastUsed: Date.now(),
+          });
+        }
       }
       
       // Add Farcaster verified addresses
       if (isFarcasterAuth) {
         const verifiedAddresses = getVerifiedAddresses() || [];
         verifiedAddresses.forEach(address => {
-          if (!linkedWallets.find(w => w.address.toLowerCase() === address.toLowerCase())) {
+          const existingIndex = linkedWallets.findIndex(
+            w => w.address.toLowerCase() === address.toLowerCase()
+          );
+          
+          if (existingIndex >= 0) {
+            // Update existing wallet to include Farcaster verification
+            if (linkedWallets[existingIndex].type !== 'connected') {
+              linkedWallets[existingIndex].type = 'farcaster-verified';
+            }
+          } else {
             linkedWallets.push({
               address,
               type: 'farcaster-verified',
@@ -80,10 +104,22 @@ export function useWalletLinking() {
         });
       }
       
-      // Determine primary wallet
-      const primaryWallet = linkedWallets.length > 0 
-        ? (account?.address || linkedWallets[0].address)
-        : null;
+      // Clean up disconnected wallets
+      linkedWallets = linkedWallets.map(wallet => {
+        if (wallet.type === 'connected' && wallet.address.toLowerCase() !== account?.address?.toLowerCase()) {
+          // Wallet was connected but is no longer the active wallet
+          return {
+            ...wallet,
+            type: wallet.address.toLowerCase() === (getVerifiedAddresses()?.[0]?.toLowerCase()) 
+              ? 'farcaster-verified' 
+              : 'manually-added'
+          };
+        }
+        return wallet;
+      });
+      
+      // Determine primary wallet - prefer connected, then first available
+      const primaryWallet = account?.address || linkedWallets[0]?.address || null;
       
       setState({
         linkedWallets,
@@ -101,14 +137,14 @@ export function useWalletLinking() {
     }
   }, [account?.address, isFarcasterAuth, getVerifiedAddresses]);
 
-  // Save linked wallets to storage
+  // Save only persistent wallets to storage (not temporary connected state)
   const saveLinkedWallets = useCallback((wallets: LinkedWallet[]) => {
     try {
       // Only save manually-added and labeled wallets to localStorage
-      // Connected and Farcaster wallets are dynamic
+      // Connected and Farcaster wallets are reconstructed dynamically
       const walletsToSave = wallets.filter(w => 
         w.type === 'manually-added' || 
-        (w.label && w.label !== 'Connected Wallet')
+        (w.label && w.label !== 'Connected Wallet' && w.label !== 'Farcaster Verified')
       );
       localStorage.setItem(STORAGE_KEY, JSON.stringify(walletsToSave));
     } catch (error) {
@@ -116,7 +152,7 @@ export function useWalletLinking() {
     }
   }, []);
 
-  // Link a new wallet by connecting it
+  // FIXED: Link a new wallet by connecting it
   const linkWallet = useCallback(async (walletId: string, label?: string) => {
     setState(prev => ({ ...prev, error: null }));
     
@@ -127,49 +163,28 @@ export function useWalletLinking() {
       }
 
       const wallet = walletOption.wallet();
-      const result = await connect(wallet);
       
-      if (result) {
-  // Get the account from the connected wallet
-  const account = result.getAccount();
-  if (account) {
-    const newWallet: LinkedWallet = {
-      address: account.address,
-          type: 'connected',
-          label: label || walletOption.name,
-          connectorId: walletId,
-          lastUsed: Date.now(),
-        };
-
-        const updatedWallets = [...state.linkedWallets];
-        const existingIndex = updatedWallets.findIndex(
-          w => w.address.toLowerCase() === newWallet.address.toLowerCase()
-        );
-
-        if (existingIndex >= 0) {
-          updatedWallets[existingIndex] = { ...updatedWallets[existingIndex], ...newWallet };
-        } else {
-          updatedWallets.unshift(newWallet);
-        }
-
-        setState(prev => ({
-          ...prev,
-          linkedWallets: updatedWallets,
-          primaryWallet: newWallet.address,
-        }));
-
-        saveLinkedWallets(updatedWallets);
-        return { success: true, address: newWallet.address };
-      }
+      // FIXED: Thirdweb v5 connect returns void, account is available via useActiveAccount
+      await connect(wallet);
+      
+      // Wait a bit for the account to be available
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // The account should now be available via useActiveAccount hook
+      // loadLinkedWallets will be called via useEffect and will handle the new wallet
+      
+      return { success: true, message: 'Wallet connected successfully' };
+      
     } catch (error: any) {
       console.error('Error linking wallet:', error);
+      const errorMessage = error.message || 'Failed to link wallet';
       setState(prev => ({
         ...prev,
-        error: error.message || 'Failed to link wallet',
+        error: errorMessage,
       }));
-      return { success: false, error: error.message || 'Failed to link wallet' };
+      return { success: false, error: errorMessage };
     }
-  }, [connect, state.linkedWallets, saveLinkedWallets]);
+  }, [connect]);
 
   // Manually add a wallet address (for watch-only)
   const addWalletAddress = useCallback((address: string, label: string) => {
@@ -207,7 +222,18 @@ export function useWalletLinking() {
   }, [state.linkedWallets, saveLinkedWallets]);
 
   // Remove a linked wallet
-  const unlinkWallet = useCallback((address: string) => {
+  const unlinkWallet = useCallback(async (address: string) => {
+    const isCurrentlyConnected = account?.address?.toLowerCase() === address.toLowerCase();
+    
+    // If removing the currently connected wallet, disconnect it first
+    if (isCurrentlyConnected) {
+      try {
+        await disconnect();
+      } catch (error) {
+        console.error('Error disconnecting wallet:', error);
+      }
+    }
+
     const updatedWallets = state.linkedWallets.filter(
       w => w.address.toLowerCase() !== address.toLowerCase()
     );
@@ -226,7 +252,7 @@ export function useWalletLinking() {
 
     saveLinkedWallets(updatedWallets);
     return { success: true };
-  }, [state.linkedWallets, state.primaryWallet, saveLinkedWallets]);
+  }, [state.linkedWallets, state.primaryWallet, saveLinkedWallets, account?.address, disconnect]);
 
   // Set primary wallet for transactions
   const setPrimaryWallet = useCallback((address: string) => {
@@ -280,20 +306,23 @@ export function useWalletLinking() {
       w => w.address.toLowerCase() === address.toLowerCase()
     );
     
+    const isConnected = account?.address?.toLowerCase() === address.toLowerCase();
+    const isPrimary = state.primaryWallet?.toLowerCase() === address.toLowerCase();
+    
     return {
       address,
       label: wallet?.label || `${address.slice(0, 6)}...${address.slice(-4)}`,
       type: wallet?.type || 'unknown',
-      isConnected: account?.address?.toLowerCase() === address.toLowerCase(),
-      isPrimary: state.primaryWallet?.toLowerCase() === address.toLowerCase(),
-      canRemove: wallet?.type !== 'farcaster-verified',
+      isConnected,
+      isPrimary,
+      canRemove: wallet?.type !== 'farcaster-verified' || !isConnected,
     };
   }, [state.linkedWallets, state.primaryWallet, account?.address]);
 
-  // Load wallets on mount and when dependencies change
+  // FIXED: Reload wallets when account or Farcaster state changes
   useEffect(() => {
     loadLinkedWallets();
-  }, [loadLinkedWallets]);
+  }, [account?.address, isFarcasterAuth]);
 
   // Clear error after 5 seconds
   useEffect(() => {
