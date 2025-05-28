@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { TrophyIcon, BookOpenIcon, UserIcon, CalendarIcon, ClockIcon } from 'lucide-react';
+import { TrophyIcon, BookOpenIcon, UserIcon, CalendarIcon, ClockIcon, ImageIcon } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useReadContract } from "thirdweb/react";
 import { getContract } from "thirdweb";
@@ -8,6 +8,106 @@ import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, VOTING_ABI } from "../lib/contracts";
 import { toEther } from "thirdweb/utils";
 import PageContainer from '../components/layout/PageContainer';
+import { formatDistanceToNow } from 'date-fns';
+
+// Enhanced Leaderboard Entry Component
+const LeaderboardEntryCard: React.FC<{ entry: any; index: number }> = ({ entry, index }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+  
+  const isTopThree = index < 3;
+  const rankColors = {
+    0: 'border-yellow-400 bg-yellow-50',
+    1: 'border-gray-400 bg-gray-50', 
+    2: 'border-amber-600 bg-amber-50',
+  };
+
+  const handleImageLoad = () => setImageLoading(false);
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoading(false);
+  };
+
+  return (
+    <Link 
+      to={`/evermark/${entry.evermark.id}`}
+      className="block hover:bg-gray-50 transition-colors"
+    >
+      <div className={`p-6 flex items-center ${isTopThree ? 'border-l-4' : ''} ${
+        isTopThree ? rankColors[index as keyof typeof rankColors] : ''
+      }`}>
+        {/* Rank Badge */}
+        <div className={`flex items-center justify-center h-12 w-12 rounded-full mr-4 flex-shrink-0 font-bold text-lg ${
+          index === 0 ? 'bg-yellow-100 text-yellow-700' :
+          index === 1 ? 'bg-gray-100 text-gray-700' :
+          index === 2 ? 'bg-amber-100 text-amber-700' :
+          'bg-purple-100 text-purple-700'
+        }`}>
+          {entry.rank}
+        </div>
+        
+        {/* Image */}
+        <div className="w-16 h-16 bg-gray-100 rounded-lg mr-4 flex-shrink-0 overflow-hidden">
+          {entry.evermark.image && !imageError ? (
+            <div className="relative w-full h-full">
+              {imageLoading && (
+                <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-lg"></div>
+              )}
+              <img
+                src={entry.evermark.image}
+                alt={entry.evermark.title}
+                className="w-full h-full object-cover rounded-lg"
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+              />
+            </div>
+          ) : (
+            <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-lg">
+              <ImageIcon className="h-6 w-6 text-gray-400" />
+            </div>
+          )}
+        </div>
+        
+        {/* Content */}
+        <div className="flex-grow min-w-0 mr-4">
+          <h3 className="font-medium text-gray-900 truncate mb-1">
+            {entry.evermark.title}
+          </h3>
+          <div className="flex items-center text-sm text-gray-500 mb-1">
+            <UserIcon className="h-3 w-3 mr-1" />
+            <span className="truncate">{entry.evermark.author}</span>
+          </div>
+          {entry.evermark.description && (
+            <p className="text-sm text-gray-600 line-clamp-2 mb-1">
+              {entry.evermark.description}
+            </p>
+          )}
+          <div className="flex items-center text-xs text-gray-500">
+            <CalendarIcon className="h-3 w-3 mr-1" />
+            <span>{formatDistanceToNow(new Date(entry.evermark.creationTime), { addSuffix: true })}</span>
+          </div>
+        </div>
+        
+        {/* Vote Count */}
+        <div className="flex-shrink-0 text-right">
+          <p className="font-bold text-purple-600 text-xl">
+            {toEther(entry.votes)}
+          </p>
+          <p className="text-xs text-gray-500">
+            vote{Number(toEther(entry.votes)) !== 1 ? 's' : ''}
+          </p>
+        </div>
+        
+        {/* Crown for #1 */}
+        {entry.rank === 1 && (
+          <div className="ml-3 text-2xl">
+            👑
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+};
 
 const LeaderboardPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'current' | 'previous'>('current');
@@ -91,11 +191,23 @@ const LeaderboardPage: React.FC = () => {
 
         {/* Leaderboard Content */}
         {activeData.isLoading ? (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="animate-pulse space-y-4">
-              <div className="h-12 bg-gray-200 rounded"></div>
-              <div className="h-12 bg-gray-200 rounded"></div>
-              <div className="h-12 bg-gray-200 rounded"></div>
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-50 to-amber-50 px-6 py-4 border-b border-gray-200">
+              <div className="h-6 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="divide-y divide-gray-200">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="p-6 flex items-center">
+                  <div className="h-12 w-12 bg-gray-200 rounded-full mr-4 animate-pulse"></div>
+                  <div className="w-16 h-16 bg-gray-200 rounded-lg mr-4 animate-pulse"></div>
+                  <div className="flex-grow space-y-2">
+                    <div className="h-5 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+                    <div className="h-3 bg-gray-200 rounded w-2/3 animate-pulse"></div>
+                  </div>
+                  <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
             </div>
           </div>
         ) : activeData.error ? (
@@ -119,18 +231,18 @@ const LeaderboardPage: React.FC = () => {
               <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {activeTab === 'current' ? 'No Votes Yet This Week' : 'No Data Available'}
               </h3>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-6">
                 {activeTab === 'current' 
-                  ? 'Be the first to vote on Evermarks this week!'
-                  : 'No leaderboard data for this week.'
+                  ? 'Be the first to vote on Evermarks this week! Voting helps great content rise to the top.'
+                  : 'No leaderboard data available for this week.'
                 }
               </p>
               {activeTab === 'current' && (
                 <Link 
                   to="/" 
-                  className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
-                  <BookOpenIcon className="h-4 w-4 mr-2" />
+                  <BookOpenIcon className="h-5 w-5 mr-2" />
                   Explore Evermarks
                 </Link>
               )}
@@ -155,65 +267,13 @@ const LeaderboardPage: React.FC = () => {
             </div>
             
             <div className="divide-y divide-gray-200">
-              {activeData.entries.map((entry, index) => {
-                const isTopThree = index < 3;
-                const rankColors = {
-                  0: 'border-yellow-400 bg-yellow-50 text-yellow-700',
-                  1: 'border-gray-400 bg-gray-50 text-gray-700', 
-                  2: 'border-amber-600 bg-amber-50 text-amber-700',
-                };
-                
-                return (
-                  <Link 
-                    key={entry.evermark.id} 
-                    to={`/evermark/${entry.evermark.id}`}
-                    className="block hover:bg-gray-50 transition-colors"
-                  >
-                    <div className={`p-6 flex items-center ${isTopThree ? 'border-l-4' : ''} ${
-                      isTopThree ? rankColors[index as keyof typeof rankColors] : ''
-                    }`}>
-                      {/* Rank Badge */}
-                      <div className={`flex items-center justify-center h-10 w-10 rounded-full mr-4 flex-shrink-0 ${
-                        isTopThree ? 'font-bold text-lg' : 'bg-gray-100 text-gray-600 font-medium'
-                      }`}>
-                        {isTopThree ? (
-                          <span>{entry.rank}</span>
-                        ) : (
-                          <span>{entry.rank}</span>
-                        )}
-                      </div>
-                      
-                      {/* Content */}
-                      <div className="flex-grow min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate mb-1">
-                          {entry.evermark.title}
-                        </h3>
-                        <div className="flex items-center text-sm text-gray-500">
-                          <UserIcon className="h-3 w-3 mr-1" />
-                          <span className="truncate">{entry.evermark.author}</span>
-                        </div>
-                      </div>
-                      
-                      {/* Vote Count */}
-                      <div className="flex-shrink-0 ml-4 text-right">
-                        <p className="font-bold text-purple-600 text-lg">
-                          {toEther(entry.votes)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          vote{Number(toEther(entry.votes)) !== 1 ? 's' : ''}
-                        </p>
-                      </div>
-                      
-                      {/* Crown for #1 */}
-                      {entry.rank === 1 && (
-                        <div className="ml-2 text-yellow-500">
-                          👑
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-                );
-              })}
+              {activeData.entries.map((entry, index) => (
+                <LeaderboardEntryCard 
+                  key={entry.evermark.id} 
+                  entry={entry} 
+                  index={index} 
+                />
+              ))}
             </div>
           </div>
         )}
