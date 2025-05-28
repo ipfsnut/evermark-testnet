@@ -1,4 +1,3 @@
-// src/pages/LeaderboardPage.tsx - Shows both current and previous cycle data
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { TrophyIcon, BookOpenIcon, UserIcon, CalendarIcon, ClockIcon } from 'lucide-react';

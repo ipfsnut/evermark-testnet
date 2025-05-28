@@ -1,4 +1,4 @@
-// src/hooks/useLeaderboard.ts - FIXED VERSION FOR NEW ARCHITECTURE
+// src/hooks/useLeaderboard.ts - FIXED VERSION FOR COMPLETE EVERMARK DATA
 import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, readContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
@@ -11,10 +11,59 @@ export interface LeaderboardEntry {
     title: string;
     author: string;
     creator: string;
+    description?: string;
+    sourceUrl?: string;
+    image?: string;
+    metadataURI: string;
+    creationTime: number;
   };
   votes: bigint;
   rank: number;
 }
+
+// Helper function to fetch IPFS metadata
+const fetchIPFSMetadata = async (metadataURI: string) => {
+  const defaultReturn = { description: "", sourceUrl: "", image: "" };
+  
+  if (!metadataURI || !metadataURI.startsWith('ipfs://')) {
+    return defaultReturn;
+  }
+
+  try {
+    const ipfsHash = metadataURI.replace('ipfs://', '');
+    if (ipfsHash.length < 40) {
+      return defaultReturn;
+    }
+    
+    const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    
+    const response = await fetch(ipfsGatewayUrl, { 
+      signal: controller.signal,
+      cache: 'force-cache',
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      return defaultReturn;
+    }
+    
+    const ipfsData = await response.json();
+    
+    return {
+      description: ipfsData.description || "",
+      sourceUrl: ipfsData.external_url || "",
+      image: ipfsData.image 
+        ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
+        : ""
+    };
+  } catch (error) {
+    return defaultReturn;
+  }
+};
 
 export function useLeaderboard(weekNumber?: number) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -43,10 +92,10 @@ export function useLeaderboard(weekNumber?: number) {
     abi: EVERMARK_NFT_ABI,
   }), []);
   
-  // FIXED: Get current cycle from voting contract
+  // Get current cycle from voting contract
   const { data: currentCycle, isLoading: isLoadingCycle } = useReadContract({
     contract: votingContract,
-    method: "getCurrentCycle", // VERIFIED: This method exists in VOTING_ABI
+    method: "getCurrentCycle",
     params: [],
   });
   
@@ -72,7 +121,7 @@ export function useLeaderboard(weekNumber?: number) {
         try {
           leaderboardData = await readContract({
             contract: leaderboardContract,
-            method: "getWeeklyTopBookmarks", // VERIFIED: This method exists in LEADERBOARD_ABI
+            method: "getWeeklyTopBookmarks",
             params: [BigInt(targetWeek), BigInt(10)], // Get top 10
           });
           console.log("Found finalized leaderboard data:", leaderboardData);
@@ -81,10 +130,9 @@ export function useLeaderboard(weekNumber?: number) {
           
           // STRATEGY 2: Fallback - Build leaderboard from current voting data
           try {
-            // FIXED: Get all bookmarks with votes in the current cycle
             const bookmarksWithVotes = await readContract({
               contract: votingContract,
-              method: "getBookmarksWithVotesInCycle", // VERIFIED: This method exists in VOTING_ABI
+              method: "getBookmarksWithVotesInCycle",
               params: [BigInt(targetWeek)],
             });
             
@@ -105,16 +153,14 @@ export function useLeaderboard(weekNumber?: number) {
                 try {
                   const votes = await readContract({
                     contract: votingContract,
-                    method: "getBookmarkVotesInCycle", // VERIFIED: This method exists in VOTING_ABI
+                    method: "getBookmarkVotesInCycle",
                     params: [BigInt(targetWeek), bookmarkId],
                   });
-                  
-                  console.log(`Bookmark ${bookmarkId} has ${votes} votes`);
                   
                   return {
                     tokenId: bookmarkId,
                     votes: votes,
-                    rank: BigInt(0), // Will be set after sorting
+                    rank: BigInt(0),
                   };
                 } catch (err) {
                   console.error(`Error fetching votes for bookmark ${bookmarkId}:`, err);
@@ -136,7 +182,6 @@ export function useLeaderboard(weekNumber?: number) {
             console.log("Built leaderboard from voting data:", leaderboardData);
           } catch (votingError) {
             console.error("Error fetching voting data:", votingError);
-            // If we can't get voting data either, return empty
             if (isMounted) {
               setEntries([]);
               setIsLoading(false);
@@ -154,15 +199,15 @@ export function useLeaderboard(weekNumber?: number) {
           return;
         }
         
-        // ENHANCED: Enhance with Evermark metadata
-        console.log("Enhancing with metadata...");
+        // ENHANCED: Get complete Evermark metadata
+        console.log("Enhancing with complete metadata...");
         const enhancedEntries = await Promise.all(
           leaderboardData.map(async (bookmark: any) => {
             try {
-              // FIXED: Check if bookmark exists using correct method
+              // Check if bookmark exists
               const exists = await readContract({
                 contract: evermarkContract,
-                method: "exists", // VERIFIED: This method exists in EVERMARK_NFT_ABI
+                method: "exists",
                 params: [bookmark.tokenId],
               });
               
@@ -171,21 +216,34 @@ export function useLeaderboard(weekNumber?: number) {
                 return null;
               }
               
-              // FIXED: Get metadata using correct method name
-              const [title, author] = await readContract({
+              // FIXED: Get metadata using correct method name for Evermark (not Bookmark)
+              const [title, author, metadataURI] = await readContract({
                 contract: evermarkContract,
-                method: "getBookmarkMetadata", // VERIFIED: This method exists in EVERMARK_NFT_ABI
+                method: "getEvermarkMetadata", // FIXED: Use Evermark instead of Bookmark
                 params: [bookmark.tokenId],
               });
               
-              // FIXED: Get creator using correct method name  
+              // Get creator address
               const creator = await readContract({
                 contract: evermarkContract,
-                method: "getBookmarkCreator", // VERIFIED: This method exists in EVERMARK_NFT_ABI
+                method: "getEvermarkCreator", // FIXED: Use Evermark instead of Bookmark
                 params: [bookmark.tokenId],
               });
               
-              console.log(`Enhanced bookmark ${bookmark.tokenId}:`, { title, author, creator });
+              // Get creation time
+              const creationTime = await readContract({
+                contract: evermarkContract,
+                method: "getEvermarkCreationTime", // FIXED: Use Evermark instead of Bookmark
+                params: [bookmark.tokenId],
+              });
+              
+              // ENHANCED: Fetch IPFS metadata for description, image, etc.
+              const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
+              
+              console.log(`Enhanced bookmark ${bookmark.tokenId}:`, { 
+                title, author, creator, description: description ? 'present' : 'missing',
+                image: image ? 'present' : 'missing'
+              });
               
               return {
                 evermark: {
@@ -193,6 +251,11 @@ export function useLeaderboard(weekNumber?: number) {
                   title: title || `Evermark #${bookmark.tokenId}`,
                   author: author || "Unknown",
                   creator: creator,
+                  description,
+                  sourceUrl,
+                  image,
+                  metadataURI,
+                  creationTime: Number(creationTime) * 1000, // Convert to milliseconds
                 },
                 votes: bookmark.votes,
                 rank: Number(bookmark.rank),
@@ -206,6 +269,11 @@ export function useLeaderboard(weekNumber?: number) {
                   title: `Evermark #${bookmark.tokenId}`,
                   author: "Unknown",
                   creator: "0x0",
+                  description: "",
+                  sourceUrl: "",
+                  image: "",
+                  metadataURI: "",
+                  creationTime: Date.now(),
                 },
                 votes: bookmark.votes,
                 rank: Number(bookmark.rank),
@@ -216,7 +284,7 @@ export function useLeaderboard(weekNumber?: number) {
         
         // Filter out nulls and set entries
         const validEntries = enhancedEntries.filter(entry => entry !== null);
-        console.log("Final leaderboard entries:", validEntries);
+        console.log(`Final leaderboard entries with complete data:`, validEntries.length);
         
         if (isMounted) {
           setEntries(validEntries);
@@ -239,10 +307,10 @@ export function useLeaderboard(weekNumber?: number) {
     };
   }, [targetWeek, isLoadingCycle, votingContract, leaderboardContract, evermarkContract]);
   
-  // FIXED: Check if leaderboard is finalized using contract method
+  // Check if leaderboard is finalized
   const isFinalized = useMemo(() => {
     // For current week, assume it's not finalized
-    // For previous weeks, check if they're finalized (could add contract call here)
+    // For previous weeks, check if they're finalized
     return targetWeek < (currentCycle ? Number(currentCycle) : 1);
   }, [targetWeek, currentCycle]);
   
@@ -255,7 +323,7 @@ export function useLeaderboard(weekNumber?: number) {
   };
 }
 
-// ENHANCED: Hook for leaderboard management (admin functions)
+// Hook for leaderboard management (admin functions)
 export function useLeaderboardManagement() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,7 +347,7 @@ export function useLeaderboardManagement() {
     try {
       const transaction = prepareContractCall({
         contract: leaderboardContract,
-        method: "finalizeWeeklyLeaderboard", // VERIFIED: This method exists in LEADERBOARD_ABI
+        method: "finalizeWeeklyLeaderboard",
         params: [BigInt(weekNumber)],
       });
       
