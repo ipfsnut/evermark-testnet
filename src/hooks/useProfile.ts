@@ -1,4 +1,3 @@
-// src/hooks/useProfile.ts - Enhanced with Farcaster-first authentication
 import { useActiveAccount } from "thirdweb/react";
 import { useFarcasterUser } from '../lib/farcaster';
 
@@ -68,16 +67,17 @@ export function useProfile(): UnifiedProfile {
   
   const isAuthenticated = isFarcasterAuthenticated || isWalletConnected;
   
-  // For contract interactions, prioritize wallet but allow Farcaster verified addresses
+  // FIXED: Trust that Farcaster users can interact with contracts
+  // Frame SDK doesn't always expose verified addresses even though they exist
   const verifiedAddresses = getVerifiedAddresses();
-  const canInteractWithContracts = isWalletConnected || 
-    (isFarcasterAuthenticated && verifiedAddresses && verifiedAddresses.length > 0);
+  const canInteractWithContracts = isWalletConnected || isFarcasterAuthenticated;
   
-  // Primary address for contract interactions
+  // FIXED: For Farcaster users without exposed verified addresses,
+  // we'll handle the actual signing when needed (prompt to link wallet)
   const primaryAddress = walletAddress || 
     (verifiedAddresses && verifiedAddresses.length > 0 
       ? verifiedAddresses[0] 
-      : undefined);
+      : (isFarcasterAuthenticated ? 'farcaster-pending' : undefined));
   
   // Determine the best display name (prioritize Farcaster in Farcaster environment)
   const displayName = (() => {
