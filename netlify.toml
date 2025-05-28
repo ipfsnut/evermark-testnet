@@ -67,8 +67,7 @@
     Access-Control-Allow-Origin = "*"
     Cache-Control = "public, max-age=300"
 
-# Specific redirects for common API patterns
-[[redirects]]
+  [[redirects]]
   from = "/webhook"
   to = "/.netlify/functions/webhook"
   status = 200
@@ -76,4 +75,14 @@
 [[redirects]]
   from = "/webhook/*"
   to = "/.netlify/functions/webhook"
+  status = 200
+
+[[redirects]]
+  from = "/api/shares"
+  to = "/.netlify/functions/shares"
+  status = 200
+
+[[redirects]]
+  from = "/api/shares/*"
+  to = "/.netlify/functions/shares"
   status = 200

@@ -1,10 +1,11 @@
 {
   "name": "evermark-netlify-functions",
   "version": "1.0.0",
-  "description": "Netlify functions for Evermark webhook",
+  "description": "Netlify functions for Evermark webhook and share tracking",
   "main": "index.js",
   "dependencies": {
-    "@netlify/functions": "^2.0.0"
+    "@netlify/functions": "^2.0.0",
+    "@supabase/supabase-js": "^2.39.0"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
