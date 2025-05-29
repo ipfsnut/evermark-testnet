@@ -117,6 +117,28 @@ export const useEvermarkCreation = () => {
   
   const account = useActiveAccount();
 
+  // Add this test function temporarily
+  const testPinataAuth = async () => {
+    const jwt = import.meta.env.VITE_PINATA_JWT;
+    console.log("🧪 Testing Pinata auth...");
+    
+    try {
+      const response = await fetch('https://api.pinata.cloud/data/testAuthentication', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${jwt}`,
+        },
+      });
+      
+      const result = await response.json();
+      console.log("🧪 Auth test result:", result);
+      return response.ok;
+    } catch (error) {
+      console.error("🧪 Auth test failed:", error);
+      return false;
+    }
+  };
+
   const createEvermark = async (metadata: EvermarkMetadata) => {
     const accountAddress = account?.address;
     
