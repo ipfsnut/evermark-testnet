@@ -45,7 +45,6 @@ interface Evermark {
   description?: string;
   image?: string;
   creationTime: number;
-  // Add any other properties your evermarks have
 }
 
 // Enhanced Evermark Card for Bookshelf
@@ -321,28 +320,50 @@ const EnhancedBookshelfPage: React.FC = () => {
     if (address) {
       const savedCollections = localStorage.getItem(`collections_${address}`);
       if (savedCollections) {
-        setCollections(JSON.parse(savedCollections));
+        try {
+          const parsed = JSON.parse(savedCollections);
+          setCollections(parsed);
+        } catch (error) {
+          console.error('Error loading collections:', error);
+        }
       }
     }
   }, [address]);
 
   const stats = getStats();
 
-  // Get evermark details for bookshelf items
+  // FIXED: Better evermark matching with debug logging
   const getFavoriteEvermarks = () => {
+    console.log('📚 Debug Favorites:');
+    console.log('- Bookshelf favorites:', bookshelfData.favorites);
+    console.log('- Available evermarks:', evermarks.map(e => ({id: e.id, title: e.title})));
+    
     return bookshelfData.favorites
       .map(item => {
         const evermark = evermarks.find(e => e.id === item.evermarkId);
-        return evermark ? { evermark, bookshelfItem: item } : null;
+        if (!evermark) {
+          console.log(`❌ Could not find evermark with ID: ${item.evermarkId}`);
+          return null;
+        }
+        console.log(`✅ Found favorite evermark: ${evermark.title}`);
+        return { evermark, bookshelfItem: item };
       })
       .filter(Boolean) as { evermark: Evermark; bookshelfItem: any }[];
   };
 
   const getCurrentReadingEvermarks = () => {
+    console.log('📖 Debug Current Reading:');
+    console.log('- Bookshelf current reading:', bookshelfData.currentReading);
+    
     return bookshelfData.currentReading
       .map(item => {
         const evermark = evermarks.find(e => e.id === item.evermarkId);
-        return evermark ? { evermark, bookshelfItem: item } : null;
+        if (!evermark) {
+          console.log(`❌ Could not find evermark with ID: ${item.evermarkId}`);
+          return null;
+        }
+        console.log(`✅ Found current reading evermark: ${evermark.title}`);
+        return { evermark, bookshelfItem: item };
       })
       .filter(Boolean) as { evermark: Evermark; bookshelfItem: any }[];
   };
@@ -376,7 +397,7 @@ const EnhancedBookshelfPage: React.FC = () => {
 
   if (!isConnected) {
     return (
-      <PageContainer title="My Bookshelf">
+      <PageContainer>
         <div className="text-center py-12">
           <BookOpenIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
           <p className="text-gray-600">Connect your wallet to view your bookshelf</p>
@@ -388,10 +409,16 @@ const EnhancedBookshelfPage: React.FC = () => {
   const favoriteEvermarks = getFavoriteEvermarks();
   const currentReadingEvermarks = getCurrentReadingEvermarks();
 
+  // Debug logging
+  console.log('📊 Bookshelf Debug Summary:');
+  console.log('- Stats:', stats);
+  console.log('- Favorite evermarks found:', favoriteEvermarks.length);
+  console.log('- Current reading evermarks found:', currentReadingEvermarks.length);
+
   return (
-    <PageContainer title="My Bookshelf">
+    <PageContainer>
       <div className="space-y-8">
-        {/* Header */}
+        {/* FIXED: Single header without duplicate title */}
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-serif font-bold text-gray-900 mb-2">My Bookshelf</h1>
@@ -477,12 +504,18 @@ const EnhancedBookshelfPage: React.FC = () => {
               <HeartIcon className="mx-auto h-12 w-12 text-red-300 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No Favorites Yet</h3>
               <p className="text-gray-600 mb-4">Mark your most loved Evermarks as favorites</p>
-              <Link
-                to="/my-evermarks"
-                className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-              >
-                Browse Your Evermarks
-              </Link>
+              {evermarks.length > 0 ? (
+                <p className="text-sm text-purple-600 mb-4">
+                  Use the "Quick Add Evermarks" button above to add your Evermarks to favorites!
+                </p>
+              ) : (
+                <Link
+                  to="/my-evermarks"
+                  className="inline-flex items-center px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                >
+                  Browse Your Evermarks
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -524,12 +557,18 @@ const EnhancedBookshelfPage: React.FC = () => {
               <BookOpenIcon className="mx-auto h-12 w-12 text-blue-300 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Nothing Currently Reading</h3>
               <p className="text-gray-600 mb-4">Add Evermarks you're actively exploring</p>
-              <Link
-                to="/my-evermarks"
-                className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-              >
-                Browse Your Evermarks
-              </Link>
+              {evermarks.length > 0 ? (
+                <p className="text-sm text-purple-600 mb-4">
+                  Use the "Quick Add Evermarks" button above to add your Evermarks to current reading!
+                </p>
+              ) : (
+                <Link
+                  to="/my-evermarks"
+                  className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                >
+                  Browse Your Evermarks
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -542,73 +581,6 @@ const EnhancedBookshelfPage: React.FC = () => {
                   onRemove={() => removeFromBookshelf(evermark.id)}
                   onUpdateNotes={(notes) => updateNotes(evermark.id, notes)}
                 />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Collections Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center">
-              <FolderIcon className="h-6 w-6 text-purple-500 mr-3" />
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900">Collections</h2>
-                <p className="text-sm text-gray-600">Organize your Evermarks into custom groups</p>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-            >
-              <PlusIcon className="w-4 h-4 mr-2" />
-              New Collection
-            </button>
-          </div>
-
-          {collections.length === 0 ? (
-            <div className="text-center py-12">
-              <FolderIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Collections Yet</h3>
-              <p className="text-gray-600">Create custom collections to organize your Evermarks</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {collections.map(collection => (
-                <div key={collection.id} className="border border-gray-200 rounded-lg p-4 hover:border-purple-300 transition-colors">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center">
-                      <FolderIcon className="h-5 w-5 text-purple-600 mr-2" />
-                      <h3 className="font-medium text-gray-900">{collection.name}</h3>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      {collection.isPublic ? (
-                        <GlobeIcon className="h-4 w-4 text-green-600" />
-                      ) : (
-                        <LockIcon className="h-4 w-4 text-gray-400" />
-                      )}
-                    </div>
-                  </div>
-                  
-                  {collection.description && (
-                    <p className="text-sm text-gray-600 mb-3">{collection.description}</p>
-                  )}
-                  
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-500">{collection.evermarkIds.length} items</span>
-                    <div className="flex items-center gap-2">
-                      <button className="p-1 text-gray-500 hover:text-gray-700">
-                        <ShareIcon className="h-4 w-4" />
-                      </button>
-                      <button className="p-1 text-gray-500 hover:text-gray-700">
-                        <EditIcon className="h-4 w-4" />
-                      </button>
-                      <button className="p-1 text-red-500 hover:text-red-700">
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
               ))}
             </div>
           )}
