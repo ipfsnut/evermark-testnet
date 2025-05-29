@@ -4,6 +4,39 @@ import { getContract, prepareContractCall, sendTransaction, readContract } from 
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
 
+// ADD THE TYPE DEFINITIONS RIGHT HERE - AFTER IMPORTS, BEFORE INTERFACES
+interface CastDataSuccess {
+  title: string;
+  author: string;
+  content: string;
+  timestamp: string;
+  castHash: string;
+  username: string;
+  authorFid: number;
+  embeds: any[];
+  mentions: any[];
+  parentHash: string;
+  rootParentHash: string;
+  canonicalUrl: string;
+}
+
+interface CastDataError {
+  title: string;
+  author: string;
+  content: string;
+  timestamp: string;
+  error: string;
+  canonicalUrl: string;
+}
+
+type CastData = CastDataSuccess | CastDataError;
+
+// Type guard function
+const isCastDataSuccess = (castData: CastData): castData is CastDataSuccess => {
+  return !('error' in castData);
+};
+
+// NOW CONTINUE WITH EXISTING INTERFACES
 export interface EvermarkMetadata {
   title: string;
   description: string;
@@ -15,7 +48,7 @@ export interface EvermarkMetadata {
 // Developer referrer address
 const DEVELOPER_REFERRER = "0x2B27EA7DaA8Bf1dE98407447b269Dfe280753fe3";
 
-// Add Pinata upload function
+// Pinata image upload function
 const uploadToPinata = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -54,8 +87,59 @@ const uploadToPinata = async (file: File): Promise<string> => {
   }
 };
 
-// Add Farcaster cast fetching using Pinata's Hub API
-const fetchCastDataFromPinata = async (castUrl: string) => {
+// Extract and normalize cast hash from various input formats
+const extractCastHash = (input: string): string | null => {
+  console.log("🔍 Extracting cast hash from input:", input);
+  
+  // If it's already just a hash
+  if (input.startsWith('0x') && input.length >= 10) {
+    console.log("✅ Input is already a hash:", input);
+    return input;
+  }
+  
+  // If it's a farcaster.xyz URL: https://farcaster.xyz/username/0x12345...
+  if (input.includes('farcaster.xyz')) {
+    const urlParts = input.split('/');
+    const hash = urlParts[urlParts.length - 1];
+    if (hash.startsWith('0x')) {
+      console.log("✅ Extracted hash from farcaster.xyz URL:", hash);
+      return hash;
+    }
+  }
+  
+  // If it's a warpcast URL: https://warpcast.com/username/0x12345...
+  if (input.includes('warpcast.com')) {
+    const urlParts = input.split('/');
+    const hash = urlParts[urlParts.length - 1];
+    if (hash.startsWith('0x')) {
+      console.log("✅ Extracted hash from warpcast URL:", hash);
+      return hash;
+    }
+  }
+  
+  // Try to find any 0x hash in the string
+  const hashMatch = input.match(/0x[a-fA-F0-9]+/);
+  if (hashMatch) {
+    console.log("✅ Found hash in string:", hashMatch[0]);
+    return hashMatch[0];
+  }
+  
+  console.log("❌ No valid hash found in input");
+  return null;
+};
+
+// Check if input is Farcaster-related
+const isFarcasterInput = (input: string): boolean => {
+  return (
+    input.includes('farcaster.xyz') ||
+    input.includes('warpcast.com') ||
+    input.includes('farcaster') ||
+    (input.startsWith('0x') && input.length >= 10) // Assume standalone hashes are Farcaster
+  );
+};
+
+// Fetch cast data using Pinata's Farcaster Hub API
+const fetchCastDataFromPinata = async (input: string): Promise<CastData> => {
   const jwt = import.meta.env.VITE_PINATA_JWT;
   
   if (!jwt) {
@@ -63,19 +147,22 @@ const fetchCastDataFromPinata = async (castUrl: string) => {
   }
 
   try {
-    console.log("🎯 Fetching cast data via Pinata Hub API:", castUrl);
+    console.log("🎯 Processing Farcaster input:", input);
     
-    // Extract cast hash from Warpcast URL
-    // URL format: https://warpcast.com/username/0x12345...
-    const urlParts = castUrl.split('/');
-    const castHash = urlParts[urlParts.length - 1];
+    // Extract the cast hash
+    const castHash = extractCastHash(input);
     
-    if (!castHash.startsWith('0x')) {
-      throw new Error("Invalid cast hash format");
+    if (!castHash) {
+      throw new Error("Could not extract valid cast hash from input");
     }
+    
+    console.log("🔍 Using cast hash:", castHash);
 
-    // Use Pinata's Farcaster Hub API to get cast data
-    const response = await fetch(`https://api.pinata.cloud/v3/farcaster/casts/${castHash}`, {
+    // Use Pinata's Farcaster Hub API
+    const apiUrl = `https://api.pinata.cloud/v3/farcaster/casts/${castHash}`;
+    console.log("🌐 Making request to:", apiUrl);
+
+    const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${jwt}`,
@@ -83,44 +170,72 @@ const fetchCastDataFromPinata = async (castUrl: string) => {
       }
     });
 
+    console.log("📡 Response status:", response.status);
+    console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error("❌ Pinata Hub API error:", {
         status: response.status,
         statusText: response.statusText,
-        body: errorText
+        body: errorText,
+        url: apiUrl,
+        hash: castHash
       });
-      throw new Error(`Failed to fetch cast: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch cast: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const castData = await response.json();
-    console.log("✅ Cast data fetched from Pinata:", castData);
+    console.log("✅ Raw cast data from Pinata:", JSON.stringify(castData, null, 2));
 
-    // Extract relevant information from the cast
-    return {
-      title: castData.text ? `"${castData.text.substring(0, 50)}..."` : "Farcaster Cast",
+    // Check if we got valid data
+    if (!castData || typeof castData !== 'object') {
+      console.error("❌ Invalid cast data received:", castData);
+      throw new Error("Invalid cast data received from API");
+    }
+
+    // Build the canonical farcaster.xyz URL
+    const username = castData.author?.username || 'unknown';
+    const canonicalUrl = `https://farcaster.xyz/${username}/${castHash}`;
+
+    // Extract relevant information from the cast - return success type
+    const extractedData: CastDataSuccess = {
+      title: castData.text ? `"${castData.text.substring(0, 50)}${castData.text.length > 50 ? '...' : ''}` : "Farcaster Cast",
       author: castData.author?.username || castData.author?.display_name || "Unknown Author",
       content: castData.text || "",
-      timestamp: castData.timestamp,
+      timestamp: castData.timestamp || new Date().toISOString(),
       castHash: castHash,
-      username: castData.author?.username,
-      authorFid: castData.author?.fid,
+      username: castData.author?.username || "unknown",
+      authorFid: castData.author?.fid || 0,
       embeds: castData.embeds || [],
       mentions: castData.mentions || [],
-      parentHash: castData.parent_hash,
-      rootParentHash: castData.root_parent_hash
+      parentHash: castData.parent_hash || "",
+      rootParentHash: castData.root_parent_hash || "",
+      canonicalUrl: canonicalUrl
     };
+
+    console.log("✅ Extracted cast data:", extractedData);
+    return extractedData;
 
   } catch (error: any) {
     console.error("❌ Failed to fetch cast data from Pinata:", error);
-    // Return fallback data
-    return {
+    console.error("❌ Error details:", {
+      message: error.message,
+      stack: error.stack,
+      input: input
+    });
+    
+    // Return fallback data with error info - return error type
+    const errorData: CastDataError = {
       title: "Farcaster Cast",
       author: "Unknown Author",
       content: "Failed to fetch cast content",
       timestamp: new Date().toISOString(),
-      error: error.message
+      error: error.message,
+      canonicalUrl: input.includes('http') ? input : `https://farcaster.xyz/unknown/${input}`
     };
+    
+    return errorData;
   }
 };
 
@@ -128,7 +243,7 @@ const fetchCastDataFromPinata = async (castUrl: string) => {
 const uploadMetadataToPinata = async (
   metadata: EvermarkMetadata, 
   imageUrl?: string, 
-  castData?: any
+  castData?: CastData
 ): Promise<string> => {
   const jwt = import.meta.env.VITE_PINATA_JWT;
   
@@ -140,7 +255,7 @@ const uploadMetadataToPinata = async (
     name: metadata.title,
     description: metadata.description,
     image: imageUrl || '',
-    external_url: metadata.sourceUrl,
+    external_url: castData?.canonicalUrl || metadata.sourceUrl,
     attributes: [
       {
         trait_type: 'Author',
@@ -148,14 +263,14 @@ const uploadMetadataToPinata = async (
       },
       {
         trait_type: 'Source URL',
-        value: metadata.sourceUrl
+        value: castData?.canonicalUrl || metadata.sourceUrl
       },
       {
         trait_type: 'Created',
         value: new Date().toISOString()
       },
-      // Add rich cast data if available
-      ...(castData && !castData.error ? [
+      // Add rich cast data if available and successful
+      ...(castData && isCastDataSuccess(castData) ? [
         {
           trait_type: 'Cast Content',
           value: castData.content
@@ -170,16 +285,20 @@ const uploadMetadataToPinata = async (
         },
         {
           trait_type: 'Author FID',
-          value: castData.authorFid?.toString()
+          value: castData.authorFid.toString()
         },
         {
           trait_type: 'Cast Timestamp',
           value: castData.timestamp
+        },
+        {
+          trait_type: 'Platform',
+          value: 'Farcaster'
         }
       ] : [])
     ],
-    // Include full cast data in metadata
-    ...(castData && !castData.error && {
+    // Include full cast data in metadata if successful
+    ...(castData && isCastDataSuccess(castData) && {
       farcaster_data: {
         content: castData.content,
         author: {
@@ -191,7 +310,8 @@ const uploadMetadataToPinata = async (
         embeds: castData.embeds,
         mentions: castData.mentions,
         parent_hash: castData.parentHash,
-        root_parent_hash: castData.rootParentHash
+        root_parent_hash: castData.rootParentHash,
+        canonical_url: castData.canonicalUrl
       }
     })
   };
@@ -201,7 +321,7 @@ const uploadMetadataToPinata = async (
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`,
+        'Authorization': `Bearer ${jwt}`,
       },
       body: JSON.stringify({
         pinataContent: metadataObject,
@@ -209,7 +329,8 @@ const uploadMetadataToPinata = async (
           name: `evermark-metadata-${Date.now()}`,
           keyvalues: {
             type: 'evermark-metadata',
-            title: metadata.title
+            title: metadata.title,
+            platform: castData && isCastDataSuccess(castData) ? 'farcaster' : 'general'
           }
         }
       }),
@@ -256,6 +377,7 @@ export const useEvermarkCreation = () => {
     setSuccess(null);
 
     console.log("🚀 Starting Evermark creation process...");
+    console.log("🔍 Input metadata:", JSON.stringify(metadata, null, 2));
 
     try {
       // Get contract
@@ -315,22 +437,45 @@ export const useEvermarkCreation = () => {
 
       let actualTitle = metadata.title;
       let actualAuthor = metadata.author;
-      let castData = null;
+      let castData: CastData | undefined = undefined;
       
-      // Check if it's a Farcaster cast URL and fetch data via Pinata
-      if (metadata.sourceUrl && (metadata.sourceUrl.includes('warpcast.com') || metadata.sourceUrl.includes('farcaster'))) {
-        console.log("🎯 Detected Farcaster cast URL, fetching via Pinata Hub API...");
-        castData = await fetchCastDataFromPinata(metadata.sourceUrl);
-        
-        if (castData && !castData.error) {
-          actualTitle = castData.title;
-          actualAuthor = castData.author;
-          console.log("✅ Using fetched cast data:", { title: actualTitle, author: actualAuthor });
+      // Check if it's Farcaster-related input and fetch data
+      console.log("🔍 Checking if input is Farcaster-related...");
+      console.log("🔍 Source URL/Input:", metadata.sourceUrl);
+      
+      if (metadata.sourceUrl && isFarcasterInput(metadata.sourceUrl)) {
+        console.log("🎯 Detected Farcaster input, fetching cast data...");
+        try {
+          castData = await fetchCastDataFromPinata(metadata.sourceUrl);
+          
+          if (isCastDataSuccess(castData)) {
+            actualTitle = castData.title;
+            actualAuthor = castData.author;
+            console.log("✅ Using fetched cast data:", { 
+              title: actualTitle,
+              author: actualAuthor,
+              canonicalUrl: castData.canonicalUrl
+            });
+          } else {
+            console.log("❌ Cast data fetch failed or returned error:", castData.error);
+          }
+        } catch (fetchError: any) {
+          console.error("❌ Error fetching cast data:", fetchError);
+          // Continue with original metadata if cast fetch fails
         }
+      } else {
+        console.log("❌ Input not recognized as Farcaster-related");
       }
 
       // Upload metadata to Pinata with the fetched cast data
       console.log("📝 Uploading metadata to Pinata...");
+      console.log("📝 Final metadata before upload:", {
+        title: actualTitle,
+        author: actualAuthor,
+        sourceUrl: metadata.sourceUrl,
+        hasCastData: !!castData && isCastDataSuccess(castData)
+      });
+      
       try {
         metadataURI = await uploadMetadataToPinata({
           ...metadata,
@@ -348,8 +493,8 @@ export const useEvermarkCreation = () => {
 
       console.log("🔧 Preparing transaction with params:", {
         metadataURI,
-        title: metadata.title,
-        author: metadata.author,
+        title: actualTitle,
+        author: actualAuthor,
         referrer: DEVELOPER_REFERRER,
         value: mintingFee.toString()
       });
@@ -360,8 +505,8 @@ export const useEvermarkCreation = () => {
         method: "mintEvermarkWithReferral",
         params: [
           metadataURI,           // string metadataURI
-          metadata.title,       // string title  
-          metadata.author,      // string creator
+          actualTitle,          // string title (use fetched title)
+          actualAuthor,         // string creator (use fetched author)
           DEVELOPER_REFERRER    // address referrer
         ],
         value: mintingFee, // Use the actual fee from contract
@@ -375,14 +520,20 @@ export const useEvermarkCreation = () => {
       });
 
       console.log("✅ Transaction successful:", result.transactionHash);
-      setSuccess("Evermark created successfully!");
+      
+      const successMessage = castData && isCastDataSuccess(castData)
+        ? `Farcaster cast by @${castData.username} preserved successfully!`
+        : "Evermark created successfully!";
+      
+      setSuccess(successMessage);
       
       return { 
         success: true, 
-        message: "Evermark created successfully!", 
+        message: successMessage,
         txHash: result.transactionHash,
         metadataURI,
-        imageUrl
+        imageUrl,
+        castData: castData && isCastDataSuccess(castData) ? castData : null
       };
 
     } catch (error: any) {
@@ -398,6 +549,8 @@ export const useEvermarkCreation = () => {
           errorMessage = "Transaction was rejected by user.";
         } else if (error.message.includes("paused")) {
           errorMessage = "Contract is currently paused.";
+        } else if (error.message.includes("Pinata")) {
+          errorMessage = `Upload failed: ${error.message}`;
         } else {
           errorMessage = error.message;
         }
@@ -418,12 +571,32 @@ export const useEvermarkCreation = () => {
     setSuccess(null);
   };
 
+  // Helper function to test if a string is a valid Farcaster input
+  const validateFarcasterInput = (input: string): { isValid: boolean; type: string; hash?: string } => {
+    if (!input) return { isValid: false, type: 'empty' };
+    
+    const hash = extractCastHash(input);
+    
+    if (hash) {
+      if (input.includes('farcaster.xyz')) {
+        return { isValid: true, type: 'farcaster.xyz URL', hash };
+      } else if (input.includes('warpcast.com')) {
+        return { isValid: true, type: 'warpcast URL', hash };
+      } else if (input.startsWith('0x')) {
+        return { isValid: true, type: 'cast hash', hash };
+      }
+    }
+    
+    return { isValid: false, type: 'invalid' };
+  };
+
   return { 
     createEvermark, 
     isCreating, 
     error, 
     success, 
     clearMessages,
+    validateFarcasterInput,
     // Expose the processing state for additional UI control
     isProcessing: isProcessingRef.current 
   };
