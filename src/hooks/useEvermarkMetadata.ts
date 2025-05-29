@@ -22,6 +22,8 @@ export interface EvermarkMetadata {
 }
 
 export const useEvermarkMetadata = (metadataURI?: string) => {
+  console.log("🎯 useEvermarkMetadata called with:", metadataURI);
+  
   const [metadata, setMetadata] = useState<EvermarkMetadata | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

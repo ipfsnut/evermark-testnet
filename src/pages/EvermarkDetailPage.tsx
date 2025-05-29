@@ -88,9 +88,15 @@ const EvermarkDetailPage: React.FC = () => {
     });
   };
 
+  console.log("🔍 Evermark data:", evermark);
+  console.log("🔍 Metadata URI:", evermark?.metadataURI);
+  console.log("🔍 Metadata:", metadata);
+  console.log("🔍 getImageUrl():", getImageUrl());
+
   const displayTitle = metadata?.name || evermark?.title || '';
   const displayDescription = metadata?.description || '';
   const displayImage = getImageUrl();
+  console.log("🔍 Final displayImage:", displayImage);
   const externalUrl = metadata?.external_url;
   
   if (isLoading) {
