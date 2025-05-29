@@ -39,10 +39,6 @@ export function EnhancedCreateEvermark() {
   const [isUploadingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   
-  // Remove all cast extraction state - the hook handles this now
-  // const [isExtractingCast, setIsExtractingCast] = useState(false);
-  // const [extractedCastData, setExtractedCastData] = useState<any>(null);
-  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -210,8 +206,13 @@ export function EnhancedCreateEvermark() {
 
   // Get author from metadata
   const getAuthor = (): string => {
-    return enhancedMetadata.customFields.find(f => f.key === 'author')?.value || 
-           profile.farcasterUser?.displayName || 
+    // Check for cast data first
+    const castAuthor = enhancedMetadata.customFields.find(f => f.key === 'author')?.value;
+    if (castAuthor && castAuthor !== 'Unknown Author') {
+      return castAuthor;
+    }
+    
+    return profile.farcasterUser?.displayName || 
            profile.farcasterUser?.username || 
            'Unknown Author';
   };

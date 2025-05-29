@@ -37,6 +37,68 @@ interface MetadataFormProps {
   initialMetadata?: Partial<EnhancedMetadata>;
 }
 
+const extractCastHash = (input: string): string | null => {
+  if (input.startsWith('0x') && input.length >= 10) {
+    return input;
+  }
+  
+  if (input.includes('farcaster.xyz')) {
+    const urlParts = input.split('/');
+    const hash = urlParts[urlParts.length - 1];
+    if (hash.startsWith('0x')) {
+      return hash;
+    }
+  }
+  
+  if (input.includes('warpcast.com')) {
+    const urlParts = input.split('/');
+    const hash = urlParts[urlParts.length - 1];
+    if (hash.startsWith('0x')) {
+      return hash;
+    }
+  }
+  
+  const hashMatch = input.match(/0x[a-fA-F0-9]+/);
+  if (hashMatch) {
+    return hashMatch[0];
+  }
+  
+  return null;
+};
+
+const extractCastDataFromUrl = (input: string) => {
+  try {
+    const castHash = extractCastHash(input);
+    if (!castHash) return null;
+
+    let username = "unknown";
+    let canonicalUrl = input;
+    
+    if (input.includes('farcaster.xyz/')) {
+      const urlParts = input.split('/');
+      const usernameIndex = urlParts.findIndex(part => part === 'farcaster.xyz') + 1;
+      if (usernameIndex > 0 && urlParts[usernameIndex]) {
+        username = urlParts[usernameIndex];
+        canonicalUrl = input;
+      }
+    } else {
+      canonicalUrl = `https://farcaster.xyz/unknown/${castHash}`;
+    }
+
+    return {
+      title: `Cast by @${username}`,
+      author: username,
+      content: `Farcaster cast ${castHash}`,
+      castHash: castHash,
+      username: username,
+      canonicalUrl: canonicalUrl
+    };
+  } catch (error) {
+    console.error("Failed to extract cast data:", error);
+    return null;
+  }
+};
+
 export const MetadataForm: React.FC<MetadataFormProps> = ({ 
   onMetadataChange, 
   initialMetadata 

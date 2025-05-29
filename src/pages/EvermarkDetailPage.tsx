@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeftIcon, BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ShieldIcon } from 'lucide-react';
+import { ArrowLeftIcon, BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ShieldIcon, MessageCircleIcon } from 'lucide-react';
 import { useActiveAccount } from "thirdweb/react";
 import { VotingPanel } from '../components/voting/VotingPanel';
 import { getContract, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
+import { useEvermarkMetadata } from '../hooks/useEvermarkMetadata';
 
-interface EvermarkMetadata {
+interface EvermarkData {
   id: string;
   title: string;
   author: string;
-  description: string;
-  sourceUrl?: string;
   metadataURI: string;
   creator: string;
   creationTime: number;
@@ -21,9 +20,12 @@ interface EvermarkMetadata {
 const EvermarkDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const account = useActiveAccount();
-  const [evermark, setEvermark] = useState<EvermarkMetadata | null>(null);
+  const [evermark, setEvermark] = useState<EvermarkData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch metadata using our hook
+  const { metadata, getImageUrl, isFarcasterCast } = useEvermarkMetadata(evermark?.metadataURI);
 
   useEffect(() => {
     const fetchEvermarkDetails = async () => {
@@ -42,56 +44,34 @@ const EvermarkDetailPage: React.FC = () => {
           abi: EVERMARK_NFT_ABI,
         });
 
-        // Get metadata from the contract using FIXED method names
+        // Get metadata from the contract
         const [title, author, metadataURI] = await readContract({
           contract,
-          method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
+          method: "getEvermarkMetadata",
           params: [BigInt(id)],
         });
 
         // Get creator address
         const creator = await readContract({
           contract,
-          method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
+          method: "getEvermarkCreator",
           params: [BigInt(id)],
         });
 
         // Get creation time
         const creationTime = await readContract({
           contract,
-          method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
+          method: "getEvermarkCreationTime",
           params: [BigInt(id)],
         });
-
-        // If metadata URI is IPFS, fetch additional data
-        let description = "";
-        let sourceUrl = "";
-        
-        if (metadataURI && metadataURI.startsWith('ipfs://')) {
-          try {
-            const ipfsHash = metadataURI.replace('ipfs://', '');
-            const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
-            const response = await fetch(ipfsGatewayUrl);
-            
-            if (response.ok) {
-              const ipfsData = await response.json();
-              description = ipfsData.description || "";
-              sourceUrl = ipfsData.external_url || "";
-            }
-          } catch (ipfsError) {
-            console.error("Error fetching IPFS metadata:", ipfsError);
-          }
-        }
 
         setEvermark({
           id,
           title,
           author,
-          description,
-          sourceUrl,
           metadataURI,
           creator,
-          creationTime: Number(creationTime) * 1000, // Convert to milliseconds
+          creationTime: Number(creationTime) * 1000,
         });
       } catch (err: any) {
         console.error("Error fetching Evermark:", err);
@@ -112,6 +92,12 @@ const EvermarkDetailPage: React.FC = () => {
       day: 'numeric'
     });
   };
+
+  // Use metadata if available, fallback to contract data
+  const displayTitle = metadata?.name || evermark?.title || '';
+  const displayDescription = metadata?.description || '';
+  const displayImage = getImageUrl();
+  const externalUrl = metadata?.external_url;
   
   if (isLoading) {
     return (
@@ -174,12 +160,32 @@ const EvermarkDetailPage: React.FC = () => {
           Back to Home
         </Link>
       </div>
+
+      {/* Hero Image Section */}
+      {displayImage && (
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
+          <div className="aspect-video bg-gray-100 relative">
+            <img
+              src={displayImage}
+              alt={displayTitle}
+              className="w-full h-full object-cover"
+            />
+            {/* Platform badge */}
+            {isFarcasterCast() && (
+              <div className="absolute top-4 right-4 bg-purple-600 text-white px-3 py-2 rounded-full text-sm font-medium flex items-center">
+                <MessageCircleIcon className="h-4 w-4 mr-2" />
+                Farcaster Cast
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">
-              {evermark.title}
+              {displayTitle}
             </h1>
             <div className="flex flex-wrap items-center text-sm text-gray-600 gap-4">
               <div className="flex items-center">
@@ -203,11 +209,11 @@ const EvermarkDetailPage: React.FC = () => {
                   </a>
                 </div>
               )}
-              {evermark.sourceUrl && (
+              {externalUrl && (
                 <div className="flex items-center">
                   <ExternalLinkIcon className="h-4 w-4 mr-1" />
                   <a 
-                    href={evermark.sourceUrl} 
+                    href={externalUrl} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-purple-600 hover:underline"
@@ -223,12 +229,85 @@ const EvermarkDetailPage: React.FC = () => {
           </div>
         </div>
         
-        <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <h2 className="text-lg font-medium text-gray-900 mb-2">Description</h2>
-          <p className="text-gray-700 whitespace-pre-line">
-            {evermark.description || "No description provided."}
-          </p>
-        </div>
+        {/* Content Section */}
+        {displayDescription && (
+          <div className="mb-6">
+            {isFarcasterCast() ? (
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 mb-3 flex items-center">
+                  <MessageCircleIcon className="h-5 w-5 mr-2 text-purple-600" />
+                  Cast Content
+                </h2>
+                <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-400">
+                  <p className="text-gray-700 whitespace-pre-line italic text-lg">
+                    "{displayDescription}"
+                  </p>
+                  
+                  {/* Farcaster metadata */}
+                  {metadata?.farcaster_data && (
+                    <div className="mt-4 pt-4 border-t border-purple-200">
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="font-medium text-purple-900">Author:</span>
+                          <span className="ml-2 text-purple-700">@{metadata.farcaster_data.author.username}</span>
+                        </div>
+                        <div>
+                          <span className="font-medium text-purple-900">Cast Hash:</span>
+                          <span className="ml-2 font-mono text-xs text-purple-700">{metadata.farcaster_data.cast_hash}</span>
+                        </div>
+                        {metadata.farcaster_data.author.fid > 0 && (
+                          <div>
+                            <span className="font-medium text-purple-900">FID:</span>
+                            <span className="ml-2 text-purple-700">{metadata.farcaster_data.author.fid}</span>
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium text-purple-900">Original:</span>
+                          <a 
+                            href={metadata.farcaster_data.canonical_url} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="ml-2 text-purple-600 hover:underline"
+                          >
+                            View on Farcaster
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div>
+                <h2 className="text-lg font-medium text-gray-900 mb-3">Description</h2>
+                <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-gray-700 whitespace-pre-line">
+                    {displayDescription}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Attributes */}
+        {metadata?.attributes && metadata.attributes.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-3">Attributes</h3>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {metadata.attributes.map((attr, index) => (
+                <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    {attr.trait_type}
+                  </div>
+                  <div className="text-sm text-gray-900 mt-1">
+                    {attr.value}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         <div className="flex items-center text-sm text-gray-600 mb-4">
           <ShieldIcon className="h-4 w-4 mr-1" />
