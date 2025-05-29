@@ -122,14 +122,29 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   
   // Generate trackable share URL
   const getShareUrl = (platform?: string) => {
-    const baseUrl = `${window.location.origin}/share/${evermarkId}`;
-    const params = new URLSearchParams();
+    // Use special /share/ URLs for social platforms that need meta tags
+    const socialPlatforms = ['twitter', 'facebook', 'linkedin', 'farcaster', 'bluesky', 'lens'];
     
-    if (platform) params.set('utm_source', platform);
-    params.set('utm_medium', 'social');
-    params.set('utm_campaign', 'evermark_share');
-    
-    return `${baseUrl}?${params.toString()}`;
+    if (platform && socialPlatforms.includes(platform)) {
+      const baseUrl = `${window.location.origin}/share/evermark/${evermarkId}`;
+      const params = new URLSearchParams();
+      
+      if (platform) params.set('utm_source', platform);
+      params.set('utm_medium', 'social');
+      params.set('utm_campaign', 'evermark_share');
+      
+      return `${baseUrl}?${params.toString()}`;
+    } else {
+      // Use direct URLs for copy/direct access
+      const baseUrl = `${window.location.origin}/evermark/${evermarkId}`;
+      const params = new URLSearchParams();
+      
+      if (platform) params.set('utm_source', platform);
+      params.set('utm_medium', 'social');
+      params.set('utm_campaign', 'evermark_share');
+      
+      return `${baseUrl}?${params.toString()}`;
+    }
   };
   
   // Generate platform-specific share URLs

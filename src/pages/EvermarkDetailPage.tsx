@@ -6,16 +6,46 @@ import { VotingPanel } from '../components/voting/VotingPanel';
 import { getContract, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
-import { useEvermarkMetadata } from '../hooks/useEvermarkMetadata';
 
 interface EvermarkData {
   id: string;
   title: string;
   author: string;
+  description: string;
+  sourceUrl: string;
+  image: string;
   metadataURI: string;
   creator: string;
   creationTime: number;
 }
+
+// Helper function to fetch IPFS metadata
+const fetchIPFSMetadata = async (metadataURI: string) => {
+  if (!metadataURI) return { description: "", sourceUrl: "", image: "" };
+  
+  try {
+    const fetchUrl = metadataURI.startsWith('ipfs://') 
+      ? metadataURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
+      : metadataURI;
+    
+    const response = await fetch(fetchUrl);
+    if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
+    
+    const ipfsData = await response.json();
+    
+    return {
+      description: ipfsData.description || "",
+      sourceUrl: ipfsData.external_url || "",
+      image: ipfsData.image 
+        ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
+        : "",
+      farcaster_data: ipfsData.farcaster_data
+    };
+  } catch (error) {
+    console.error('Error fetching IPFS metadata:', error);
+    return { description: "", sourceUrl: "", image: "" };
+  }
+};
 
 const EvermarkDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,8 +53,6 @@ const EvermarkDetailPage: React.FC = () => {
   const [evermark, setEvermark] = useState<EvermarkData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const { metadata, getImageUrl, isFarcasterCast } = useEvermarkMetadata(evermark?.metadataURI);
 
   useEffect(() => {
     const fetchEvermarkDetails = async () => {
@@ -61,22 +89,21 @@ const EvermarkDetailPage: React.FC = () => {
           params: [BigInt(id)],
         });
 
+        // Fetch IPFS metadata including image
+        const { description, sourceUrl, image, farcaster_data } = await fetchIPFSMetadata(metadataURI);
+
         setEvermark({
           id,
           title,
           author,
+          description,
+          sourceUrl,
+          image,
           metadataURI,
           creator,
           creationTime: Number(creationTime) * 1000,
         });
-        console.log("🔍 EVERMARK FETCHED:", {
-          id,
-          title,
-          author,
-          metadataURI,
-          creator,
-          creationTime: Number(creationTime) * 1000,
-        });
+
       } catch (err: any) {
         console.error("Error fetching Evermark:", err);
         setError(err.message || "Failed to load Evermark details");
@@ -96,16 +123,11 @@ const EvermarkDetailPage: React.FC = () => {
     });
   };
 
-  console.log("🔍 Evermark data:", evermark);
-  console.log("🔍 Metadata URI:", evermark?.metadataURI);
-  console.log("🔍 Metadata:", metadata);
-  console.log("🔍 getImageUrl():", getImageUrl());
-
-  const displayTitle = metadata?.name || evermark?.title || '';
-  const displayDescription = metadata?.description || '';
-  const displayImage = getImageUrl();
-  console.log("🔍 Final displayImage:", displayImage);
-  const externalUrl = metadata?.external_url;
+  // Helper to check if it's a Farcaster cast
+  const isFarcasterCast = () => {
+    return evermark?.sourceUrl?.includes('farcaster') || 
+           evermark?.description?.includes('Farcaster');
+  };
   
   if (isLoading) {
     return (
@@ -169,13 +191,14 @@ const EvermarkDetailPage: React.FC = () => {
         </Link>
       </div>
 
-      {displayImage && (
+      {/* Cover Image Section */}
+      {evermark.image && (
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
           <div className="aspect-video bg-gray-100 relative">
-            <img
-              src={displayImage}
-              alt={displayTitle}
-              className="w-full h-full object-cover"
+            <img 
+              src={evermark.image} 
+              alt={evermark.title} 
+              className="w-full h-full object-cover" 
             />
             {isFarcasterCast() && (
               <div className="absolute top-4 right-4 bg-purple-600 text-white px-3 py-2 rounded-full text-sm font-medium flex items-center">
@@ -191,7 +214,7 @@ const EvermarkDetailPage: React.FC = () => {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h1 className="text-3xl font-serif font-bold text-gray-900 mb-2">
-              {displayTitle}
+              {evermark.title}
             </h1>
             <div className="flex flex-wrap items-center text-sm text-gray-600 gap-4">
               <div className="flex items-center">
@@ -215,11 +238,11 @@ const EvermarkDetailPage: React.FC = () => {
                   </a>
                 </div>
               )}
-              {externalUrl && (
+              {evermark.sourceUrl && (
                 <div className="flex items-center">
                   <ExternalLinkIcon className="h-4 w-4 mr-1" />
                   <a 
-                    href={externalUrl} 
+                    href={evermark.sourceUrl} 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="text-purple-600 hover:underline"
@@ -235,7 +258,7 @@ const EvermarkDetailPage: React.FC = () => {
           </div>
         </div>
         
-        {displayDescription && (
+        {evermark.description && (
           <div className="mb-6">
             {isFarcasterCast() ? (
               <div>
@@ -245,40 +268,8 @@ const EvermarkDetailPage: React.FC = () => {
                 </h2>
                 <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-400">
                   <p className="text-gray-700 whitespace-pre-line italic text-lg">
-                    "{displayDescription}"
+                    "{evermark.description}"
                   </p>
-                  
-                  {metadata?.farcaster_data && (
-                    <div className="mt-4 pt-4 border-t border-purple-200">
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="font-medium text-purple-900">Author:</span>
-                          <span className="ml-2 text-purple-700">@{metadata.farcaster_data.author.username}</span>
-                        </div>
-                        <div>
-                          <span className="font-medium text-purple-900">Cast Hash:</span>
-                          <span className="ml-2 font-mono text-xs text-purple-700">{metadata.farcaster_data.cast_hash}</span>
-                        </div>
-                        {metadata.farcaster_data.author.fid > 0 && (
-                          <div>
-                            <span className="font-medium text-purple-900">FID:</span>
-                            <span className="ml-2 text-purple-700">{metadata.farcaster_data.author.fid}</span>
-                          </div>
-                        )}
-                        <div>
-                          <span className="font-medium text-purple-900">Original:</span>
-                          <a 
-                            href={metadata.farcaster_data.canonical_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="ml-2 text-purple-600 hover:underline"
-                          >
-                            View on Farcaster
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             ) : (
@@ -286,29 +277,11 @@ const EvermarkDetailPage: React.FC = () => {
                 <h2 className="text-lg font-medium text-gray-900 mb-3">Description</h2>
                 <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                   <p className="text-gray-700 whitespace-pre-line">
-                    {displayDescription}
+                    {evermark.description}
                   </p>
                 </div>
               </div>
             )}
-          </div>
-        )}
-        
-        {metadata?.attributes && metadata.attributes.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Attributes</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              {metadata.attributes.map((attr, index) => (
-                <div key={index} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    {attr.trait_type}
-                  </div>
-                  <div className="text-sm text-gray-900 mt-1">
-                    {attr.value}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         )}
         

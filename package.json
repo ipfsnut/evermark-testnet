@@ -14,6 +14,7 @@
     "@farcaster/frame-sdk": "latest",
     "@supabase/supabase-js": "^2.49.8",
     "@tanstack/react-query": "^5.45.1",
+    "async": "^3.2.6",
     "classnames": "^2.5.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.263.1",

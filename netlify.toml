@@ -10,6 +10,16 @@
   status = 200
 
 [[redirects]]
+  from = "/share/evermark/:id"
+  to = "/.netlify/functions/evermark-share"
+  status = 200
+
+[[redirects]]
+  from = "/api/shares"
+  to = "/.netlify/functions/shares"
+  status = 200
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
