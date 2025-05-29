@@ -12,7 +12,6 @@ export const EVERMARK_CONFIG = {
     evermarkVoting: "0x53d44a46B789C6E70AA770090B32030D2bc641B7",
     nftStaking: "0x852c5cA39fD619C1a83e0d17A8aAC8F81ae184cE",
     evermarkLeaderboard: "0x95Db94e87877eFD2821b5CBE7C3eaf344628ff80",
-    evermarkAuction: "0xABbb61652e17c7D8c546bFEA8777816882A5aE76"
   }
 } as const;
 
