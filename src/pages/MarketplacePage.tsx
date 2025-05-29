@@ -1,23 +1,30 @@
 import * as React from "react";
 import { useState } from "react";
 import { useMarketplace, MarketplaceButton } from "../hooks/useMarketplace"; 
+import { useActiveAccount } from "thirdweb/react";
+import PageContainer from "../components/layout/PageContainer";
 
 const MARKETPLACE_CONTRACT_ADDRESS = import.meta.env.VITE_MARKETPLACE_ADDRESS || "";
 
-
 export function MarketplacePage() {
+  const account = useActiveAccount();
+  const address = account?.address;
+
+  // Only initialize marketplace hook if we have an address and contract
+  const marketplaceHook = useMarketplace(MARKETPLACE_CONTRACT_ADDRESS);
+  
+  // Safely destructure with fallbacks
   const {
-    listings,
-    userListings,
-    isLoading,
-    error,
+    listings = [],
+    userListings = [],
+    isLoading = false,
+    error = null,
     createListing,
     buyItem,
     makeOffer,
     cancelListing,
-    refetchListings,
-    address
-  } = useMarketplace(MARKETPLACE_CONTRACT_ADDRESS);
+    refetchListings
+  } = marketplaceHook || {};
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createListingData, setCreateListingData] = useState({
@@ -29,8 +36,26 @@ export function MarketplacePage() {
     secondsUntilEnd: 60 * 60 * 24 * 7 // 1 week default
   });
 
+  // Early return if no marketplace contract address
+  if (!MARKETPLACE_CONTRACT_ADDRESS) {
+    return (
+      <PageContainer>
+        <div className="text-center py-16">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">NFT Marketplace</h1>
+          <p className="text-red-600">Marketplace contract address not configured.</p>
+          <p className="text-sm text-gray-600 mt-2">Please set VITE_MARKETPLACE_ADDRESS in your environment variables.</p>
+        </div>
+      </PageContainer>
+    );
+  }
+
   const handleCreateListing = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!createListing) {
+      alert("Marketplace not available");
+      return;
+    }
+
     try {
       await createListing(createListingData);
       setShowCreateForm(false);
@@ -50,6 +75,11 @@ export function MarketplacePage() {
   };
 
   const handleBuyItem = async (listingId: string, quantity: number = 1) => {
+    if (!buyItem) {
+      alert("Marketplace not available");
+      return;
+    }
+
     try {
       await buyItem(listingId, quantity);
       alert("Purchase successful!");
@@ -60,6 +90,11 @@ export function MarketplacePage() {
   };
 
   const handleMakeOffer = async (listing: any) => {
+    if (!makeOffer) {
+      alert("Marketplace not available");
+      return;
+    }
+
     const price = prompt("Enter your offer price in ETH (e.g., 0.1):");
     if (!price) return;
 
@@ -79,6 +114,11 @@ export function MarketplacePage() {
   };
 
   const handleCancelListing = async (listingId: string) => {
+    if (!cancelListing) {
+      alert("Marketplace not available");
+      return;
+    }
+
     try {
       await cancelListing(listingId);
       alert("Listing cancelled successfully!");
@@ -90,234 +130,225 @@ export function MarketplacePage() {
 
   if (!address) {
     return (
-      <div style={{ padding: "20px" }}>
-        <h1>NFT Marketplace</h1>
-        <p>Please connect your wallet to use the marketplace.</p>
-      </div>
+      <PageContainer>
+        <div className="text-center py-16">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">NFT Marketplace</h1>
+          <p className="text-gray-600">Please connect your wallet to use the marketplace.</p>
+        </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h1>NFT Marketplace</h1>
-      
-      {error && (
-        <div style={{ color: "red", marginBottom: "20px" }}>
-          Error: {error}
-        </div>
-      )}
-
-      {/* Create Listing Button */}
-      <div style={{ marginBottom: "30px" }}>
-        <button 
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          style={{ 
-            padding: "10px 20px", 
-            backgroundColor: "#0070f3", 
-            color: "white", 
-            border: "none", 
-            borderRadius: "5px",
-            cursor: "pointer"
-          }}
-        >
-          {showCreateForm ? "Cancel" : "Create New Listing"}
-        </button>
-      </div>
-
-      {/* Create Listing Form */}
-      {showCreateForm && (
-        <div style={{ 
-          border: "1px solid #ccc", 
-          padding: "20px", 
-          borderRadius: "5px", 
-          marginBottom: "30px" 
-        }}>
-          <h3>Create New Listing</h3>
-          <form onSubmit={handleCreateListing}>
-            <div style={{ marginBottom: "10px" }}>
-              <label>NFT Contract Address:</label>
-              <input
-                type="text"
-                value={createListingData.assetContractAddress}
-                onChange={(e) => setCreateListingData({
-                  ...createListingData,
-                  assetContractAddress: e.target.value
-                })}
-                style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-                required
-              />
-            </div>
-            <div style={{ marginBottom: "10px" }}>
-              <label>Token ID:</label>
-              <input
-                type="text"
-                value={createListingData.tokenId}
-                onChange={(e) => setCreateListingData({
-                  ...createListingData,
-                  tokenId: e.target.value
-                })}
-                style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-                required
-              />
-            </div>
-            <div style={{ marginBottom: "10px" }}>
-              <label>Price (ETH):</label>
-              <input
-                type="text"
-                placeholder="e.g., 0.1"
-                value={createListingData.price}
-                onChange={(e) => setCreateListingData({
-                  ...createListingData,
-                  price: e.target.value
-                })}
-                style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-                required
-              />
-            </div>
-            <div style={{ marginBottom: "10px" }}>
-              <label>Quantity:</label>
-              <input
-                type="number"
-                min="1"
-                value={createListingData.quantity}
-                onChange={(e) => setCreateListingData({
-                  ...createListingData,
-                  quantity: parseInt(e.target.value)
-                })}
-                style={{ width: "100%", padding: "8px", marginTop: "5px" }}
-              />
-            </div>
-            <button 
-              type="submit"
-              style={{ 
-                padding: "10px 20px", 
-                backgroundColor: "#28a745", 
-                color: "white", 
-                border: "none", 
-                borderRadius: "5px",
-                cursor: "pointer"
-              }}
-            >
-              Create Listing
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* Your Listings */}
-      {userListings.length > 0 && (
-        <div style={{ marginBottom: "30px" }}>
-          <h2>Your Listings ({userListings.length})</h2>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-            {userListings.map((listing) => (
-              <div key={listing.id} style={{ 
-                border: "1px solid #ddd", 
-                padding: "15px", 
-                borderRadius: "5px",
-                backgroundColor: "#f9f9f9"
-              }}>
-                <h4>{listing.asset.name || `Token #${listing.tokenId}`}</h4>
-                {listing.asset.image && (
-                  <img 
-                    src={listing.asset.image} 
-                    alt={listing.asset.name}
-                    style={{ width: "100%", height: "200px", objectFit: "cover", marginBottom: "10px" }}
-                  />
-                )}
-                <p>Price: {listing.buyoutCurrencyValuePerToken.displayValue} ETH</p>
-                <p>Quantity: {listing.quantity}</p>
-                <p>Listing ID: {listing.id}</p>
-                <button
-                  onClick={() => handleCancelListing(listing.id)}
-                  style={{ 
-                    padding: "8px 16px", 
-                    backgroundColor: "#dc3545", 
-                    color: "white", 
-                    border: "none", 
-                    borderRadius: "3px",
-                    cursor: "pointer"
-                  }}
-                >
-                  Cancel Listing
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* All Marketplace Listings */}
-      <div>
-        <h2>All Listings ({listings.length})</h2>
-        {isLoading ? (
-          <p>Loading listings...</p>
-        ) : listings.length === 0 ? (
-          <p>No listings found.</p>
-        ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "20px" }}>
-            {listings.map((listing) => {
-              const isOwnListing = listing.seller.toLowerCase() === address?.toLowerCase();
-              return (
-                <div key={listing.id} style={{ 
-                  border: "1px solid #ddd", 
-                  padding: "15px", 
-                  borderRadius: "5px",
-                  backgroundColor: isOwnListing ? "#fff3cd" : "white"
-                }}>
-                  <h4>{listing.asset.name || `Token #${listing.tokenId}`}</h4>
-                  {listing.asset.image && (
-                    <img 
-                      src={listing.asset.image} 
-                      alt={listing.asset.name}
-                      style={{ width: "100%", height: "200px", objectFit: "cover", marginBottom: "10px" }}
-                    />
-                  )}
-                  <p>{listing.asset.description}</p>
-                  <p>Price: {listing.buyoutCurrencyValuePerToken.displayValue} ETH</p>
-                  <p>Quantity: {listing.quantity}</p>
-                  <p>Seller: {listing.seller.slice(0, 6)}...{listing.seller.slice(-4)}</p>
-                  <p>Listing ID: {listing.id}</p>
-                  
-                  {isOwnListing ? (
-                    <p style={{ color: "#856404", fontWeight: "bold" }}>Your Listing</p>
-                  ) : (
-                    <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
-                      <MarketplaceButton
-                        contractAddress={MARKETPLACE_CONTRACT_ADDRESS}
-                        transaction={() => buyItem(listing.id, 1)}
-                        onSuccess={() => alert("Purchase successful!")}
-                        style={{ 
-                          padding: "8px 16px", 
-                          backgroundColor: "#28a745", 
-                          color: "white", 
-                          border: "none", 
-                          borderRadius: "3px",
-                          cursor: "pointer"
-                        }}
-                      >
-                        Buy Now
-                      </MarketplaceButton>
-                      <button
-                        onClick={() => handleMakeOffer(listing)}
-                        style={{ 
-                          padding: "8px 16px", 
-                          backgroundColor: "#007bff", 
-                          color: "white", 
-                          border: "none", 
-                          borderRadius: "3px",
-                          cursor: "pointer"
-                        }}
-                      >
-                        Make Offer
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+    <PageContainer>
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-gray-900">NFT Marketplace</h1>
+        
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-red-800">Error: {error}</p>
           </div>
         )}
+
+        {/* Create Listing Button */}
+        <div>
+          <button 
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            {showCreateForm ? "Cancel" : "Create New Listing"}
+          </button>
+        </div>
+
+        {/* Create Listing Form */}
+        {showCreateForm && (
+          <div className="bg-white border border-gray-200 rounded-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">Create New Listing</h3>
+            <form onSubmit={handleCreateListing} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  NFT Contract Address:
+                </label>
+                <input
+                  type="text"
+                  value={createListingData.assetContractAddress}
+                  onChange={(e) => setCreateListingData({
+                    ...createListingData,
+                    assetContractAddress: e.target.value
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Token ID:
+                </label>
+                <input
+                  type="text"
+                  value={createListingData.tokenId}
+                  onChange={(e) => setCreateListingData({
+                    ...createListingData,
+                    tokenId: e.target.value
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Price (ETH):
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g., 0.1"
+                  value={createListingData.price}
+                  onChange={(e) => setCreateListingData({
+                    ...createListingData,
+                    price: e.target.value
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity:
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={createListingData.quantity}
+                  onChange={(e) => setCreateListingData({
+                    ...createListingData,
+                    quantity: parseInt(e.target.value) || 1
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <button 
+                type="submit"
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                Create Listing
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Your Listings */}
+        {userListings.length > 0 && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">
+              Your Listings ({userListings.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {userListings.map((listing) => (
+                <div key={listing.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-medium text-gray-900 mb-2">
+                    {listing.asset?.name || `Token #${listing.tokenId}`}
+                  </h4>
+                  {listing.asset?.image && (
+                    <img 
+                      src={listing.asset.image} 
+                      alt={listing.asset.name || 'NFT'}
+                      className="w-full h-48 object-cover rounded-lg mb-3"
+                    />
+                  )}
+                  <p className="text-sm text-gray-600 mb-2">
+                    Price: {listing.buyoutCurrencyValuePerToken?.displayValue || 'N/A'} ETH
+                  </p>
+                  <p className="text-sm text-gray-600 mb-3">
+                    Quantity: {listing.quantity || 'N/A'}
+                  </p>
+                  <button
+                    onClick={() => handleCancelListing(listing.id)}
+                    className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Cancel Listing
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* All Marketplace Listings */}
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">
+            All Listings ({listings.length})
+          </h2>
+          {isLoading ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">Loading listings...</p>
+            </div>
+          ) : listings.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No listings found.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {listings.map((listing) => {
+                const isOwnListing = listing.seller?.toLowerCase() === address?.toLowerCase();
+                return (
+                  <div 
+                    key={listing.id} 
+                    className={`border rounded-lg p-4 ${
+                      isOwnListing ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'
+                    }`}
+                  >
+                    <h4 className="font-medium text-gray-900 mb-2">
+                      {listing.asset?.name || `Token #${listing.tokenId}`}
+                    </h4>
+                    {listing.asset?.image && (
+                      <img 
+                        src={listing.asset.image} 
+                        alt={listing.asset.name || 'NFT'}
+                        className="w-full h-48 object-cover rounded-lg mb-3"
+                      />
+                    )}
+                    {listing.asset?.description && (
+                      <p className="text-sm text-gray-600 mb-2">{listing.asset.description}</p>
+                    )}
+                    <p className="text-sm text-gray-600 mb-2">
+                      Price: {listing.buyoutCurrencyValuePerToken?.displayValue || 'N/A'} ETH
+                    </p>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Quantity: {listing.quantity || 'N/A'}
+                    </p>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Seller: {listing.seller ? `${listing.seller.slice(0, 6)}...${listing.seller.slice(-4)}` : 'Unknown'}
+                    </p>
+                    
+                    {isOwnListing ? (
+                      <p className="text-yellow-700 font-medium text-center">Your Listing</p>
+                    ) : (
+                      <div className="flex gap-2">
+                        {MarketplaceButton && (
+                          <MarketplaceButton
+                            contractAddress={MARKETPLACE_CONTRACT_ADDRESS}
+                            transaction={() => buyItem && buyItem(listing.id, 1)}
+                            onSuccess={() => alert("Purchase successful!")}
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          >
+                            Buy Now
+                          </MarketplaceButton>
+                        )}
+                        <button
+                          onClick={() => handleMakeOffer(listing)}
+                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                        >
+                          Make Offer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
