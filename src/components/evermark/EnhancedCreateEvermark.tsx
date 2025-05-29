@@ -43,6 +43,9 @@ export function EnhancedCreateEvermark() {
   const [isExtractingCast, setIsExtractingCast] = useState(false);
   const [extractedCastData, setExtractedCastData] = useState<any>(null);
   
+  // Add form submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Auto-populate author if we have Farcaster info
@@ -94,6 +97,7 @@ export function EnhancedCreateEvermark() {
     setImagePreview(null);
     setImageUploadError(null);
   };
+  
   // Cast extraction function using Pinata's Farcaster API
   const handleExtractCastMetadata = async () => {
     const castInput = enhancedMetadata.castUrl;
@@ -302,31 +306,39 @@ export function EnhancedCreateEvermark() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const finalTitle = generateTitle();
-    if (!finalTitle.trim()) {
-      return;
-    }
+    // Prevent multiple submissions
+    if (isSubmitting || isCreating) return;
+    setIsSubmitting(true);
     
-    const evermarkData: EvermarkMetadata = {
-      title: finalTitle,
-      description: generateDescription(),
-      sourceUrl: getSourceUrl(),
-      author: getAuthor(),
-      imageFile: selectedImage,
-    };
-    
-    console.log('Creating Evermark with enhanced metadata:', {
-      basicData: evermarkData,
-      enhancedMetadata
-    });
-    
-    const result = await createEvermark(evermarkData);
-    
-    if (result.success) {
-      // Redirect to the collection page after 2 seconds
-      setTimeout(() => {
+    try {
+      const finalTitle = generateTitle();
+      if (!finalTitle.trim()) {
+        return;
+      }
+      
+      const evermarkData: EvermarkMetadata = {
+        title: finalTitle,
+        description: generateDescription(),
+        sourceUrl: getSourceUrl(),
+        author: getAuthor(),
+        imageFile: selectedImage,
+      };
+      
+      console.log('Creating Evermark with enhanced metadata:', {
+        basicData: evermarkData,
+        enhancedMetadata
+      });
+      
+      const result = await createEvermark(evermarkData);
+      
+      if (result.success) {
+        // Navigate immediately after successful creation
         navigate("/my-evermarks");
-      }, 2000);
+      }
+    } catch (error) {
+      console.error("Evermark creation failed:", error);
+    } finally {
+      setIsSubmitting(false);
     }
   };
   
@@ -429,6 +441,19 @@ export function EnhancedCreateEvermark() {
               <p className="text-green-600 text-sm">{success}</p>
               <p className="text-green-600 text-sm mt-1">
                 Redirecting to your collection...
+              </p>
+            </div>
+          </div>
+        )}
+        
+        {/* Transaction processing indicator */}
+        {(isCreating || isSubmitting) && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start">
+            <LoaderIcon className="h-5 w-5 text-blue-600 mr-3 mt-0.5 animate-spin" />
+            <div>
+              <p className="text-blue-700 font-medium">Processing Transaction</p>
+              <p className="text-blue-600 text-sm">
+                Please confirm the transaction in your wallet...
               </p>
             </div>
           </div>
@@ -562,7 +587,7 @@ export function EnhancedCreateEvermark() {
                 <button
                   type="button"
                   onClick={handleAutoDetect}
-                  disabled={isCreating}
+                  disabled={isCreating || isSubmitting}
                   className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Auto-Detect from URL
@@ -600,10 +625,10 @@ export function EnhancedCreateEvermark() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={isCreating || isUploadingImage || !contractAuth.canInteract}
+            disabled={isCreating || isSubmitting || isUploadingImage || !contractAuth.canInteract}
             className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isCreating ? (
+            {isCreating || isSubmitting ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                 Creating Evermark...
