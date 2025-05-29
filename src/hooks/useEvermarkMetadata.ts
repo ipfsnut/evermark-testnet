@@ -53,6 +53,10 @@ export const useEvermarkMetadata = (metadataURI?: string) => {
         console.log("✅ Metadata fetched:", data);
         
         setMetadata(data);
+        console.log("🖼️ Image field in metadata:", data.image);
+        console.log("🔗 Converted image URL:", data.image?.startsWith('ipfs://') 
+          ? data.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
+          : data.image);
       } catch (err: any) {
         console.error("❌ Failed to fetch metadata:", err);
         setError(err.message);

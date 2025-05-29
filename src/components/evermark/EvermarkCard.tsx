@@ -16,6 +16,8 @@ export function EvermarkCard({ evermark, isCompact = false }: EvermarkCardProps)
   
   // Fetch metadata from IPFS
   const { metadata, getImageUrl, isFarcasterCast } = useEvermarkMetadata(evermark.metadataURI);
+  console.log("🖼️ Display image URL:", getImageUrl());
+  console.log("🔍 Evermark metadataURI:", evermark.metadataURI);
   
   // Use metadata if available, fallback to contract data
   const displayImage = getImageUrl() || evermark.image;
