@@ -69,6 +69,14 @@ const EvermarkDetailPage: React.FC = () => {
           creator,
           creationTime: Number(creationTime) * 1000,
         });
+        console.log("🔍 EVERMARK FETCHED:", {
+          id,
+          title,
+          author,
+          metadataURI,
+          creator,
+          creationTime: Number(creationTime) * 1000,
+        });
       } catch (err: any) {
         console.error("Error fetching Evermark:", err);
         setError(err.message || "Failed to load Evermark details");
