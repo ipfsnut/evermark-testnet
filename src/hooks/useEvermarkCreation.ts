@@ -168,8 +168,10 @@ export const useEvermarkCreation = () => {
         abi: EVERMARK_NFT_ABI,
       });
 
-      // Check if contract is paused
-      console.log("🔍 Checking contract state...");
+      // Check contract state and get the actual minting fee
+      console.log("🔍 Checking contract state and minting fee...");
+      let mintingFee: bigint;
+      
       try {
         const isPaused = await readContract({
           contract,
@@ -180,9 +182,22 @@ export const useEvermarkCreation = () => {
         if (isPaused) {
           throw new Error("Contract is currently paused");
         }
+
+        // Get the actual minting fee from the contract
+        mintingFee = await readContract({
+          contract,
+          method: "MINTING_FEE",
+          params: []
+        });
+        
+        console.log("💰 Contract minting fee:", mintingFee.toString(), "wei");
+        console.log("💰 Minting fee in ETH:", Number(mintingFee) / 1e18);
+        
       } catch (stateError: any) {
-        console.warn("Could not check contract state:", stateError.message);
-        // Continue anyway - state check is not critical
+        console.error("Contract state check failed:", stateError);
+        // If we can't read the fee, use a fallback
+        mintingFee = BigInt("1000000000000000"); // 0.001 ETH as fallback
+        console.warn("Using fallback minting fee:", mintingFee.toString());
       }
 
       let imageUrl = "";
@@ -218,10 +233,10 @@ export const useEvermarkCreation = () => {
         title: metadata.title,
         author: metadata.author,
         referrer: DEVELOPER_REFERRER,
-        value: "70000000000000"
+        value: mintingFee.toString()
       });
 
-      // Use mintEvermarkWithReferral with developer address
+      // Use the actual minting fee from the contract
       const transaction = prepareContractCall({
         contract,
         method: "mintEvermarkWithReferral",
@@ -231,7 +246,7 @@ export const useEvermarkCreation = () => {
           metadata.author,      // string creator
           DEVELOPER_REFERRER    // address referrer
         ],
-        value: BigInt("70000000000000"), // MINTING_FEE
+        value: mintingFee, // Use the actual fee from contract
       });
 
       console.log("📤 Sending transaction to blockchain...");
@@ -257,9 +272,8 @@ export const useEvermarkCreation = () => {
       
       let errorMessage = "Unknown error";
       if (error.message) {
-        if (error.message.includes("ReentrancyGuard")) {
-          errorMessage = "Transaction failed due to timing conflict. Please wait a moment and try again.";
-          console.error("🔒 Reentrancy guard triggered - this suggests the contract is processing another transaction");
+        if (error.message.includes("Insufficient minting fee")) {
+          errorMessage = "Insufficient minting fee. Please check the required amount.";
         } else if (error.message.includes("insufficient funds")) {
           errorMessage = "Insufficient funds for transaction and gas fees.";
         } else if (error.message.includes("user rejected")) {
