@@ -73,9 +73,18 @@ export const useEvermarkMetadata = (metadataURI?: string) => {
       return null;
     }
     
-    const convertedUrl = metadata.image.startsWith('ipfs://') 
-      ? metadata.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
-      : metadata.image;
+    // Handle both ipfs:// URLs and already-converted gateway URLs
+    let convertedUrl;
+    if (metadata.image.startsWith('ipfs://')) {
+      convertedUrl = metadata.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/');
+    } else if (metadata.image.startsWith('https://gateway.pinata.cloud/ipfs/')) {
+      convertedUrl = metadata.image; // Already converted
+    } else if (metadata.image.startsWith('https://')) {
+      convertedUrl = metadata.image; // Regular HTTP URL
+    } else {
+      // Assume it's just a hash
+      convertedUrl = `https://gateway.pinata.cloud/ipfs/${metadata.image}`;
+    }
     
     console.log("✅ Converted image URL:", convertedUrl);
     return convertedUrl;
