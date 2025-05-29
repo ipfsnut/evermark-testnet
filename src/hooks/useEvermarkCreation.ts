@@ -4,7 +4,6 @@ import { getContract, prepareContractCall, sendTransaction, readContract } from 
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
 
-// ADD THE TYPE DEFINITIONS RIGHT HERE - AFTER IMPORTS, BEFORE INTERFACES
 interface CastDataSuccess {
   title: string;
   author: string;
@@ -31,12 +30,10 @@ interface CastDataError {
 
 type CastData = CastDataSuccess | CastDataError;
 
-// Type guard function
 const isCastDataSuccess = (castData: CastData): castData is CastDataSuccess => {
   return !('error' in castData);
 };
 
-// NOW CONTINUE WITH EXISTING INTERFACES
 export interface EvermarkMetadata {
   title: string;
   description: string;
@@ -48,7 +45,6 @@ export interface EvermarkMetadata {
 // Developer referrer address
 const DEVELOPER_REFERRER = "0x2B27EA7DaA8Bf1dE98407447b269Dfe280753fe3";
 
-// Pinata image upload function
 const uploadToPinata = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -140,38 +136,29 @@ const isFarcasterInput = (input: string): boolean => {
 
 // Fetch cast data using Pinata's Farcaster Hub API
 const fetchCastDataFromPinata = async (input: string): Promise<CastData> => {
-  const jwt = import.meta.env.VITE_PINATA_JWT;
-  
-  if (!jwt) {
-    throw new Error("Pinata JWT token not found");
-  }
-
   try {
     console.log("🎯 Processing Farcaster input:", input);
     
-    // Extract the cast hash
     const castHash = extractCastHash(input);
-    
     if (!castHash) {
       throw new Error("Could not extract valid cast hash from input");
     }
     
     console.log("🔍 Using cast hash:", castHash);
 
-    // Use Pinata's Farcaster Hub API
-    const apiUrl = `https://api.pinata.cloud/v3/farcaster/casts/${castHash}`;
+    // Use the correct Pinata Hub API endpoint
+    const apiUrl = `https://hub.pinata.cloud/v1/castById?hash=${castHash}`;
     console.log("🌐 Making request to:", apiUrl);
 
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${jwt}`,
+        // Hub API might not need JWT auth since it's public
         'Content-Type': 'application/json'
       }
     });
 
     console.log("📡 Response status:", response.status);
-    console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -186,31 +173,26 @@ const fetchCastDataFromPinata = async (input: string): Promise<CastData> => {
     }
 
     const castData = await response.json();
-    console.log("✅ Raw cast data from Pinata:", JSON.stringify(castData, null, 2));
+    console.log("✅ Raw cast data from Pinata Hub:", JSON.stringify(castData, null, 2));
 
-    // Check if we got valid data
-    if (!castData || typeof castData !== 'object') {
-      console.error("❌ Invalid cast data received:", castData);
-      throw new Error("Invalid cast data received from API");
-    }
-
-    // Build the canonical farcaster.xyz URL
-    const username = castData.author?.username || 'unknown';
+    // The Hub API response format might be different - let's see what we get
+    // We'll need to adjust this based on the actual response structure
+    
+    const username = castData.data?.author?.username || 'unknown';
     const canonicalUrl = `https://farcaster.xyz/${username}/${castHash}`;
 
-    // Extract relevant information from the cast - return success type
     const extractedData: CastDataSuccess = {
-      title: castData.text ? `"${castData.text.substring(0, 50)}${castData.text.length > 50 ? '...' : ''}` : "Farcaster Cast",
-      author: castData.author?.username || castData.author?.display_name || "Unknown Author",
-      content: castData.text || "",
-      timestamp: castData.timestamp || new Date().toISOString(),
+      title: castData.data?.text ? `"${castData.data.text.substring(0, 50)}${castData.data.text.length > 50 ? '...' : ''}` : "Farcaster Cast",
+      author: castData.data?.author?.displayName || castData.data?.author?.username || "Unknown Author",
+      content: castData.data?.text || "",
+      timestamp: castData.data?.timestamp || new Date().toISOString(),
       castHash: castHash,
-      username: castData.author?.username || "unknown",
-      authorFid: castData.author?.fid || 0,
-      embeds: castData.embeds || [],
-      mentions: castData.mentions || [],
-      parentHash: castData.parent_hash || "",
-      rootParentHash: castData.root_parent_hash || "",
+      username: username,
+      authorFid: castData.data?.author?.fid || 0,
+      embeds: castData.data?.embeds || [],
+      mentions: castData.data?.mentions || [],
+      parentHash: castData.data?.parentHash || "",
+      rootParentHash: castData.data?.rootParentHash || "",
       canonicalUrl: canonicalUrl
     };
 
@@ -218,14 +200,8 @@ const fetchCastDataFromPinata = async (input: string): Promise<CastData> => {
     return extractedData;
 
   } catch (error: any) {
-    console.error("❌ Failed to fetch cast data from Pinata:", error);
-    console.error("❌ Error details:", {
-      message: error.message,
-      stack: error.stack,
-      input: input
-    });
+    console.error("❌ Failed to fetch cast data from Pinata Hub:", error);
     
-    // Return fallback data with error info - return error type
     const errorData: CastDataError = {
       title: "Farcaster Cast",
       author: "Unknown Author",
