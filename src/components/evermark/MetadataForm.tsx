@@ -23,6 +23,7 @@ export interface EnhancedMetadata {
   doi?: string;
   isbn?: string;
   url?: string;
+  castUrl?: string; // Added this field
   publisher?: string;
   publicationDate?: string;
   journal?: string;
@@ -52,6 +53,7 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
     doi: initialMetadata?.doi || '',
     isbn: initialMetadata?.isbn || '',
     url: initialMetadata?.url || '',
+    castUrl: initialMetadata?.castUrl || '', // Added this field
     publisher: initialMetadata?.publisher || '',
     publicationDate: initialMetadata?.publicationDate || '',
     journal: initialMetadata?.journal || '',
@@ -264,11 +266,20 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
         )}
 
         {contentType === 'Cast' && (
-          <div className="p-3 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-700 flex items-start">
-              <AlertCircleIcon className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-              Cast metadata will be automatically extracted from the Farcaster protocol
-            </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm text-gray-600 mb-1">Cast URL or Hash</label>
+              <input
+                type="text"
+                value={typeSpecificData.castUrl || ''}
+                onChange={(e) => handleTypeSpecificChange('castUrl', e.target.value)}
+                placeholder="https://warpcast.com/username/0x1234... or 0x1234..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter a Warpcast URL or cast hash to extract metadata automatically
+              </p>
+            </div>
           </div>
         )}
 

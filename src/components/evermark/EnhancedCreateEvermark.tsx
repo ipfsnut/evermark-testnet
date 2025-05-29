@@ -88,6 +88,12 @@ export function EnhancedCreateEvermark() {
     reader.readAsDataURL(file);
   };
   
+
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    setImageUploadError(null);
+  };
   // Cast extraction function using Pinata's Farcaster API
   const handleExtractCastMetadata = async () => {
     const castInput = enhancedMetadata.castUrl;
