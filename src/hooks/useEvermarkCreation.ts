@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { useActiveAccount } from "thirdweb/react";
-import { getContract, prepareContractCall, sendTransaction } from "thirdweb";
+import { getContract, prepareContractCall, sendTransaction, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
 
@@ -11,6 +11,9 @@ export interface EvermarkMetadata {
   author: string;
   imageFile?: File | null;
 }
+
+// Developer referrer address
+const DEVELOPER_REFERRER = "0x2B27EA7DaA8Bf1dE98407447b269Dfe280753fe3";
 
 // Add Pinata upload function
 const uploadToPinata = async (file: File): Promise<string> => {
@@ -115,52 +118,27 @@ export const useEvermarkCreation = () => {
   const account = useActiveAccount();
 
   const createEvermark = async (metadata: EvermarkMetadata) => {
-    // Prevent reentrancy at the hook level
-    if (isProcessingRef.current) {
-      console.warn("Transaction already in progress");
-      return { success: false, error: "Transaction already in progress" };
-    }
-
-    if (!account) {
+    const accountAddress = account?.address;
+    
+    if (!accountAddress) {
       setError("Please connect your wallet");
       return { success: false, error: "Please connect your wallet" };
     }
 
-    // Set processing flag immediately
+    if (isProcessingRef.current) {
+      console.warn("Transaction already in progress");
+      return { success: false, error: "Transaction already in progress. Please wait." };
+    }
+
     isProcessingRef.current = true;
     setIsCreating(true);
     setError(null);
     setSuccess(null);
 
+    console.log("🚀 Starting Evermark creation process...");
+
     try {
-      let imageUrl = "";
-      let metadataURI = "";
-
-      // Upload image to Pinata if it exists
-      if (metadata.imageFile) {
-        try {
-          console.log("Uploading image to Pinata...");
-          imageUrl = await uploadToPinata(metadata.imageFile);
-          console.log("Image uploaded successfully:", imageUrl);
-        } catch (uploadError: any) {
-          console.error("Failed to upload image:", uploadError);
-          setError(`Image upload failed: ${uploadError.message}`);
-          return { success: false, error: `Image upload failed: ${uploadError.message}` };
-        }
-      }
-
-      // Upload metadata to Pinata
-      try {
-        console.log("Uploading metadata to Pinata...");
-        metadataURI = await uploadMetadataToPinata(metadata, imageUrl);
-        console.log("Metadata uploaded successfully:", metadataURI);
-      } catch (metadataError: any) {
-        console.error("Failed to upload metadata:", metadataError);
-        setError(`Metadata upload failed: ${metadataError.message}`);
-        return { success: false, error: `Metadata upload failed: ${metadataError.message}` };
-      }
-
-      // Get contract with ABI
+      // Get contract
       const contract = getContract({
         client,
         chain: CHAIN,
@@ -168,25 +146,80 @@ export const useEvermarkCreation = () => {
         abi: EVERMARK_NFT_ABI,
       });
 
-      // Prepare transaction using the correct function name and parameters
+      // Check if contract is paused
+      console.log("🔍 Checking contract state...");
+      try {
+        const isPaused = await readContract({
+          contract,
+          method: "paused",
+          params: []
+        });
+        
+        if (isPaused) {
+          throw new Error("Contract is currently paused");
+        }
+      } catch (stateError: any) {
+        console.warn("Could not check contract state:", stateError.message);
+        // Continue anyway - state check is not critical
+      }
+
+      let imageUrl = "";
+      let metadataURI = "";
+
+      // Upload image to Pinata if it exists
+      if (metadata.imageFile) {
+        console.log("📸 Uploading image to Pinata...");
+        try {
+          imageUrl = await uploadToPinata(metadata.imageFile);
+          console.log("✅ Image uploaded successfully:", imageUrl);
+        } catch (uploadError: any) {
+          console.error("❌ Failed to upload image:", uploadError);
+          throw new Error(`Image upload failed: ${uploadError.message}`);
+        }
+      }
+
+      // Upload metadata to Pinata
+      console.log("📝 Uploading metadata to Pinata...");
+      try {
+        metadataURI = await uploadMetadataToPinata(metadata, imageUrl);
+        console.log("✅ Metadata uploaded successfully:", metadataURI);
+      } catch (metadataError: any) {
+        console.error("❌ Failed to upload metadata:", metadataError);
+        throw new Error(`Metadata upload failed: ${metadataError.message}`);
+      }
+
+      // Small delay to ensure uploads are fully processed
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      console.log("🔧 Preparing transaction with params:", {
+        metadataURI,
+        title: metadata.title,
+        author: metadata.author,
+        referrer: DEVELOPER_REFERRER,
+        value: "70000000000000"
+      });
+
+      // Use mintEvermarkWithReferral with developer address
       const transaction = prepareContractCall({
         contract,
-        method: "mintEvermark",
+        method: "mintEvermarkWithReferral",
         params: [
           metadataURI,           // string metadataURI
           metadata.title,       // string title  
           metadata.author,      // string creator
+          DEVELOPER_REFERRER    // address referrer
         ],
-        value: BigInt("70000000000000"), // MINTING_FEE from contract (0.001 ETH)
+        value: BigInt("70000000000000"), // MINTING_FEE
       });
 
-      console.log("Sending transaction to contract...");
-      // Send transaction
+      console.log("📤 Sending transaction to blockchain...");
+      
       const result = await sendTransaction({
         transaction,
         account,
       });
 
+      console.log("✅ Transaction successful:", result.transactionHash);
       setSuccess("Evermark created successfully!");
       
       return { 
@@ -198,17 +231,19 @@ export const useEvermarkCreation = () => {
       };
 
     } catch (error: any) {
-      console.error("Failed to create Evermark:", error);
+      console.error("❌ Transaction failed:", error);
       
-      // More specific error handling
       let errorMessage = "Unknown error";
       if (error.message) {
         if (error.message.includes("ReentrancyGuard")) {
-          errorMessage = "Transaction already in progress. Please wait and try again.";
+          errorMessage = "Transaction failed due to timing conflict. Please wait a moment and try again.";
+          console.error("🔒 Reentrancy guard triggered - this suggests the contract is processing another transaction");
         } else if (error.message.includes("insufficient funds")) {
-          errorMessage = "Insufficient funds for transaction.";
+          errorMessage = "Insufficient funds for transaction and gas fees.";
         } else if (error.message.includes("user rejected")) {
-          errorMessage = "Transaction was rejected.";
+          errorMessage = "Transaction was rejected by user.";
+        } else if (error.message.includes("paused")) {
+          errorMessage = "Contract is currently paused.";
         } else {
           errorMessage = error.message;
         }
@@ -218,9 +253,9 @@ export const useEvermarkCreation = () => {
       return { success: false, error: errorMessage };
       
     } finally {
-      // Always reset states in finally block
-      setIsCreating(false);
       isProcessingRef.current = false;
+      setIsCreating(false);
+      console.log("🧹 Cleanup completed");
     }
   };
 
