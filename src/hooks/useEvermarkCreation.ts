@@ -54,12 +54,93 @@ const uploadToPinata = async (file: File): Promise<string> => {
   }
 };
 
+// Add Farcaster cast fetching using Pinata's Hub API
+const fetchCastDataFromPinata = async (castUrl: string) => {
+  const jwt = import.meta.env.VITE_PINATA_JWT;
+  
+  if (!jwt) {
+    throw new Error("Pinata JWT token not found");
+  }
+
+  try {
+    console.log("🎯 Fetching cast data via Pinata Hub API:", castUrl);
+    
+    // Extract cast hash from Warpcast URL
+    // URL format: https://warpcast.com/username/0x12345...
+    const urlParts = castUrl.split('/');
+    const castHash = urlParts[urlParts.length - 1];
+    
+    if (!castHash.startsWith('0x')) {
+      throw new Error("Invalid cast hash format");
+    }
+
+    // Use Pinata's Farcaster Hub API to get cast data
+    const response = await fetch(`https://api.pinata.cloud/v3/farcaster/casts/${castHash}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${jwt}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Pinata Hub API error:", {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      });
+      throw new Error(`Failed to fetch cast: ${response.status} ${response.statusText}`);
+    }
+
+    const castData = await response.json();
+    console.log("✅ Cast data fetched from Pinata:", castData);
+
+    // Extract relevant information from the cast
+    return {
+      title: castData.text ? `"${castData.text.substring(0, 50)}..."` : "Farcaster Cast",
+      author: castData.author?.username || castData.author?.display_name || "Unknown Author",
+      content: castData.text || "",
+      timestamp: castData.timestamp,
+      castHash: castHash,
+      username: castData.author?.username,
+      authorFid: castData.author?.fid,
+      embeds: castData.embeds || [],
+      mentions: castData.mentions || [],
+      parentHash: castData.parent_hash,
+      rootParentHash: castData.root_parent_hash
+    };
+
+  } catch (error: any) {
+    console.error("❌ Failed to fetch cast data from Pinata:", error);
+    // Return fallback data
+    return {
+      title: "Farcaster Cast",
+      author: "Unknown Author",
+      content: "Failed to fetch cast content",
+      timestamp: new Date().toISOString(),
+      error: error.message
+    };
+  }
+};
+
 // Create metadata JSON and upload to Pinata
-const uploadMetadataToPinata = async (metadata: EvermarkMetadata, imageUrl?: string): Promise<string> => {
+const uploadMetadataToPinata = async (
+  metadata: EvermarkMetadata, 
+  imageUrl?: string, 
+  castData?: any
+): Promise<string> => {
+  const jwt = import.meta.env.VITE_PINATA_JWT;
+  
+  if (!jwt) {
+    throw new Error("Pinata JWT token not found");
+  }
+
   const metadataObject = {
     name: metadata.title,
     description: metadata.description,
     image: imageUrl || '',
+    external_url: metadata.sourceUrl,
     attributes: [
       {
         trait_type: 'Author',
@@ -72,8 +153,47 @@ const uploadMetadataToPinata = async (metadata: EvermarkMetadata, imageUrl?: str
       {
         trait_type: 'Created',
         value: new Date().toISOString()
+      },
+      // Add rich cast data if available
+      ...(castData && !castData.error ? [
+        {
+          trait_type: 'Cast Content',
+          value: castData.content
+        },
+        {
+          trait_type: 'Cast Hash',
+          value: castData.castHash
+        },
+        {
+          trait_type: 'Author Username',
+          value: castData.username
+        },
+        {
+          trait_type: 'Author FID',
+          value: castData.authorFid?.toString()
+        },
+        {
+          trait_type: 'Cast Timestamp',
+          value: castData.timestamp
+        }
+      ] : [])
+    ],
+    // Include full cast data in metadata
+    ...(castData && !castData.error && {
+      farcaster_data: {
+        content: castData.content,
+        author: {
+          username: castData.username,
+          fid: castData.authorFid
+        },
+        cast_hash: castData.castHash,
+        timestamp: castData.timestamp,
+        embeds: castData.embeds,
+        mentions: castData.mentions,
+        parent_hash: castData.parentHash,
+        root_parent_hash: castData.rootParentHash
       }
-    ]
+    })
   };
 
   try {
@@ -116,28 +236,6 @@ export const useEvermarkCreation = () => {
   const isProcessingRef = useRef(false);
   
   const account = useActiveAccount();
-
-  // Add this test function temporarily
-  const testPinataAuth = async () => {
-    const jwt = import.meta.env.VITE_PINATA_JWT;
-    console.log("🧪 Testing Pinata auth...");
-    
-    try {
-      const response = await fetch('https://api.pinata.cloud/data/testAuthentication', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${jwt}`,
-        },
-      });
-      
-      const result = await response.json();
-      console.log("🧪 Auth test result:", result);
-      return response.ok;
-    } catch (error) {
-      console.error("🧪 Auth test failed:", error);
-      return false;
-    }
-  };
 
   const createEvermark = async (metadata: EvermarkMetadata) => {
     const accountAddress = account?.address;
@@ -215,10 +313,30 @@ export const useEvermarkCreation = () => {
         }
       }
 
-      // Upload metadata to Pinata
+      let actualTitle = metadata.title;
+      let actualAuthor = metadata.author;
+      let castData = null;
+      
+      // Check if it's a Farcaster cast URL and fetch data via Pinata
+      if (metadata.sourceUrl && (metadata.sourceUrl.includes('warpcast.com') || metadata.sourceUrl.includes('farcaster'))) {
+        console.log("🎯 Detected Farcaster cast URL, fetching via Pinata Hub API...");
+        castData = await fetchCastDataFromPinata(metadata.sourceUrl);
+        
+        if (castData && !castData.error) {
+          actualTitle = castData.title;
+          actualAuthor = castData.author;
+          console.log("✅ Using fetched cast data:", { title: actualTitle, author: actualAuthor });
+        }
+      }
+
+      // Upload metadata to Pinata with the fetched cast data
       console.log("📝 Uploading metadata to Pinata...");
       try {
-        metadataURI = await uploadMetadataToPinata(metadata, imageUrl);
+        metadataURI = await uploadMetadataToPinata({
+          ...metadata,
+          title: actualTitle,
+          author: actualAuthor
+        }, imageUrl, castData);
         console.log("✅ Metadata uploaded successfully:", metadataURI);
       } catch (metadataError: any) {
         console.error("❌ Failed to upload metadata:", metadataError);
