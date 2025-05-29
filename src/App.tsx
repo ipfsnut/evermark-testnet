@@ -6,6 +6,7 @@ import { FarcasterProvider, useFarcasterUser } from './lib/farcaster';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
+
 // Import enhanced pages
 import EnhancedHomePage from './pages/EnhancedHomePage';
 import ProfilePage from './pages/ProfilePage';
@@ -54,7 +55,7 @@ function AppContent() {
           <Route path="/" element={<EnhancedHomePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/auctions" element={<MarketplacePage />} />
+          <Route path="/Market" element={<MarketplacePage />} />
           <Route path="/my-evermarks" element={<MyEvermarksPage />} />
           <Route path="/create" element={<EnhancedCreateEvermark />} />
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
