@@ -1,42 +1,261 @@
 import * as React from "react";
 import { useState } from "react";
-import { useMarketplace, MarketplaceButton } from "../hooks/useMarketplace"; 
-import { useActiveAccount } from "thirdweb/react";
+import { 
+  useActiveAccount, 
+  useActiveWalletChain,
+  useReadContract,
+  useSendTransaction 
+} from "thirdweb/react";
+import { 
+  getContract, 
+  NATIVE_TOKEN_ADDRESS 
+} from "thirdweb";
+import { 
+  getAllListings,
+  createListing,
+  buyFromListing,
+  makeOffer,
+  cancelListing 
+} from "thirdweb/extensions/marketplace";
+import { client } from "../lib/thirdweb";
+import { CHAIN } from "../lib/contracts";
 import PageContainer from "../components/layout/PageContainer";
 
 const MARKETPLACE_CONTRACT_ADDRESS = import.meta.env.VITE_MARKETPLACE_ADDRESS || "";
 
 export function MarketplacePage() {
   const account = useActiveAccount();
-  const address = account?.address;
-
-  // Only initialize marketplace hook if we have an address and contract
-  const marketplaceHook = useMarketplace(MARKETPLACE_CONTRACT_ADDRESS);
-  
-  // Safely destructure with fallbacks
-  const {
-    listings = [],
-    userListings = [],
-    isLoading = false,
-    error = null,
-    createListing,
-    buyItem,
-    makeOffer,
-    cancelListing,
-    refetchListings
-  } = marketplaceHook || {};
+  const activeChain = useActiveWalletChain();
+  const { mutateAsync: sendTransaction } = useSendTransaction();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createListingData, setCreateListingData] = useState({
     assetContractAddress: "",
     tokenId: "",
     price: "",
-    currencyAddress: "",
     quantity: 1,
-    secondsUntilEnd: 60 * 60 * 24 * 7 // 1 week default
   });
 
-  // Early return if no marketplace contract address
+  // Get marketplace contract
+  const contract = getContract({
+    client,
+    chain: activeChain || CHAIN,
+    address: MARKETPLACE_CONTRACT_ADDRESS,
+  });
+
+  // Fetch listings using the CORRECT v5 pattern - extension as first parameter
+  const { 
+    data: allListingsData, 
+    isLoading, 
+    error,
+    refetch: refetchListings 
+  } = useReadContract(getAllListings, {
+    contract,
+    count: 100n,
+    start: 0,
+  });
+
+  // Process listings data
+  const listings = React.useMemo(() => {
+    if (!allListingsData || !Array.isArray(allListingsData)) {
+      console.log("No listings data:", allListingsData);
+      return [];
+    }
+    
+    console.log("Raw listings from contract:", allListingsData);
+
+    return allListingsData.map((listing: any, index: number) => {
+      console.log(`Processing listing ${index}:`, listing);
+      
+      return {
+        id: listing.listingId?.toString() || listing.id?.toString() || index.toString(),
+        seller: listing.listingCreator || listing.seller || listing.creator || "",
+        tokenId: listing.assetContract?.tokenId?.toString() || listing.tokenId?.toString() || "",
+        assetContractAddress: listing.assetContract?.assetContract || listing.assetContract || "",
+        price: listing.pricePerToken?.toString() || listing.buyoutPrice?.toString() || "0",
+        quantity: listing.quantity?.toString() || "1",
+        currencyAddress: listing.currency || listing.currencyContract || NATIVE_TOKEN_ADDRESS,
+        startTime: listing.startTimestamp || listing.startTimeInSeconds || 0,
+        endTime: listing.endTimestamp || listing.endTimeInSeconds || 0,
+        asset: {
+          name: listing.asset?.name || `Token #${listing.tokenId || listing.assetContract?.tokenId || 'Unknown'}`,
+          image: listing.asset?.image || "",
+          description: listing.asset?.description || "",
+        }
+      };
+    });
+  }, [allListingsData]);
+
+  // Filter user's listings
+  const userListings = React.useMemo(() => {
+    if (!account?.address) return [];
+    return listings.filter(
+      listing => listing.seller.toLowerCase() === account.address.toLowerCase()
+    );
+  }, [listings, account?.address]);
+
+  // Create listing function
+  const handleCreateListing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!account?.address) {
+      alert("Please connect your wallet");
+      return;
+    }
+
+    try {
+      console.log("Creating listing with data:", createListingData);
+      
+      const transaction = createListing({
+        contract,
+        assetContractAddress: createListingData.assetContractAddress, // assetContractAddress instead of assetContract
+        tokenId: BigInt(createListingData.tokenId),
+        quantity: BigInt(createListingData.quantity),
+        currencyContractAddress: NATIVE_TOKEN_ADDRESS, // currencyContractAddress instead of currency
+        pricePerToken: createListingData.price,
+        startTimestamp: new Date(), // Date object, not bigint
+        endTimestamp: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000), // Date object, 1 week from now
+      });
+
+      console.log("Sending create listing transaction...");
+      const result = await sendTransaction(transaction);
+      console.log("Transaction result:", result);
+      
+      setShowCreateForm(false);
+      setCreateListingData({
+        assetContractAddress: "",
+        tokenId: "",
+        price: "",
+        quantity: 1,
+      });
+      
+      // Refetch listings after a short delay
+      setTimeout(() => {
+        console.log("Refetching listings...");
+        refetchListings();
+      }, 3000);
+      
+      alert("Listing created successfully!");
+      
+    } catch (error) {
+      console.error("Failed to create listing:", error);
+      alert(`Failed to create listing: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Buy item function
+  const handleBuyItem = async (listingId: string, quantity: number = 1) => {
+    if (!account?.address) {
+      alert("Please connect your wallet");
+      return;
+    }
+
+    try {
+      console.log("Buying item:", { listingId, quantity });
+      
+      const transaction = buyFromListing({
+        contract,
+        listingId: BigInt(listingId),
+        quantity: BigInt(quantity),
+        recipient: account.address, // recipient instead of buyFor
+      });
+
+      console.log("Sending buy transaction...");
+      const result = await sendTransaction(transaction);
+      console.log("Buy transaction result:", result);
+      
+      setTimeout(() => {
+        console.log("Refetching listings after purchase...");
+        refetchListings();
+      }, 3000);
+      
+      alert("Purchase successful!");
+      
+    } catch (error) {
+      console.error("Failed to buy item:", error);
+      alert(`Failed to buy item: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Make offer function
+  const handleMakeOffer = async (listing: any) => {
+    if (!account?.address) {
+      alert("Please connect your wallet");
+      return;
+    }
+
+    const price = prompt("Enter your offer price in ETH (e.g., 0.1):");
+    if (!price) return;
+
+    try {
+      console.log("Making offer:", { listing, price });
+      
+      const transaction = makeOffer({
+        contract,
+        assetContractAddress: listing.assetContractAddress, // assetContractAddress instead of assetContract
+        tokenId: BigInt(listing.tokenId),
+        quantity: BigInt(1),
+        currencyContractAddress: NATIVE_TOKEN_ADDRESS, // currencyContractAddress instead of currency
+        totalOffer: price, // totalOffer instead of totalPrice
+        offerExpiresAt: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000), // Date object, 1 week
+      });
+
+      console.log("Sending offer transaction...");
+      const result = await sendTransaction(transaction);
+      console.log("Offer transaction result:", result);
+      
+      alert("Offer made successfully!");
+      
+    } catch (error) {
+      console.error("Failed to make offer:", error);
+      alert(`Failed to make offer: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Cancel listing function
+  const handleCancelListing = async (listingId: string) => {
+    if (!account?.address) {
+      alert("Please connect your wallet");
+      return;
+    }
+
+    try {
+      console.log("Cancelling listing:", listingId);
+      
+      const transaction = cancelListing({
+        contract,
+        listingId: BigInt(listingId),
+      });
+
+      console.log("Sending cancel transaction...");
+      const result = await sendTransaction(transaction);
+      console.log("Cancel transaction result:", result);
+      
+      setTimeout(() => {
+        console.log("Refetching listings after cancel...");
+        refetchListings();
+      }, 3000);
+      
+      alert("Listing cancelled successfully!");
+      
+    } catch (error) {
+      console.error("Failed to cancel listing:", error);
+      alert(`Failed to cancel listing: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // Debug info
+  React.useEffect(() => {
+    console.log("Marketplace Debug Info:");
+    console.log("- Contract address:", MARKETPLACE_CONTRACT_ADDRESS);
+    console.log("- Active chain:", activeChain?.name || activeChain?.id);
+    console.log("- Account:", account?.address);
+    console.log("- Loading:", isLoading);
+    console.log("- Error:", error);
+    console.log("- Raw data:", allListingsData);
+    console.log("- Processed listings:", listings);
+  }, [MARKETPLACE_CONTRACT_ADDRESS, activeChain, account, isLoading, error, allListingsData, listings]);
+
+  // Early return checks
   if (!MARKETPLACE_CONTRACT_ADDRESS) {
     return (
       <PageContainer>
@@ -49,86 +268,7 @@ export function MarketplacePage() {
     );
   }
 
-  const handleCreateListing = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!createListing) {
-      alert("Marketplace not available");
-      return;
-    }
-
-    try {
-      await createListing(createListingData);
-      setShowCreateForm(false);
-      setCreateListingData({
-        assetContractAddress: "",
-        tokenId: "",
-        price: "",
-        currencyAddress: "",
-        quantity: 1,
-        secondsUntilEnd: 60 * 60 * 24 * 7
-      });
-      alert("Listing created successfully!");
-    } catch (error) {
-      console.error("Failed to create listing:", error);
-      alert("Failed to create listing");
-    }
-  };
-
-  const handleBuyItem = async (listingId: string, quantity: number = 1) => {
-    if (!buyItem) {
-      alert("Marketplace not available");
-      return;
-    }
-
-    try {
-      await buyItem(listingId, quantity);
-      alert("Purchase successful!");
-    } catch (error) {
-      console.error("Failed to buy item:", error);
-      alert("Failed to buy item");
-    }
-  };
-
-  const handleMakeOffer = async (listing: any) => {
-    if (!makeOffer) {
-      alert("Marketplace not available");
-      return;
-    }
-
-    const price = prompt("Enter your offer price in ETH (e.g., 0.1):");
-    if (!price) return;
-
-    try {
-      await makeOffer({
-        listingId: listing.id,
-        price,
-        quantity: 1,
-        assetContractAddress: listing.assetContractAddress,
-        tokenId: listing.tokenId
-      });
-      alert("Offer made successfully!");
-    } catch (error) {
-      console.error("Failed to make offer:", error);
-      alert("Failed to make offer");
-    }
-  };
-
-  const handleCancelListing = async (listingId: string) => {
-    if (!cancelListing) {
-      alert("Marketplace not available");
-      return;
-    }
-
-    try {
-      await cancelListing(listingId);
-      alert("Listing cancelled successfully!");
-    } catch (error) {
-      console.error("Failed to cancel listing:", error);
-      alert("Failed to cancel listing");
-    }
-  };
-
-  if (!address) {
+  if (!account?.address) {
     return (
       <PageContainer>
         <div className="text-center py-16">
@@ -142,13 +282,43 @@ export function MarketplacePage() {
   return (
     <PageContainer>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">NFT Marketplace</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-900">NFT Marketplace</h1>
+          <button 
+            onClick={() => {
+              console.log("Manual refresh clicked");
+              refetchListings();
+            }}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+          >
+            Refresh
+          </button>
+        </div>
         
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">Error: {error}</p>
+            <p className="text-red-800">Error: {error instanceof Error ? error.message : String(error)}</p>
+            <button 
+              onClick={() => {
+                console.log("Retry clicked");
+                refetchListings();
+              }}
+              className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
           </div>
         )}
+
+        {/* Debug Info */}
+        <div className="bg-gray-50 border rounded-lg p-4 text-sm">
+          <h3 className="font-semibold mb-2">Debug Info:</h3>
+          <p>Contract: {MARKETPLACE_CONTRACT_ADDRESS}</p>
+          <p>Chain: {activeChain?.name || activeChain?.id || 'Unknown'}</p>
+          <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
+          <p>Raw listings count: {allListingsData?.length || 0}</p>
+          <p>Processed listings count: {listings.length}</p>
+        </div>
 
         {/* Create Listing Button */}
         <div>
@@ -177,6 +347,7 @@ export function MarketplacePage() {
                     assetContractAddress: e.target.value
                   })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="0x..."
                   required
                 />
               </div>
@@ -192,6 +363,7 @@ export function MarketplacePage() {
                     tokenId: e.target.value
                   })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="1"
                   required
                 />
               </div>
@@ -201,7 +373,7 @@ export function MarketplacePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g., 0.1"
+                  placeholder="0.1"
                   value={createListingData.price}
                   onChange={(e) => setCreateListingData({
                     ...createListingData,
@@ -245,22 +417,16 @@ export function MarketplacePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {userListings.map((listing) => (
                 <div key={listing.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">
-                    {listing.asset?.name || `Token #${listing.tokenId}`}
-                  </h4>
-                  {listing.asset?.image && (
+                  <h4 className="font-medium text-gray-900 mb-2">{listing.asset.name}</h4>
+                  {listing.asset.image && (
                     <img 
                       src={listing.asset.image} 
-                      alt={listing.asset.name || 'NFT'}
+                      alt={listing.asset.name}
                       className="w-full h-48 object-cover rounded-lg mb-3"
                     />
                   )}
-                  <p className="text-sm text-gray-600 mb-2">
-                    Price: {listing.buyoutCurrencyValuePerToken?.displayValue || 'N/A'} ETH
-                  </p>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Quantity: {listing.quantity || 'N/A'}
-                  </p>
+                  <p className="text-sm text-gray-600 mb-2">Price: {listing.price} ETH</p>
+                  <p className="text-sm text-gray-600 mb-3">Quantity: {listing.quantity}</p>
                   <button
                     onClick={() => handleCancelListing(listing.id)}
                     className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -284,12 +450,15 @@ export function MarketplacePage() {
             </div>
           ) : listings.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600">No listings found.</p>
+              <p className="text-gray-600">No listings found. Create the first one!</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Check the debug info above for connection details.
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {listings.map((listing) => {
-                const isOwnListing = listing.seller?.toLowerCase() === address?.toLowerCase();
+                const isOwnListing = listing.seller?.toLowerCase() === account.address?.toLowerCase();
                 return (
                   <div 
                     key={listing.id} 
@@ -297,25 +466,19 @@ export function MarketplacePage() {
                       isOwnListing ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'
                     }`}
                   >
-                    <h4 className="font-medium text-gray-900 mb-2">
-                      {listing.asset?.name || `Token #${listing.tokenId}`}
-                    </h4>
-                    {listing.asset?.image && (
+                    <h4 className="font-medium text-gray-900 mb-2">{listing.asset.name}</h4>
+                    {listing.asset.image && (
                       <img 
                         src={listing.asset.image} 
-                        alt={listing.asset.name || 'NFT'}
+                        alt={listing.asset.name}
                         className="w-full h-48 object-cover rounded-lg mb-3"
                       />
                     )}
-                    {listing.asset?.description && (
+                    {listing.asset.description && (
                       <p className="text-sm text-gray-600 mb-2">{listing.asset.description}</p>
                     )}
-                    <p className="text-sm text-gray-600 mb-2">
-                      Price: {listing.buyoutCurrencyValuePerToken?.displayValue || 'N/A'} ETH
-                    </p>
-                    <p className="text-sm text-gray-600 mb-2">
-                      Quantity: {listing.quantity || 'N/A'}
-                    </p>
+                    <p className="text-sm text-gray-600 mb-2">Price: {listing.price} ETH</p>
+                    <p className="text-sm text-gray-600 mb-2">Quantity: {listing.quantity}</p>
                     <p className="text-sm text-gray-600 mb-3">
                       Seller: {listing.seller ? `${listing.seller.slice(0, 6)}...${listing.seller.slice(-4)}` : 'Unknown'}
                     </p>
@@ -324,16 +487,12 @@ export function MarketplacePage() {
                       <p className="text-yellow-700 font-medium text-center">Your Listing</p>
                     ) : (
                       <div className="flex gap-2">
-                        {MarketplaceButton && (
-                          <MarketplaceButton
-                            contractAddress={MARKETPLACE_CONTRACT_ADDRESS}
-                            transaction={() => buyItem && buyItem(listing.id, 1)}
-                            onSuccess={() => alert("Purchase successful!")}
-                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                          >
-                            Buy Now
-                          </MarketplaceButton>
-                        )}
+                        <button
+                          onClick={() => handleBuyItem(listing.id, 1)}
+                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          Buy Now
+                        </button>
                         <button
                           onClick={() => handleMakeOffer(listing)}
                           className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
