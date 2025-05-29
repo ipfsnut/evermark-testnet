@@ -1,3 +1,5 @@
+// MarketplacePage.tsx - Correct Thirdweb v5.100.1 implementation
+
 import * as React from "react";
 import { useState } from "react";
 import { 
@@ -22,6 +24,7 @@ import { CHAIN } from "../lib/contracts";
 import PageContainer from "../components/layout/PageContainer";
 
 const MARKETPLACE_CONTRACT_ADDRESS = import.meta.env.VITE_MARKETPLACE_ADDRESS || "";
+const EVERMARK_NFT_ADDRESS = import.meta.env.VITE_EVERMARK_NFT_ADDRESS || "";
 
 export function MarketplacePage() {
   const account = useActiveAccount();
@@ -30,7 +33,6 @@ export function MarketplacePage() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createListingData, setCreateListingData] = useState({
-    assetContractAddress: "",
     tokenId: "",
     price: "",
     quantity: 1,
@@ -55,7 +57,7 @@ export function MarketplacePage() {
     start: 0,
   });
 
-  // Process listings data
+  // Process listings data - filter to only EverMark NFTs
   const listings = React.useMemo(() => {
     if (!allListingsData || !Array.isArray(allListingsData)) {
       console.log("No listings data:", allListingsData);
@@ -64,26 +66,30 @@ export function MarketplacePage() {
     
     console.log("Raw listings from contract:", allListingsData);
 
-    return allListingsData.map((listing: any, index: number) => {
-      console.log(`Processing listing ${index}:`, listing);
-      
-      return {
-        id: listing.listingId?.toString() || listing.id?.toString() || index.toString(),
-        seller: listing.listingCreator || listing.seller || listing.creator || "",
-        tokenId: listing.assetContract?.tokenId?.toString() || listing.tokenId?.toString() || "",
-        assetContractAddress: listing.assetContract?.assetContract || listing.assetContract || "",
-        price: listing.pricePerToken?.toString() || listing.buyoutPrice?.toString() || "0",
-        quantity: listing.quantity?.toString() || "1",
-        currencyAddress: listing.currency || listing.currencyContract || NATIVE_TOKEN_ADDRESS,
-        startTime: listing.startTimestamp || listing.startTimeInSeconds || 0,
-        endTime: listing.endTimestamp || listing.endTimeInSeconds || 0,
-        asset: {
-          name: listing.asset?.name || `Token #${listing.tokenId || listing.assetContract?.tokenId || 'Unknown'}`,
-          image: listing.asset?.image || "",
-          description: listing.asset?.description || "",
-        }
-      };
-    });
+    return allListingsData
+      .map((listing: any, index: number) => {
+        console.log(`Processing listing ${index}:`, listing);
+        
+        return {
+          id: listing.listingId?.toString() || listing.id?.toString() || index.toString(),
+          seller: listing.listingCreator || listing.seller || listing.creator || "",
+          tokenId: listing.assetContract?.tokenId?.toString() || listing.tokenId?.toString() || "",
+          assetContractAddress: listing.assetContract?.assetContract || listing.assetContract || "",
+          price: listing.pricePerToken?.toString() || listing.buyoutPrice?.toString() || "0",
+          quantity: listing.quantity?.toString() || "1",
+          currencyAddress: listing.currency || listing.currencyContract || NATIVE_TOKEN_ADDRESS,
+          startTime: listing.startTimestamp || listing.startTimeInSeconds || 0,
+          endTime: listing.endTimestamp || listing.endTimeInSeconds || 0,
+          asset: {
+            name: listing.asset?.name || `EverMark #${listing.tokenId || listing.assetContract?.tokenId || 'Unknown'}`,
+            image: listing.asset?.image || "",
+            description: listing.asset?.description || "",
+          }
+        };
+      })
+      .filter(listing => 
+        listing.assetContractAddress.toLowerCase() === EVERMARK_NFT_ADDRESS.toLowerCase()
+      ); // Only show EverMark NFT listings
   }, [allListingsData]);
 
   // Filter user's listings
@@ -107,7 +113,7 @@ export function MarketplacePage() {
       
       const transaction = createListing({
         contract,
-        assetContractAddress: createListingData.assetContractAddress, // assetContractAddress instead of assetContract
+        assetContractAddress: EVERMARK_NFT_ADDRESS, // Fixed to EverMark NFTs only
         tokenId: BigInt(createListingData.tokenId),
         quantity: BigInt(createListingData.quantity),
         currencyContractAddress: NATIVE_TOKEN_ADDRESS, // currencyContractAddress instead of currency
@@ -122,7 +128,6 @@ export function MarketplacePage() {
       
       setShowCreateForm(false);
       setCreateListingData({
-        assetContractAddress: "",
         tokenId: "",
         price: "",
         quantity: 1,
@@ -245,24 +250,37 @@ export function MarketplacePage() {
 
   // Debug info
   React.useEffect(() => {
-    console.log("Marketplace Debug Info:");
-    console.log("- Contract address:", MARKETPLACE_CONTRACT_ADDRESS);
+    console.log("EverMark Marketplace Debug Info:");
+    console.log("- Marketplace contract:", MARKETPLACE_CONTRACT_ADDRESS);
+    console.log("- EverMark NFT contract:", EVERMARK_NFT_ADDRESS);
     console.log("- Active chain:", activeChain?.name || activeChain?.id);
     console.log("- Account:", account?.address);
     console.log("- Loading:", isLoading);
     console.log("- Error:", error);
     console.log("- Raw data:", allListingsData);
-    console.log("- Processed listings:", listings);
-  }, [MARKETPLACE_CONTRACT_ADDRESS, activeChain, account, isLoading, error, allListingsData, listings]);
+    console.log("- Filtered EverMark listings:", listings);
+  }, [MARKETPLACE_CONTRACT_ADDRESS, EVERMARK_NFT_ADDRESS, activeChain, account, isLoading, error, allListingsData, listings]);
 
   // Early return checks
   if (!MARKETPLACE_CONTRACT_ADDRESS) {
     return (
       <PageContainer>
         <div className="text-center py-16">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">NFT Marketplace</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">EverMark Marketplace</h1>
           <p className="text-red-600">Marketplace contract address not configured.</p>
           <p className="text-sm text-gray-600 mt-2">Please set VITE_MARKETPLACE_ADDRESS in your environment variables.</p>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  if (!EVERMARK_NFT_ADDRESS) {
+    return (
+      <PageContainer>
+        <div className="text-center py-16">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">EverMark Marketplace</h1>
+          <p className="text-red-600">EverMark NFT contract address not configured.</p>
+          <p className="text-sm text-gray-600 mt-2">Please set VITE_EVERMARK_NFT_ADDRESS in your environment variables.</p>
         </div>
       </PageContainer>
     );
@@ -272,7 +290,7 @@ export function MarketplacePage() {
     return (
       <PageContainer>
         <div className="text-center py-16">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">NFT Marketplace</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">EverMark Marketplace</h1>
           <p className="text-gray-600">Please connect your wallet to use the marketplace.</p>
         </div>
       </PageContainer>
@@ -283,7 +301,7 @@ export function MarketplacePage() {
     <PageContainer>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">NFT Marketplace</h1>
+          <h1 className="text-3xl font-bold text-gray-900">EverMark Marketplace</h1>
           <button 
             onClick={() => {
               console.log("Manual refresh clicked");
@@ -313,11 +331,12 @@ export function MarketplacePage() {
         {/* Debug Info */}
         <div className="bg-gray-50 border rounded-lg p-4 text-sm">
           <h3 className="font-semibold mb-2">Debug Info:</h3>
-          <p>Contract: {MARKETPLACE_CONTRACT_ADDRESS}</p>
+          <p>Marketplace Contract: {MARKETPLACE_CONTRACT_ADDRESS}</p>
+          <p>EverMark NFT Contract: {EVERMARK_NFT_ADDRESS}</p>
           <p>Chain: {activeChain?.name || activeChain?.id || 'Unknown'}</p>
           <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
           <p>Raw listings count: {allListingsData?.length || 0}</p>
-          <p>Processed listings count: {listings.length}</p>
+          <p>EverMark listings count: {listings.length}</p>
         </div>
 
         {/* Create Listing Button */}
@@ -326,34 +345,26 @@ export function MarketplacePage() {
             onClick={() => setShowCreateForm(!showCreateForm)}
             className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
-            {showCreateForm ? "Cancel" : "Create New Listing"}
+            {showCreateForm ? "Cancel" : "List Your EverMark"}
           </button>
         </div>
 
         {/* Create Listing Form */}
         {showCreateForm && (
           <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Create New Listing</h3>
+            <h3 className="text-lg font-semibold mb-4">Create New EverMark Listing</h3>
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>NFT Collection:</strong> EverMark NFTs ({EVERMARK_NFT_ADDRESS})
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                This marketplace is exclusive to EverMark NFTs from your collection.
+              </p>
+            </div>
             <form onSubmit={handleCreateListing} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  NFT Contract Address:
-                </label>
-                <input
-                  type="text"
-                  value={createListingData.assetContractAddress}
-                  onChange={(e) => setCreateListingData({
-                    ...createListingData,
-                    assetContractAddress: e.target.value
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="0x..."
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Token ID:
+                  EverMark Token ID:
                 </label>
                 <input
                   type="text"
@@ -402,7 +413,7 @@ export function MarketplacePage() {
                 type="submit"
                 className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
-                Create Listing
+                Create EverMark Listing
               </button>
             </form>
           </div>
@@ -412,7 +423,7 @@ export function MarketplacePage() {
         {userListings.length > 0 && (
           <div>
             <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Your Listings ({userListings.length})
+              Your EverMark Listings ({userListings.length})
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {userListings.map((listing) => (
@@ -442,15 +453,15 @@ export function MarketplacePage() {
         {/* All Marketplace Listings */}
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            All Listings ({listings.length})
+            All EverMark Listings ({listings.length})
           </h2>
           {isLoading ? (
             <div className="text-center py-8">
-              <p className="text-gray-600">Loading listings...</p>
+              <p className="text-gray-600">Loading EverMark listings...</p>
             </div>
           ) : listings.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-600">No listings found. Create the first one!</p>
+              <p className="text-gray-600">No EverMark listings found. List the first one!</p>
               <p className="text-sm text-gray-500 mt-2">
                 Check the debug info above for connection details.
               </p>
