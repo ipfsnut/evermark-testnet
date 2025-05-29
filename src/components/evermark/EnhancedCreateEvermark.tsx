@@ -1,15 +1,16 @@
 import React, { useState, useRef } from "react";
 import { useProfile, useContractAuth } from "../../hooks/useProfile";
 import { useEvermarkCreation, type EvermarkMetadata } from "../../hooks/useEvermarkCreation";
+import { MetadataForm, type EnhancedMetadata } from "./MetadataForm";
 import { 
   PlusIcon, 
-  LinkIcon, 
   AlertCircleIcon, 
   CheckCircleIcon,
   UploadIcon,
   ImageIcon,
   XIcon,
   LoaderIcon,
+  InfoIcon,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import PageContainer from '../layout/PageContainer';
@@ -21,10 +22,18 @@ export function EnhancedCreateEvermark() {
   const contractAuth = useContractAuth();
   const { createEvermark, isCreating, error, success } = useEvermarkCreation();
   
+  // Enhanced metadata state
+  const [enhancedMetadata, setEnhancedMetadata] = useState<EnhancedMetadata>({
+    contentType: 'URL',
+    tags: [],
+    customFields: []
+  });
+  
+  // Basic required fields
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [sourceUrl, setSourceUrl] = useState("");
-  const [author, setAuthor] = useState("");
+  
+  // Image upload state
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isUploadingImage] = useState(false);
@@ -34,10 +43,19 @@ export function EnhancedCreateEvermark() {
   
   // Auto-populate author if we have Farcaster info
   React.useEffect(() => {
-    if (profile.farcasterUser && !author) {
-      setAuthor(profile.farcasterUser.displayName || profile.farcasterUser.username || '');
+    if (profile.farcasterUser && !enhancedMetadata.customFields.find(f => f.key === 'author')) {
+      const authorName = profile.farcasterUser.displayName || profile.farcasterUser.username || '';
+      if (authorName) {
+        setEnhancedMetadata(prev => ({
+          ...prev,
+          customFields: [
+            ...prev.customFields,
+            { key: 'author', value: authorName }
+          ]
+        }));
+      }
     }
-  }, [profile.farcasterUser, author]);
+  }, [profile.farcasterUser, enhancedMetadata.customFields]);
   
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -74,21 +92,137 @@ export function EnhancedCreateEvermark() {
       fileInputRef.current.value = '';
     }
   };
+
+  // Generate title based on content type and metadata
+  const generateTitle = (): string => {
+    if (title.trim()) return title.trim();
+    
+    const { contentType } = enhancedMetadata;
+    
+    switch (contentType) {
+      case 'DOI':
+        return enhancedMetadata.journal ? 
+          `Research Paper from ${enhancedMetadata.journal}` : 
+          'Academic Research Paper';
+          
+      case 'ISBN':
+        return enhancedMetadata.publisher ? 
+          `Book from ${enhancedMetadata.publisher}` : 
+          'Published Book';
+          
+      case 'URL':
+        if (enhancedMetadata.url) {
+          try {
+            const domain = new URL(enhancedMetadata.url).hostname.replace('www.', '');
+            return `Content from ${domain}`;
+          } catch {
+            return 'Web Content';
+          }
+        }
+        return 'Web Content';
+        
+      case 'Cast':
+        return 'Farcaster Cast';
+        
+      case 'Custom':
+        return enhancedMetadata.customFields.find(f => f.key === 'title')?.value || 'Custom Evermark';
+        
+      default:
+        return 'Untitled Evermark';
+    }
+  };
+
+  // Generate description from metadata
+  const generateDescription = (): string => {
+    if (description.trim()) return description.trim();
+    
+    const { contentType } = enhancedMetadata;
+    let autoDescription = '';
+    
+    switch (contentType) {
+      case 'DOI':
+        const parts = [];
+        if (enhancedMetadata.journal) parts.push(`Published in ${enhancedMetadata.journal}`);
+        if (enhancedMetadata.volume) parts.push(`Volume ${enhancedMetadata.volume}`);
+        if (enhancedMetadata.issue) parts.push(`Issue ${enhancedMetadata.issue}`);
+        if (enhancedMetadata.pages) parts.push(`Pages ${enhancedMetadata.pages}`);
+        if (enhancedMetadata.publicationDate) parts.push(`Published ${enhancedMetadata.publicationDate}`);
+        autoDescription = parts.join(' • ');
+        break;
+        
+      case 'ISBN':
+        const bookParts = [];
+        if (enhancedMetadata.publisher) bookParts.push(`Published by ${enhancedMetadata.publisher}`);
+        if (enhancedMetadata.publicationDate) bookParts.push(`Published ${enhancedMetadata.publicationDate}`);
+        autoDescription = bookParts.join(' • ');
+        break;
+        
+      case 'URL':
+        autoDescription = enhancedMetadata.url ? `Web content from ${enhancedMetadata.url}` : 'Web content reference';
+        break;
+        
+      case 'Cast':
+        autoDescription = 'Content preserved from Farcaster social network';
+        break;
+        
+      case 'Custom':
+        const customDesc = enhancedMetadata.customFields.find(f => f.key === 'description')?.value;
+        autoDescription = customDesc || 'Custom content preserved on blockchain';
+        break;
+    }
+    
+    // Add tags to description if present
+    if (enhancedMetadata.tags.length > 0) {
+      autoDescription += ` | Tags: ${enhancedMetadata.tags.join(', ')}`;
+    }
+    
+    return autoDescription;
+  };
+
+  // Get source URL from metadata
+  const getSourceUrl = (): string => {
+    const { contentType } = enhancedMetadata;
+    
+    switch (contentType) {
+      case 'DOI':
+        return enhancedMetadata.doi ? `https://doi.org/${enhancedMetadata.doi}` : '';
+      case 'ISBN':
+        return enhancedMetadata.isbn ? `https://www.worldcat.org/isbn/${enhancedMetadata.isbn}` : '';
+      case 'URL':
+        return enhancedMetadata.url || '';
+      default:
+        return enhancedMetadata.customFields.find(f => f.key === 'sourceUrl')?.value || '';
+    }
+  };
+
+  // Get author from metadata
+  const getAuthor = (): string => {
+    return enhancedMetadata.customFields.find(f => f.key === 'author')?.value || 
+           profile.farcasterUser?.displayName || 
+           profile.farcasterUser?.username || 
+           'Unknown Author';
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title.trim()) {
+    const finalTitle = generateTitle();
+    if (!finalTitle.trim()) {
       return;
     }
     
     const evermarkData: EvermarkMetadata = {
-      title,
-      description,
-      sourceUrl,
-      author,
+      title: finalTitle,
+      description: generateDescription(),
+      sourceUrl: getSourceUrl(),
+      author: getAuthor(),
       imageFile: selectedImage,
     };
+    
+    console.log('Creating Evermark with enhanced metadata:', {
+      basicData: evermarkData,
+      enhancedMetadata
+    });
     
     const result = await createEvermark(evermarkData);
     
@@ -101,21 +235,53 @@ export function EnhancedCreateEvermark() {
   };
   
   const handleAutoDetect = async () => {
+    const sourceUrl = getSourceUrl();
     if (!sourceUrl) return;
     
     // This would be an actual implementation that scrapes metadata
     // For now, just simulate a delay
     setTimeout(() => {
-      if (sourceUrl.includes("example.com")) {
-        setTitle("Example Article Title");
-        setAuthor("John Doe");
-        setDescription("This is an automatically detected description from the provided URL.");
-      } else {
-        setTitle("Detected Title from " + new URL(sourceUrl).hostname);
-        setAuthor("Unknown Author");
+      try {
+        const url = new URL(sourceUrl);
+        setTitle(`Content from ${url.hostname}`);
+        setDescription(`Automatically detected content from ${sourceUrl}`);
+      } catch {
+        setTitle("Detected Content");
+        setDescription(`Content from: ${sourceUrl}`);
       }
     }, 500);
   };
+
+  // Get content type info for display
+  const getContentTypeInfo = () => {
+    const { contentType } = enhancedMetadata;
+    const icons = {
+      Cast: '💬',
+      DOI: '📄',
+      ISBN: '📚',
+      URL: '🌐',
+      Custom: '✨'
+    };
+    
+    const descriptions = {
+      Cast: 'Social media post from Farcaster',
+      DOI: 'Academic research paper with DOI',
+      ISBN: 'Published book with ISBN',
+      URL: 'Web content from a URL',
+      Custom: 'Custom content with flexible metadata'
+    };
+    
+    return {
+      icon: icons[contentType],
+      description: descriptions[contentType]
+    };
+  };
+
+  const contentTypeInfo = getContentTypeInfo();
+  const previewTitle = generateTitle();
+  const previewDescription = generateDescription();
+  const previewSourceUrl = getSourceUrl();
+  const previewAuthor = getAuthor();
   
   return (
     <PageContainer title="Create New Evermark">
@@ -187,12 +353,12 @@ export function EnhancedCreateEvermark() {
             </div>
           </div>
         )}
-        
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          {/* Image Upload Section */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-              <ImageIcon className="h-4 w-4 mr-2" />
+
+        <form onSubmit={handleSubmit} className="space-y-8">
+          {/* Cover Image Upload Section - Always at Top */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <ImageIcon className="h-5 w-5 mr-2" />
               Cover Image (Optional)
             </h3>
             
@@ -202,7 +368,7 @@ export function EnhancedCreateEvermark() {
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 hover:bg-gray-100 transition-colors cursor-pointer"
               >
                 <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                <p className="text-gray-600 mb-2">Click to upload an image</p>
+                <p className="text-gray-600 mb-2">Click to upload a cover image</p>
                 <p className="text-xs text-gray-500">PNG, JPG, GIF up to 10MB</p>
               </div>
             ) : (
@@ -244,123 +410,126 @@ export function EnhancedCreateEvermark() {
               </div>
             )}
           </div>
-          
-          {/* Source URL with Auto-Detect */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-medium text-gray-900 mb-3 flex items-center">
-              <LinkIcon className="h-4 w-4 mr-2" />
-              Source URL (Optional)
-            </h3>
-            
-            <div className="flex gap-3">
-              <input
-                type="url"
-                value={sourceUrl}
-                onChange={(e) => setSourceUrl(e.target.value)}
-                placeholder="https://example.com/article"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-              <button
-                type="button"
-                onClick={handleAutoDetect}
-                disabled={!sourceUrl || isCreating}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Auto-Detect
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-gray-600">
-              Enter a URL to auto-detect title, author, and description
-            </p>
+
+          {/* Enhanced Metadata Form */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Content Details</h3>
+            <MetadataForm 
+              onMetadataChange={setEnhancedMetadata}
+              initialMetadata={enhancedMetadata}
+            />
           </div>
-          
-          {/* Main Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Title */}
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                Title *
-              </label>
-              <input
-                id="title"
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="Enter the title of this content"
-              />
-            </div>
+
+          {/* Optional Override Fields */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <InfoIcon className="h-5 w-5 mr-2" />
+              Optional Overrides
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              These fields will override the auto-generated values from your metadata selections.
+            </p>
             
-            {/* Author */}
-            <div>
-              <label htmlFor="author" className="block text-sm font-medium text-gray-700 mb-2">
-                Author
-              </label>
-              <input
-                id="author"
-                type="text"
-                value={author}
-                onChange={(e) => setAuthor(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder="Who created this content?"
-              />
-              {profile.farcasterUser && !author && (
+            <div className="space-y-4">
+              {/* Manual Title Override */}
+              <div>
+                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                  Custom Title (leave blank to auto-generate)
+                </label>
+                <input
+                  id="title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder={`Auto-generated: "${previewTitle}"`}
+                />
+              </div>
+              
+              {/* Manual Description Override */}
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+                  Custom Description (leave blank to auto-generate)
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                  placeholder={`Auto-generated: "${previewDescription}"`}
+                />
+              </div>
+
+              {/* Auto-detect button for URL content */}
+              {enhancedMetadata.contentType === 'URL' && previewSourceUrl && (
                 <button
                   type="button"
-                  onClick={() => setAuthor(profile.farcasterUser?.displayName || profile.farcasterUser?.username || '')}
-                  className="mt-1 text-xs text-purple-600 hover:text-purple-700"
+                  onClick={handleAutoDetect}
+                  disabled={isCreating}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Use my Farcaster name: {profile.farcasterUser.displayName || profile.farcasterUser.username}
+                  Auto-Detect from URL
                 </button>
               )}
             </div>
+          </div>
+
+          {/* Preview Section */}
+          <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Preview</h3>
             
-            {/* Description */}
-            <div>
-              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
-              <textarea
-                id="description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                placeholder="Briefly describe why this content is worth preserving"
-              />
+            <div className="bg-white rounded-lg p-4 border border-gray-300">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center">
+                  <span className="text-2xl mr-2">{contentTypeInfo.icon}</span>
+                  <div>
+                    <h4 className="font-medium text-gray-900">{previewTitle || 'Untitled'}</h4>
+                    <p className="text-sm text-gray-600">{contentTypeInfo.description}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div><strong>Author:</strong> {previewAuthor}</div>
+                {previewDescription && <div><strong>Description:</strong> {previewDescription}</div>}
+                {previewSourceUrl && <div><strong>Source:</strong> {previewSourceUrl}</div>}
+                {enhancedMetadata.tags.length > 0 && (
+                  <div><strong>Tags:</strong> {enhancedMetadata.tags.join(', ')}</div>
+                )}
+              </div>
             </div>
-            
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isCreating || !title.trim() || isUploadingImage || !contractAuth.canInteract}
-              className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCreating ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Creating Evermark...
-                </>
-              ) : (
-                <>
-                  <UploadIcon className="h-5 w-5 mr-2" />
-                  Create Evermark
-                </>
-              )}
-            </button>
-          </form>
-        </div>
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={isCreating || isUploadingImage || !contractAuth.canInteract}
+            className="w-full flex items-center justify-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isCreating ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                Creating Evermark...
+              </>
+            ) : (
+              <>
+                <UploadIcon className="h-5 w-5 mr-2" />
+                Create {enhancedMetadata.contentType} Evermark
+              </>
+            )}
+          </button>
+        </form>
         
         {/* Help Text */}
         <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <h4 className="text-sm font-medium text-blue-900 mb-2">Tips:</h4>
+          <h4 className="text-sm font-medium text-blue-900 mb-2">How it works:</h4>
           <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Add a cover image to make your Evermark more visually appealing</li>
-            <li>• Use descriptive titles that capture the essence of your content</li>
-            <li>• Include the original author's name when preserving others' work</li>
-            <li>• Add a description explaining why this content is valuable</li>
-            <li>• Your Evermark will be permanently stored on the blockchain</li>
+            <li>• <strong>Select content type:</strong> Choose what kind of content you're preserving</li>
+            <li>• <strong>Fill metadata:</strong> Provide details specific to your content type</li>
+            <li>• <strong>Add cover image:</strong> Make your Evermark visually appealing (optional)</li>
+            <li>• <strong>Custom overrides:</strong> Manually adjust title/description if needed</li>
+            <li>• <strong>Preview & create:</strong> Review and mint your Evermark to the blockchain</li>
           </ul>
         </div>
       </ContractRequired>
