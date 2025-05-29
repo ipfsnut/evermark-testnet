@@ -39,6 +39,10 @@ export function EnhancedCreateEvermark() {
   const [isUploadingImage] = useState(false);
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   
+  // Cast extraction state
+  const [isExtractingCast, setIsExtractingCast] = useState(false);
+  const [extractedCastData, setExtractedCastData] = useState<any>(null);
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Auto-populate author if we have Farcaster info
@@ -84,12 +88,98 @@ export function EnhancedCreateEvermark() {
     reader.readAsDataURL(file);
   };
   
-  const removeImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
+  // Cast extraction function using Pinata's Farcaster API
+  const handleExtractCastMetadata = async () => {
+    const castInput = enhancedMetadata.castUrl;
+    if (!castInput) return;
+    
+    setIsExtractingCast(true);
     setImageUploadError(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+    
+    try {
+      // Extract cast hash from farcaster.xyz URL or use direct hash
+      let castHash = castInput.trim();
+      
+      // Handle different URL formats
+      if (castInput.includes('farcaster.xyz') || castInput.includes('warpcast.com')) {
+        // Extract hash from URL - both old and new formats
+        const urlParts = castInput.split('/');
+        castHash = urlParts[urlParts.length - 1];
+        
+        // Remove any query parameters or fragments
+        castHash = castHash.split('?')[0].split('#')[0];
+      }
+      
+      // Ensure hash starts with 0x
+      if (!castHash.startsWith('0x')) {
+        castHash = '0x' + castHash;
+      }
+      
+      console.log('Extracting cast metadata for hash:', castHash);
+      
+      // Use Pinata's Farcaster API to fetch cast data
+      const response = await fetch(`https://api.pinata.cloud/v3/farcaster/casts/${castHash}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch cast: ${response.status} ${response.statusText}`);
+      }
+      
+      const castData = await response.json();
+      console.log('Cast data retrieved:', castData);
+      
+      // Transform Pinata's response to our format
+      const extractedData = {
+        hash: castData.hash,
+        author: castData.author?.username || 'unknown-user',
+        authorDisplayName: castData.author?.display_name || castData.author?.username || 'Unknown User',
+        authorFid: castData.author?.fid || 0,
+        text: castData.text || '',
+        timestamp: castData.timestamp || new Date().toISOString(),
+        embeds: castData.embeds || [],
+        mentions: castData.mentions || [],
+        parentUrl: `https://farcaster.xyz/~/cast/${castHash}`,
+        channel: castData.parent_url ? castData.parent_url.replace('https://farcaster.xyz/~/channel/', '') : null
+      };
+      
+      setExtractedCastData(extractedData);
+      
+      // Auto-populate metadata based on extracted cast data
+      setEnhancedMetadata(prev => ({
+        ...prev,
+        customFields: [
+          ...prev.customFields.filter(f => !['author', 'castHash', 'castText', 'castTimestamp', 'authorFid', 'channel'].includes(f.key)),
+          { key: 'author', value: extractedData.authorDisplayName },
+          { key: 'castHash', value: extractedData.hash },
+          { key: 'castText', value: extractedData.text },
+          { key: 'castTimestamp', value: extractedData.timestamp },
+          { key: 'authorFid', value: extractedData.authorFid.toString() },
+          ...(extractedData.channel ? [{ key: 'channel', value: extractedData.channel }] : [])
+        ]
+      }));
+      
+      // Auto-populate title and description if they're empty
+      if (!title) {
+        const channelText = extractedData.channel ? ` in /${extractedData.channel}` : '';
+        setTitle(`Cast by ${extractedData.authorDisplayName}${channelText}`);
+      }
+      if (!description) {
+        const truncatedText = extractedData.text.length > 200 
+          ? extractedData.text.substring(0, 200) + '...' 
+          : extractedData.text;
+        setDescription(truncatedText || 'Farcaster cast content');
+      }
+      
+    } catch (error) {
+      console.error('Failed to extract cast metadata:', error);
+      setImageUploadError(`Failed to extract cast metadata: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsExtractingCast(false);
     }
   };
 
