@@ -143,69 +143,79 @@ const fetchCastDataFromPinata = async (input: string): Promise<CastData> => {
     if (!castHash) {
       throw new Error("Could not extract valid cast hash from input");
     }
+
+    // Try to extract username from farcaster.xyz URL
+    let username = null;
+    let fid = null;
     
-    console.log("🔍 Using cast hash:", castHash);
-
-    // Use the correct Pinata Hub API endpoint
-    const apiUrl = `https://hub.pinata.cloud/v1/castById?hash=${castHash}`;
-    console.log("🌐 Making request to:", apiUrl);
-
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        // Hub API might not need JWT auth since it's public
-        'Content-Type': 'application/json'
+    if (input.includes('farcaster.xyz/')) {
+      const urlParts = input.split('/');
+      const usernameIndex = urlParts.findIndex(part => part === 'farcaster.xyz') + 1;
+      if (usernameIndex > 0 && urlParts[usernameIndex]) {
+        username = urlParts[usernameIndex];
+        console.log("🔍 Extracted username:", username);
+        
+        // Look up FID for this username
+        try {
+          const userLookupUrl = `https://hub.pinata.cloud/v1/userNameProofsByName?name=${username}`;
+          console.log("🌐 Looking up FID for username:", userLookupUrl);
+          
+          const userResponse = await fetch(userLookupUrl);
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            fid = userData.proofs?.[0]?.fid;
+            console.log("✅ Found FID:", fid);
+          }
+        } catch (userError) {
+          console.log("❌ Failed to lookup FID:", userError);
+        }
       }
-    });
-
-    console.log("📡 Response status:", response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("❌ Pinata Hub API error:", {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText,
-        url: apiUrl,
-        hash: castHash
-      });
-      throw new Error(`Failed to fetch cast: ${response.status} ${response.statusText} - ${errorText}`);
     }
-
-    const castData = await response.json();
-    console.log("✅ Raw cast data from Pinata Hub:", JSON.stringify(castData, null, 2));
-
-    // The Hub API response format might be different - let's see what we get
-    // We'll need to adjust this based on the actual response structure
     
-    const username = castData.data?.author?.username || 'unknown';
-    const canonicalUrl = `https://farcaster.xyz/${username}/${castHash}`;
-
-    const extractedData: CastDataSuccess = {
-      title: castData.data?.text ? `"${castData.data.text.substring(0, 50)}${castData.data.text.length > 50 ? '...' : ''}` : "Farcaster Cast",
-      author: castData.data?.author?.displayName || castData.data?.author?.username || "Unknown Author",
-      content: castData.data?.text || "",
-      timestamp: castData.data?.timestamp || new Date().toISOString(),
-      castHash: castHash,
-      username: username,
-      authorFid: castData.data?.author?.fid || 0,
-      embeds: castData.data?.embeds || [],
-      mentions: castData.data?.mentions || [],
-      parentHash: castData.data?.parentHash || "",
-      rootParentHash: castData.data?.rootParentHash || "",
-      canonicalUrl: canonicalUrl
-    };
-
-    console.log("✅ Extracted cast data:", extractedData);
-    return extractedData;
-
+    // Now try to get the cast with FID + hash
+    if (fid && castHash) {
+      const castUrl = `https://hub.pinata.cloud/v1/castById?fid=${fid}&hash=${castHash}`;
+      console.log("🌐 Getting cast with FID + hash:", castUrl);
+      
+      const response = await fetch(castUrl);
+      console.log("📡 Response status:", response.status);
+      
+      if (response.ok) {
+        const castData = await response.json();
+        console.log("✅ Raw cast data:", JSON.stringify(castData, null, 2));
+        
+        const canonicalUrl = `https://farcaster.xyz/${username}/${castHash}`;
+        
+        const extractedData: CastDataSuccess = {
+          title: castData.data?.castAddBody?.text ? 
+            `"${castData.data.castAddBody.text.substring(0, 50)}${castData.data.castAddBody.text.length > 50 ? '...' : ''}` : 
+            "Farcaster Cast",
+          author: username || `User ${fid}`,
+          content: castData.data?.castAddBody?.text || "",
+          timestamp: castData.data?.timestamp ? new Date(castData.data.timestamp * 1000).toISOString() : new Date().toISOString(),
+          castHash: castHash,
+          username: username || `user${fid}`,
+          authorFid: fid,
+          embeds: castData.data?.castAddBody?.embeds || [],
+          mentions: castData.data?.castAddBody?.mentions || [],
+          parentHash: castData.data?.castAddBody?.parentCastId?.hash || "",
+          rootParentHash: "",
+          canonicalUrl: canonicalUrl
+        };
+        
+        return extractedData;
+      }
+    }
+    
+    throw new Error("Could not fetch cast data");
+    
   } catch (error: any) {
-    console.error("❌ Failed to fetch cast data from Pinata Hub:", error);
+    console.error("❌ Failed to fetch cast data:", error);
     
     const errorData: CastDataError = {
       title: "Farcaster Cast",
       author: "Unknown Author",
-      content: "Failed to fetch cast content",
+      content: "Failed to fetch cast content", 
       timestamp: new Date().toISOString(),
       error: error.message,
       canonicalUrl: input.includes('http') ? input : `https://farcaster.xyz/unknown/${input}`
