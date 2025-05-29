@@ -76,7 +76,7 @@ const uploadToPinata = async (file: File): Promise<string> => {
     }
 
     const result = await response.json();
-    return `https://gateway.pinata.cloud/ipfs/${result.IpfsHash}`;
+    return `ipfs://${result.IpfsHash}`;
   } catch (error) {
     console.error('Pinata upload error:', error);
     throw error;
@@ -305,6 +305,26 @@ const uploadMetadataToPinata = async (
   }
 };
 
+// Add unpin function
+const unpinFromPinata = async (ipfsHash: string): Promise<void> => {
+  try {
+    const response = await fetch(`https://api.pinata.cloud/pinning/unpin/${ipfsHash}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`,
+      },
+    });
+    
+    if (response.ok) {
+      console.log("🗑️ Successfully unpinned:", ipfsHash);
+    } else {
+      console.warn("⚠️ Failed to unpin:", ipfsHash, response.statusText);
+    }
+  } catch (error) {
+    console.error("❌ Error unpinning:", error);
+  }
+};
+
 export const useEvermarkCreation = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -379,12 +399,15 @@ export const useEvermarkCreation = () => {
 
       let imageUrl = "";
       let metadataURI = "";
+      let imageHash = ""; // Track the hash for cleanup
+      let metadataHash = ""; // Track metadata hash too
 
       // Upload image to Pinata if it exists
       if (metadata.imageFile) {
         console.log("📸 Uploading image to Pinata...");
         try {
           imageUrl = await uploadToPinata(metadata.imageFile);
+          imageHash = imageUrl.replace('ipfs://', ''); // Extract hash
           console.log("✅ Image uploaded successfully:", imageUrl);
         } catch (uploadError: any) {
           console.error("❌ Failed to upload image:", uploadError);
@@ -439,6 +462,7 @@ export const useEvermarkCreation = () => {
           title: actualTitle,
           author: actualAuthor
         }, imageUrl, castData);
+        metadataHash = metadataURI.replace('ipfs://', ''); // Extract hash
         console.log("✅ Metadata uploaded successfully:", metadataURI);
       } catch (metadataError: any) {
         console.error("❌ Failed to upload metadata:", metadataError);
