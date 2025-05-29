@@ -24,7 +24,6 @@ const EvermarkDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch metadata using our hook
   const { metadata, getImageUrl, isFarcasterCast } = useEvermarkMetadata(evermark?.metadataURI);
 
   useEffect(() => {
@@ -44,21 +43,18 @@ const EvermarkDetailPage: React.FC = () => {
           abi: EVERMARK_NFT_ABI,
         });
 
-        // Get metadata from the contract
         const [title, author, metadataURI] = await readContract({
           contract,
           method: "getEvermarkMetadata",
           params: [BigInt(id)],
         });
 
-        // Get creator address
         const creator = await readContract({
           contract,
           method: "getEvermarkCreator",
           params: [BigInt(id)],
         });
 
-        // Get creation time
         const creationTime = await readContract({
           contract,
           method: "getEvermarkCreationTime",
@@ -84,7 +80,6 @@ const EvermarkDetailPage: React.FC = () => {
     fetchEvermarkDetails();
   }, [id]);
 
-  // Format date
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -93,7 +88,6 @@ const EvermarkDetailPage: React.FC = () => {
     });
   };
 
-  // Use metadata if available, fallback to contract data
   const displayTitle = metadata?.name || evermark?.title || '';
   const displayDescription = metadata?.description || '';
   const displayImage = getImageUrl();
@@ -161,7 +155,6 @@ const EvermarkDetailPage: React.FC = () => {
         </Link>
       </div>
 
-      {/* Hero Image Section */}
       {displayImage && (
         <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
           <div className="aspect-video bg-gray-100 relative">
@@ -170,7 +163,6 @@ const EvermarkDetailPage: React.FC = () => {
               alt={displayTitle}
               className="w-full h-full object-cover"
             />
-            {/* Platform badge */}
             {isFarcasterCast() && (
               <div className="absolute top-4 right-4 bg-purple-600 text-white px-3 py-2 rounded-full text-sm font-medium flex items-center">
                 <MessageCircleIcon className="h-4 w-4 mr-2" />
@@ -229,7 +221,6 @@ const EvermarkDetailPage: React.FC = () => {
           </div>
         </div>
         
-        {/* Content Section */}
         {displayDescription && (
           <div className="mb-6">
             {isFarcasterCast() ? (
@@ -243,7 +234,6 @@ const EvermarkDetailPage: React.FC = () => {
                     "{displayDescription}"
                   </p>
                   
-                  {/* Farcaster metadata */}
                   {metadata?.farcaster_data && (
                     <div className="mt-4 pt-4 border-t border-purple-200">
                       <div className="grid grid-cols-2 gap-4 text-sm">
@@ -290,7 +280,6 @@ const EvermarkDetailPage: React.FC = () => {
           </div>
         )}
         
-        {/* Attributes */}
         {metadata?.attributes && metadata.attributes.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-900 mb-3">Attributes</h3>
@@ -323,7 +312,6 @@ const EvermarkDetailPage: React.FC = () => {
         </div>
       </div>
       
-      {/* Voting Component */}
       <div className="mb-6">
         <VotingPanel evermarkId={id || ""} isOwner={isOwner} />
       </div>

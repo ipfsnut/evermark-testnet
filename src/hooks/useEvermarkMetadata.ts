@@ -39,7 +39,6 @@ export const useEvermarkMetadata = (metadataURI?: string) => {
       try {
         console.log("📥 Fetching metadata from:", metadataURI);
         
-        // Convert ipfs:// to gateway URL if needed
         const fetchUrl = metadataURI.startsWith('ipfs://') 
           ? metadataURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
           : metadataURI;
@@ -53,10 +52,6 @@ export const useEvermarkMetadata = (metadataURI?: string) => {
         console.log("✅ Metadata fetched:", data);
         
         setMetadata(data);
-        console.log("🖼️ Image field in metadata:", data.image);
-        console.log("🔗 Converted image URL:", data.image?.startsWith('ipfs://') 
-          ? data.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
-          : data.image);
       } catch (err: any) {
         console.error("❌ Failed to fetch metadata:", err);
         setError(err.message);
@@ -68,16 +63,22 @@ export const useEvermarkMetadata = (metadataURI?: string) => {
     fetchMetadata();
   }, [metadataURI]);
 
-  // Helper to get display image URL
   const getImageUrl = () => {
-    if (!metadata?.image) return null;
+    console.log("🔍 Raw metadata?.image:", metadata?.image);
     
-    return metadata.image.startsWith('ipfs://') 
+    if (!metadata?.image) {
+      console.log("❌ No image in metadata");
+      return null;
+    }
+    
+    const convertedUrl = metadata.image.startsWith('ipfs://') 
       ? metadata.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')
       : metadata.image;
+    
+    console.log("✅ Converted image URL:", convertedUrl);
+    return convertedUrl;
   };
 
-  // Helper to check if it's a Farcaster cast
   const isFarcasterCast = () => {
     return !!(metadata?.farcaster_data || 
       metadata?.attributes?.some(attr => attr.trait_type === 'Platform' && attr.value === 'Farcaster'));
