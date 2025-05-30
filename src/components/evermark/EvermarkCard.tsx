@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookmarkIcon, UserIcon, CalendarIcon, ImageIcon, MessageCircleIcon } from 'lucide-react';
 import { Evermark } from '../../hooks/useEvermarks';
-import { useEvermarkMetadata } from '../../hooks/useEvermarkMetadata';
 
 interface EvermarkCardProps {
   evermark: Evermark;

@@ -21,7 +21,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
   // ✅ Get total votes for this Evermark
   const { data: totalVotes, isLoading: isLoadingTotalVotes, refetch: refetchTotalVotes } = useReadContract({
     contract: votingContract,
-    method: "getBookmarkVotes", // ✅ Correct
+    method: "getEvermarkVotes", 
     params: [BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!evermarkId && evermarkId !== "0",
@@ -31,7 +31,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
   // ✅ Get user's votes for this Evermark
   const userVotesQuery = useReadContract({
     contract: votingContract,
-    method: "getUserVotesForBookmark", // ✅ Correct
+    method: "getUserVotesForEvermark",
     params: [userAddress || "0x0000000000000000000000000000000000000000", BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!userAddress && !!evermarkId && evermarkId !== "0",

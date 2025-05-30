@@ -5,7 +5,7 @@ import RewardsABI from './EvermarkRewards.json';
 import LeaderboardABI from './EvermarkLeaderboard.json';
 import NFTStakingABI from './NFTStaking.json';
 import FeeCollectorABI from './FeeCollector.json';
-import EmarkTokenABI from './MockEMARK.json';
+import EmarkTokenABI from './EMARK.json';
 
 export const EVERMARK_NFT_ABI = EvermarkNFTABI as any;
 export const VOTING_ABI = VotingABI as any;
