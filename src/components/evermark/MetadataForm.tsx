@@ -7,7 +7,6 @@ import {
   LinkIcon,
   HashIcon,
   FileTextIcon,
-  AlertCircleIcon
 } from 'lucide-react';
 
 export interface MetadataField {

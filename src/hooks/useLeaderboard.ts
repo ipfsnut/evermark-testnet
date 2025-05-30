@@ -119,8 +119,8 @@ export function useLeaderboard(weekNumber?: number) {
         let leaderboardData;
         try {
           leaderboardData = await readContract({
-            contract: leaderboardContract,
-            method: "getWeeklyTopBookmarks", // ✅ Using bookmark method name
+            contract: votingContract, // Use voting contract since it has the method
+            method: "getTopEvermarksInCycle", // ✅ Updated method name
             params: [BigInt(targetWeek), BigInt(10)], // Get top 10
           });
           console.log("✅ Found finalized leaderboard data:", leaderboardData);
@@ -129,18 +129,18 @@ export function useLeaderboard(weekNumber?: number) {
           
           // STRATEGY 2: Fallback - Build leaderboard from current voting data
           try {
-            console.log("📋 Fetching bookmarks with votes for cycle:", targetWeek);
-            const bookmarksWithVotes = await readContract({
+            console.log("📋 Fetching evermarks with votes for cycle:", targetWeek);
+            const evermarksWithVotes = await readContract({
               contract: votingContract,
-              method: "getBookmarksWithVotesInCycle", // ✅ Using bookmark method name
+              method: "getEvermarksWithVotesInCycle", // ✅ Updated method name
               params: [BigInt(targetWeek)],
             });
             
-            console.log("📋 Bookmarks with votes result:", bookmarksWithVotes);
-            console.log("📋 Type:", typeof bookmarksWithVotes, "Length:", bookmarksWithVotes?.length);
+            console.log("📋 Evermarks with votes result:", evermarksWithVotes);
+            console.log("📋 Type:", typeof evermarksWithVotes, "Length:", evermarksWithVotes?.length);
             
-            if (!bookmarksWithVotes || bookmarksWithVotes.length === 0) {
-              console.log("📭 No bookmarks with votes found for cycle", targetWeek);
+            if (!evermarksWithVotes || evermarksWithVotes.length === 0) {
+              console.log("📭 No evermarks with votes found for cycle", targetWeek);
               if (isMounted) {
                 setEntries([]);
                 setIsLoading(false);
@@ -148,33 +148,33 @@ export function useLeaderboard(weekNumber?: number) {
               return;
             }
             
-            // Get vote counts for each bookmark
-            console.log("🔢 Fetching vote counts for", bookmarksWithVotes.length, "bookmarks...");
-            const bookmarkVoteData = await Promise.all(
-              bookmarksWithVotes.map(async (bookmarkId: bigint) => {
+            // Get vote counts for each evermark
+            console.log("🔢 Fetching vote counts for", evermarksWithVotes.length, "evermarks...");
+            const evermarkVoteData = await Promise.all(
+              evermarksWithVotes.map(async (evermarkId: bigint) => {
                 try {
-                  console.log("🗳️ Fetching votes for bookmark:", bookmarkId.toString());
+                  console.log("🗳️ Fetching votes for evermark:", evermarkId.toString());
                   const votes = await readContract({
                     contract: votingContract,
-                    method: "getBookmarkVotesInCycle", // ✅ Using bookmark method name
-                    params: [BigInt(targetWeek), bookmarkId],
+                    method: "getEvermarkVotesInCycle", // ✅ Updated method name
+                    params: [BigInt(targetWeek), evermarkId],
                   });
                   
-                  console.log("📊 Bookmark", bookmarkId.toString(), "has", votes.toString(), "votes");
+                  console.log("📊 Evermark", evermarkId.toString(), "has", votes.toString(), "votes");
                   return {
-                    tokenId: bookmarkId,
+                    tokenId: evermarkId,
                     votes: votes,
                     rank: BigInt(0),
                   };
                 } catch (err) {
-                  console.error(`❌ Error fetching votes for bookmark ${bookmarkId}:`, err);
+                  console.error(`❌ Error fetching votes for evermark ${evermarkId}:`, err);
                   return null;
                 }
               })
             );
             
             // Filter out failed requests and sort by votes
-            leaderboardData = bookmarkVoteData
+            leaderboardData = evermarkVoteData
               .filter(data => data !== null)
               .sort((a, b) => Number(b.votes - a.votes))
               .slice(0, 10) // Top 10
@@ -207,61 +207,61 @@ export function useLeaderboard(weekNumber?: number) {
         // Get complete Evermark metadata
         console.log("🎨 Enhancing", leaderboardData.length, "entries with complete metadata...");
         const enhancedEntries = await Promise.all(
-          leaderboardData.map(async (bookmark: any) => {
+          leaderboardData.map(async (evermark: any) => {
             try {
-              console.log("🔍 Processing bookmark:", bookmark.tokenId.toString());
+              console.log("🔍 Processing evermark:", evermark.tokenId.toString());
               
-              // Check if bookmark exists
+              // Check if evermark exists
               const exists = await readContract({
                 contract: evermarkContract,
                 method: "exists",
-                params: [bookmark.tokenId],
+                params: [evermark.tokenId],
               });
               
               if (!exists) {
-                console.log(`⚠️ Bookmark ${bookmark.tokenId} does not exist`);
+                console.log(`⚠️ Evermark ${evermark.tokenId} does not exist`);
                 return null;
               }
               
               // Get metadata using correct deployed contract method names
-              console.log("📖 Fetching metadata for bookmark:", bookmark.tokenId.toString());
+              console.log("📖 Fetching metadata for evermark:", evermark.tokenId.toString());
               const [title, author, metadataURI] = await readContract({
                 contract: evermarkContract,
                 method: "getEvermarkMetadata", // ✅ NFT contract uses "evermark" method names
-                params: [bookmark.tokenId],
+                params: [evermark.tokenId],
               });
               
-              console.log("📝 Bookmark metadata:", { title, author, metadataURI });
+              console.log("📝 Evermark metadata:", { title, author, metadataURI });
               
               // Get creator address
               const creator = await readContract({
                 contract: evermarkContract,
                 method: "getEvermarkCreator", // ✅ NFT contract uses "evermark" method names
-                params: [bookmark.tokenId],
+                params: [evermark.tokenId],
               });
               
               // Get creation time
               const creationTime = await readContract({
                 contract: evermarkContract,
                 method: "getEvermarkCreationTime", // ✅ NFT contract uses "evermark" method names
-                params: [bookmark.tokenId],
+                params: [evermark.tokenId],
               });
               
               // Fetch IPFS metadata for description, image, etc.
               console.log("🌐 Fetching IPFS metadata for:", metadataURI);
               const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
               
-              console.log(`✅ Enhanced bookmark ${bookmark.tokenId}:`, { 
+              console.log(`✅ Enhanced evermark ${evermark.tokenId}:`, { 
                 title, author, creator, 
                 hasDescription: !!description, 
                 hasImage: !!image,
-                votes: bookmark.votes.toString()
+                votes: evermark.votes.toString()
               });
               
               return {
                 evermark: {
-                  id: bookmark.tokenId.toString(),
-                  title: title || `Evermark #${bookmark.tokenId}`,
+                  id: evermark.tokenId.toString(),
+                  title: title || `Evermark #${evermark.tokenId}`,
                   author: author || "Unknown",
                   creator: creator,
                   description,
@@ -270,16 +270,16 @@ export function useLeaderboard(weekNumber?: number) {
                   metadataURI,
                   creationTime: Number(creationTime) * 1000, // Convert to milliseconds
                 },
-                votes: bookmark.votes,
-                rank: Number(bookmark.rank),
+                votes: evermark.votes,
+                rank: Number(evermark.rank),
               };
             } catch (err) {
-              console.error(`❌ Error fetching metadata for token ${bookmark.tokenId}:`, err);
+              console.error(`❌ Error fetching metadata for token ${evermark.tokenId}:`, err);
               // Return basic entry even if metadata fails
               return {
                 evermark: {
-                  id: bookmark.tokenId.toString(),
-                  title: `Evermark #${bookmark.tokenId}`,
+                  id: evermark.tokenId.toString(),
+                  title: `Evermark #${evermark.tokenId}`,
                   author: "Unknown",
                   creator: "0x0",
                   description: "",
@@ -288,8 +288,8 @@ export function useLeaderboard(weekNumber?: number) {
                   metadataURI: "",
                   creationTime: Date.now(),
                 },
-                votes: bookmark.votes,
-                rank: Number(bookmark.rank),
+                votes: evermark.votes,
+                rank: Number(evermark.rank),
               };
             }
           })

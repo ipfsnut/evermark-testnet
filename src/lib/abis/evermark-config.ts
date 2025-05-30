@@ -1,8 +1,8 @@
 
 // Evermark Protocol Contract Configuration
 export const EVERMARK_CONFIG = {
-  network: "baseSepolia",
-  chainId: 84532,
+  network: "base",
+  chainId: 8453,
   contracts: {
     mockEmark: "0x0fCc19a2FF104F326d295CA6dDAF6Bf0548fCcf7",
     cardCatalog: "0x3E09D2367703b24B9E08d7582EfC28eD908e7e41",

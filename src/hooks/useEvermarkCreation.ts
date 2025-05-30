@@ -212,19 +212,24 @@ const uploadMetadataToPinata = async (
     name: metadata.title,
     description: metadata.description,
     image: imageUrl || '',
-    external_url: castData?.canonicalUrl || metadata.sourceUrl,
+    external_url: castData?.canonicalUrl || metadata.sourceUrl || '', // Handle empty sourceUrl
     attributes: [
       {
         trait_type: 'Author',
-        value: metadata.author
+        value: metadata.author || 'Unknown Author' // Ensure we have an author
       },
       {
         trait_type: 'Source URL',
-        value: castData?.canonicalUrl || metadata.sourceUrl
+        value: castData?.canonicalUrl || metadata.sourceUrl || 'Direct Upload'
       },
       {
         trait_type: 'Created',
         value: new Date().toISOString()
+      },
+      // Add content type trait
+      {
+        trait_type: 'Content Type',
+        value: castData && isCastDataSuccess(castData) ? 'Farcaster Cast' : 'Custom Content'
       },
       // Add rich cast data if available and successful
       ...(castData && isCastDataSuccess(castData) ? [
@@ -273,6 +278,8 @@ const uploadMetadataToPinata = async (
     })
   };
 
+  console.log("📝 Uploading metadata object:", JSON.stringify(metadataObject, null, 2));
+
   try {
     const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
       method: 'POST',
@@ -298,7 +305,9 @@ const uploadMetadataToPinata = async (
     }
 
     const result = await response.json();
-    return `ipfs://${result.IpfsHash}`;
+    const metadataURI = `ipfs://${result.IpfsHash}`; // Return IPFS URI format
+    console.log("✅ Metadata uploaded with IPFS URI:", metadataURI);
+    return metadataURI;
   } catch (error) {
     console.error('Metadata upload error:', error);
     throw error;
@@ -335,6 +344,25 @@ export const useEvermarkCreation = () => {
 
     console.log("🚀 Starting Evermark creation process...");
     console.log("🔍 Input metadata:", JSON.stringify(metadata, null, 2));
+
+    // Validate required fields
+    if (!metadata.title?.trim()) {
+      const error = "Title is required";
+      setError(error);
+      return { success: false, error };
+    }
+
+    if (!metadata.description?.trim()) {
+      const error = "Description is required";
+      setError(error);
+      return { success: false, error };
+    }
+
+    // Ensure we have an author - use provided author or fallback
+    const providedAuthor = metadata.author?.trim();
+    if (!providedAuthor) {
+      console.log("⚠️ No author provided, using fallback");
+    }
 
     try {
       // Get contract
@@ -393,12 +421,13 @@ export const useEvermarkCreation = () => {
       }
 
       let actualTitle = metadata.title;
-      let actualAuthor = metadata.author;
+      let actualAuthor = providedAuthor || "Unknown Author"; // Use provided author or fallback
       let castData: CastData | undefined = undefined;
       
       // Check if it's Farcaster-related input and fetch data
       console.log("🔍 Checking if input is Farcaster-related...");
       console.log("🔍 Source URL/Input:", metadata.sourceUrl);
+      console.log("🔍 Provided Author:", providedAuthor);
       
       if (metadata.sourceUrl && isFarcasterInput(metadata.sourceUrl)) {
         console.log("🎯 Detected Farcaster input, fetching cast data...");
@@ -407,7 +436,13 @@ export const useEvermarkCreation = () => {
           
           if (isCastDataSuccess(castData)) {
             actualTitle = castData.title;
-            actualAuthor = castData.author;
+            // Only override author if none was provided
+            if (!providedAuthor) {
+              actualAuthor = castData.author;
+              console.log("✅ Using fetched author (no manual author provided):", actualAuthor);
+            } else {
+              console.log("✅ Keeping manually provided author:", actualAuthor);
+            }
             console.log("✅ Using fetched cast data:", { 
               title: actualTitle,
               author: actualAuthor,
@@ -421,15 +456,16 @@ export const useEvermarkCreation = () => {
           // Continue with original metadata if cast fetch fails
         }
       } else {
-        console.log("❌ Input not recognized as Farcaster-related");
+        console.log("❌ Input not recognized as Farcaster-related, using provided data");
       }
 
-      // Upload metadata to Pinata with the fetched cast data
+      // Upload metadata to Pinata with the processed data
       console.log("📝 Uploading metadata to Pinata...");
       console.log("📝 Final metadata before upload:", {
         title: actualTitle,
         author: actualAuthor,
         sourceUrl: metadata.sourceUrl,
+        description: metadata.description,
         hasCastData: !!castData && isCastDataSuccess(castData)
       });
       
@@ -456,17 +492,17 @@ export const useEvermarkCreation = () => {
         value: mintingFee.toString()
       });
 
-      // Use the actual minting fee from the contract
+      // Prepare the contract call
       const transaction = prepareContractCall({
         contract,
         method: "mintEvermarkWithReferral",
         params: [
           metadataURI,           // string metadataURI
-          actualTitle,          // string title (use fetched title)
-          actualAuthor,         // string creator (use fetched author)
+          actualTitle,          // string title
+          actualAuthor,         // string creator
           DEVELOPER_REFERRER    // address referrer
         ],
-        value: mintingFee, // Use the actual fee from contract
+        value: mintingFee,
       });
 
       console.log("📤 Sending transaction to blockchain...");
@@ -480,7 +516,7 @@ export const useEvermarkCreation = () => {
       
       const successMessage = castData && isCastDataSuccess(castData)
         ? `Farcaster cast by @${castData.username} preserved successfully!`
-        : "Evermark created successfully!";
+        : `Evermark "${actualTitle}" by ${actualAuthor} created successfully!`;
       
       setSuccess(successMessage);
       
