@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useActiveAccount } from "thirdweb/react";
 import { 
   BookmarkIcon, 
@@ -10,7 +10,6 @@ import {
   HeartIcon,
   BookOpenIcon,
   StarIcon,
-  CheckIcon,
   XIcon
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -334,7 +333,7 @@ const EnhancedMyEvermarksPage: React.FC = () => {
   const address = account?.address;
   
   // Existing hooks
-  const { evermarks: userOwnedEvermarks, isLoading: isLoadingOwned, error: ownedError } = useUserEvermarks(address);
+  const { evermarks: userOwnedEvermarks, isLoading: isLoadingOwned } = useUserEvermarks(address);
   const { evermarks: allEvermarks } = useEvermarks();
   const { 
     delegationHistory, 

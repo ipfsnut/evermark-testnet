@@ -89,9 +89,6 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
       setViewStats(prevStats => {
         if (!prevStats) return null;
         
-        const today = new Date();
-        const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-        
         const newStats: ViewStats = {
           totalViews: prevStats.totalViews + 1,
           viewsToday: prevStats.viewsToday + 1,

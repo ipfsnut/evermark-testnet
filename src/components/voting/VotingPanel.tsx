@@ -111,7 +111,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
       
       return new Promise<void>((resolve, reject) => {
         sendTransaction(transaction as any, {
-          onSuccess: (result) => {
+          onSuccess: () => {
             setSuccess(`Successfully delegated ${voteAmount} WEMARK to this Evermark!`);
             setVoteAmount("");
             

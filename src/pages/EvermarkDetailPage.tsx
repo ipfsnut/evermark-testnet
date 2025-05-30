@@ -90,7 +90,7 @@ const EvermarkDetailPage: React.FC = () => {
         });
 
         // Fetch IPFS metadata including image
-        const { description, sourceUrl, image, farcaster_data } = await fetchIPFSMetadata(metadataURI);
+        const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
 
         setEvermark({
           id,
