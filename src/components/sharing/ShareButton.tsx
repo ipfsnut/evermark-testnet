@@ -7,7 +7,6 @@ import {
   FacebookIcon,
   LinkedinIcon,
   MessageCircleIcon,
-  GlobeIcon,
   ZapIcon,
   AtSignIcon,
   HashIcon
@@ -158,13 +157,6 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     const url = getShareUrl('bluesky');
     const text = `Check out "${title}" ${author ? `by ${author} ` : ''}on Evermark\n\n${url}`;
     return `https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`;
-  };
-  
-  const getMastodonUrl = () => {
-    const url = getShareUrl('mastodon');
-    const text = `Check out "${title}" ${author ? `by ${author} ` : ''}on Evermark`;
-    // Mastodon doesn't have a universal share URL, so we'll provide a generic compose link
-    return `https://mastodon.social/share?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`;
   };
   
   const getLensUrl = () => {

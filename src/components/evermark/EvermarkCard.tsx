@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { BookmarkIcon, UserIcon, CalendarIcon, ImageIcon, MessageCircleIcon } from 'lucide-react';
 import { Evermark } from '../../hooks/useEvermarks';
@@ -8,18 +8,91 @@ interface EvermarkCardProps {
   isCompact?: boolean;
 }
 
+// Helper function to fetch IPFS metadata (extracted from useEvermarks.ts)
+const fetchIPFSMetadata = async (metadataURI: string) => {
+  const defaultReturn = { 
+    name: "", 
+    description: "", 
+    sourceUrl: "", 
+    image: "", 
+    farcaster_data: null 
+  };
+  
+  if (!metadataURI || !metadataURI.startsWith('ipfs://')) {
+    return defaultReturn;
+  }
+
+  try {
+    const ipfsHash = metadataURI.replace('ipfs://', '');
+    
+    if (ipfsHash.length < 40) {
+      return defaultReturn;
+    }
+    
+    const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
+    const response = await fetch(ipfsGatewayUrl, { 
+      signal: controller.signal,
+      cache: 'force-cache',
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      return defaultReturn;
+    }
+    
+    const ipfsData = await response.json();
+    
+    return {
+      name: ipfsData.name || "",
+      description: ipfsData.description || "",
+      sourceUrl: ipfsData.external_url || "",
+      image: ipfsData.image 
+        ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
+        : "",
+      farcaster_data: ipfsData.farcaster_data || null
+    };
+  } catch (error) {
+    return defaultReturn;
+  }
+};
+
 export function EvermarkCard({ evermark, isCompact = false }: EvermarkCardProps) {
   const { id, title, author, description, creationTime } = evermark;
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const [metadata, setMetadata] = useState<{
+    name: string;
+    description: string;
+    sourceUrl: string;
+    image: string;
+    farcaster_data: any;
+  } | null>(null);
   
   // Fetch metadata from IPFS
-  const { metadata, getImageUrl, isFarcasterCast } = useEvermarkMetadata(evermark.metadataURI);
-  console.log("🖼️ Display image URL:", getImageUrl());
-  console.log("🔍 Evermark metadataURI:", evermark.metadataURI);
+  useEffect(() => {
+    if (evermark.metadataURI) {
+      fetchIPFSMetadata(evermark.metadataURI).then(setMetadata);
+    }
+  }, [evermark.metadataURI]);
+  
+  // Helper functions to replace the deleted hook
+  const getImageUrl = () => {
+    return metadata?.image || evermark.image || '';
+  };
+  
+  const isFarcasterCast = () => {
+    return !!(metadata?.farcaster_data || 
+             evermark.sourceUrl?.includes('farcaster') || 
+             evermark.description?.includes('Farcaster'));
+  };
   
   // Use metadata if available, fallback to contract data
-  const displayImage = getImageUrl() || evermark.image;
+  const displayImage = getImageUrl();
   const displayDescription = metadata?.farcaster_data?.content || metadata?.description || description;
   const displayTitle = metadata?.name || title;
   
