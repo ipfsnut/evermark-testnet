@@ -1,7 +1,7 @@
-import { baseSepolia } from "thirdweb/chains";
+import { base } from "thirdweb/chains";
 
 // Chain configuration
-export const CHAIN = baseSepolia; // Change to baseSepolia for testnet
+export const CHAIN = base;
 
 // Contract addresses from environment variables
 export const CONTRACTS = {

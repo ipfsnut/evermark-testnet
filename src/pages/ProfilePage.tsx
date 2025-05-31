@@ -12,7 +12,6 @@ import {
   CoinsIcon, 
   ExternalLinkIcon,
   CheckCircleIcon,
-  SettingsIcon,
   TrendingUpIcon,
   TabletIcon,
   ChevronRightIcon
