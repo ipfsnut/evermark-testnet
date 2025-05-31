@@ -414,21 +414,27 @@ export const useEvermarkCreation = () => {
         abi: EVERMARK_NFT_ABI,
       });
 
-      // Check contract state and get minting fee
+      // Check contract state and get the actual minting fee
       console.log("🔍 Checking contract state and minting fee...");
+      console.log("🔍 Contract address:", CONTRACTS.EVERMARK_NFT);
+      console.log("🔍 Chain:", CHAIN);
+      
       let mintingFee: bigint;
       
       try {
+        console.log("🔍 Checking if contract is paused...");
         const isPaused = await readContract({
           contract,
           method: "paused",
           params: []
         });
+        console.log("🔍 Contract paused status:", isPaused);
         
         if (isPaused) {
           throw new Error("Contract is currently paused");
         }
 
+        console.log("🔍 Reading MINTING_FEE from contract...");
         mintingFee = await readContract({
           contract,
           method: "MINTING_FEE",
@@ -436,11 +442,14 @@ export const useEvermarkCreation = () => {
         });
         
         console.log("💰 Contract minting fee:", mintingFee.toString(), "wei");
+        console.log("💰 Minting fee in ETH:", Number(mintingFee) / 1e18);
         
       } catch (stateError: any) {
-        console.error("Contract state check failed:", stateError);
+        console.error("❌ Contract state check failed:", stateError);
+        console.error("❌ Error details:", stateError.message);
+        console.error("❌ Error stack:", stateError.stack);
         mintingFee = BigInt("1000000000000000"); // 0.001 ETH as fallback
-        console.warn("Using fallback minting fee:", mintingFee.toString());
+        console.warn("⚠️ Using fallback minting fee:", mintingFee.toString());
       }
 
       let imageUrl = "";
