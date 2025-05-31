@@ -2,6 +2,9 @@
 import React, { createContext, useContext, useEffect, useState, PropsWithChildren, useRef } from 'react';
 import sdk from "@farcaster/frame-sdk";
 
+// Export the SDK for use in other parts of the app
+export { sdk };
+
 interface FarcasterUser {
   fid: number;
   username?: string;
