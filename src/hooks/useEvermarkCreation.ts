@@ -575,9 +575,33 @@ export const useEvermarkCreation = () => {
         });
 
         try {
+          // Resolve the data field if it's a function
+          let transactionData: `0x${string}`;
+          
+          if (!transaction.data) {
+            throw new Error("Transaction data is missing");
+          }
+          
+          if (typeof transaction.data === 'function') {
+            const resolvedData = await transaction.data();
+            if (!resolvedData) {
+              throw new Error("Failed to resolve transaction data");
+            }
+            transactionData = resolvedData as `0x${string}`;
+          } else {
+            transactionData = transaction.data as `0x${string}`;
+          }
+
+          console.log("🔧 Wagmi transaction params:", {
+            to: transaction.to,
+            data: transactionData,
+            value: mintingFee.toString(),
+            gas: transaction.gas?.toString()
+          });
+
           const wagmiTxHash = await sendWagmiTransaction({
             to: transaction.to as `0x${string}`,
-            data: transaction.data as `0x${string}`,
+            data: transactionData,
             value: mintingFee,
             gas: transaction.gas ? BigInt(transaction.gas.toString()) : undefined,
           });
