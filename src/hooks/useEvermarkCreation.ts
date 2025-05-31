@@ -3,7 +3,7 @@ import { useActiveAccount } from "thirdweb/react";
 import { getContract, prepareContractCall, sendTransaction, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
-
+import { useFarcasterUser } from "../lib/farcaster"; // ADDED: Import Farcaster hook
 
 interface CastDataSuccess {
   title: string;
@@ -324,16 +324,20 @@ export const useEvermarkCreation = () => {
   const isProcessingRef = useRef(false);
   
   const account = useActiveAccount();
+  const { isInFarcaster, isAuthenticated: isFarcasterAuth } = useFarcasterUser(); // ADDED: Get Farcaster state
 
-const createEvermark = async (metadata: EvermarkMetadata) => {
-  // Use account address if available (webapp), otherwise get from Frame SDK (Farcaster)
-  const accountAddress = account?.address;
-  
-  if (!accountAddress && !account) {
-    setError("Please connect your wallet or authenticate");
-    return { success: false, error: "Please connect your wallet or authenticate" };
-  }
-
+  const createEvermark = async (metadata: EvermarkMetadata) => {
+    // UPDATED: Allow both traditional wallet and Farcaster authentication
+    const accountAddress = account?.address;
+    const canProceed = accountAddress || (isInFarcaster && isFarcasterAuth);
+    
+    if (!canProceed) {
+      const errorMessage = isInFarcaster ? 
+        "Please authenticate in Farcaster" : 
+        "Please connect your wallet";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    }
 
     if (isProcessingRef.current) {
       console.warn("Transaction already in progress");
@@ -510,10 +514,44 @@ const createEvermark = async (metadata: EvermarkMetadata) => {
 
       console.log("📤 Sending transaction to blockchain...");
       
-      const result = await sendTransaction({
-        transaction,
-        account,
-      });
+      // UPDATED: Handle both wallet and Farcaster transaction sending
+      let result;
+      
+      if (account) {
+        // Traditional wallet flow (webapp)
+        console.log("💳 Using connected wallet for transaction");
+        result = await sendTransaction({
+          transaction,
+          account,
+        });
+      } else if (isInFarcaster && isFarcasterAuth) {
+        // Farcaster Frame SDK flow
+        console.log("📱 Using Farcaster Frame SDK for transaction");
+        
+        // Try to use Frame SDK directly
+        if ((window as any).FrameSDK?.actions?.sendTransaction) {
+          try {
+            const frameResult = await (window as any).FrameSDK.actions.sendTransaction({
+              chainId: "eip155:8453", // Base chain
+              method: "eth_sendTransaction", 
+              params: {
+                to: transaction.to,
+                data: transaction.data,
+                value: transaction.value?.toString() || "0x0",
+                gas: transaction.gas?.toString(),
+              },
+            });
+            result = { transactionHash: frameResult.transactionHash };
+          } catch (frameError) {
+            console.error("Frame SDK transaction failed:", frameError);
+            throw new Error("Transaction failed in Farcaster. Please try again.");
+          }
+        } else {
+          throw new Error("Farcaster transaction capability not available");
+        }
+      } else {
+        throw new Error("No transaction method available");
+      }
 
       console.log("✅ Transaction successful:", result.transactionHash);
       

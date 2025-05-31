@@ -3,8 +3,7 @@ import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { client } from "../lib/thirdweb";
 import { base } from "thirdweb/chains";
 import { useFarcasterUser } from "../lib/farcaster";
-import { useActiveAccount, useConnect } from "thirdweb/react";
-import { useEffect } from "react";
+import { useActiveAccount } from "thirdweb/react";
 
 const wallets = [
   inAppWallet({
@@ -21,40 +20,8 @@ export function WalletConnect() {
   const { isInFarcaster, isAuthenticated: isFarcasterAuth, user } = useFarcasterUser();
   const account = useActiveAccount();
   const isWalletConnected = !!account;
-  const { connect } = useConnect();
 
-  // Auto-connect Farcaster wallet
-  useEffect(() => {
-    if (isInFarcaster && isFarcasterAuth && !isWalletConnected) {
-      console.log('🔗 Auto-connecting Farcaster wallet...');
-      
-      const autoConnect = async () => {
-        try {
-          const wallet = inAppWallet({
-            auth: {
-              options: ["farcaster"],
-            },
-          });
-          
-          const connectedAccount = await wallet.connect({
-            client,
-            strategy: "farcaster",
-          });
-          
-          console.log('✅ Farcaster wallet connected:', connectedAccount.address);
-        } catch (error) {
-          console.warn('⚠️ Auto-connect failed (this is often normal):', error);
-          // Don't show error to user - auto-connect failure is expected in many Farcaster contexts
-        }
-      };
-      
-      // Small delay to ensure Frame SDK is ready
-      const timer = setTimeout(autoConnect, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [isInFarcaster, isFarcasterAuth, isWalletConnected]);
-
-  // In Farcaster mini-app with authenticated user
+  // In Farcaster mini-app with authenticated user - no wallet connection needed!
   if (isInFarcaster && isFarcasterAuth && user) {
     return (
       <div className="flex items-center space-x-2">
@@ -72,39 +39,10 @@ export function WalletConnect() {
           </span>
         </div>
         
-        {/* Show connect button if wallet not connected */}
-        {!isWalletConnected && (
-          <button
-            onClick={async () => {
-              console.log('🔗 Manual connect attempted...');
-              try {
-                const wallet = inAppWallet({ 
-                  auth: { 
-                    options: ["farcaster"] 
-                  } 
-                });
-                
-                const connectedAccount = await wallet.connect({ 
-                  client, 
-                  strategy: "farcaster" 
-                });
-                
-                console.log('✅ Manual connect successful:', connectedAccount.address);
-              } catch (error) {
-                console.warn('⚠️ Manual connect failed:', error);
-                // In production, you might want to show a user-friendly message
-              }
-            }}
-            className="px-2 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 transition-colors"
-          >
-            Enable Wallet
-          </button>
-        )}
-        
-        {/* Connection status indicator */}
+        {/* Always show green for Farcaster authenticated users */}
         <div 
-          className={`w-2 h-2 rounded-full ${isWalletConnected ? 'bg-green-500' : 'bg-yellow-500'}`} 
-          title={isWalletConnected ? "Wallet Connected" : "Farcaster Authenticated"}
+          className="w-2 h-2 rounded-full bg-green-500" 
+          title="Farcaster Authenticated - Ready for Transactions"
         />
       </div>
     );
