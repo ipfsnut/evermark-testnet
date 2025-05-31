@@ -24,6 +24,24 @@ export function useWallet() {
   const effectiveAddress = account?.address || 
     (isInFarcaster && isFarcasterAuth && hasVerifiedAddress() ? getPrimaryAddress() : null);
 
+  // Add the missing getConnectionType function
+  const getConnectionType = () => {
+    if (account?.address) return 'wallet';
+    if (isInFarcaster && isFarcasterAuth && hasVerifiedAddress()) return 'farcaster';
+    return 'none';
+  };
+
+  // Add debug logging
+  console.log('🔍 useWallet Debug:', {
+    thirdwebAddress: account?.address,
+    farcasterAddress: effectiveAddress,
+    isInFarcaster,
+    isFarcasterAuth,
+    hasVerifiedAddress: hasVerifiedAddress(),
+    hasWalletAccess,
+    connectionType: getConnectionType()
+  });
+
   return {
     // Keep existing interface for backward compatibility
     account,
@@ -43,10 +61,6 @@ export function useWallet() {
     isFarcasterConnected: isInFarcaster && isFarcasterAuth && hasVerifiedAddress(),
     isInFarcaster,
     farcasterUser: user,
-    getConnectionType: () => {
-      if (account?.address) return 'wallet';
-      if (isInFarcaster && isFarcasterAuth) return 'farcaster';
-      return 'none';
-    }
+    getConnectionType // Add this function
   };
 }
