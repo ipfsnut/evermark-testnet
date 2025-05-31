@@ -73,33 +73,12 @@ export function useDelegationHistory(userAddress?: string) {
     
     setIsLoading(true);
     
-    // Mock delegation history
-    const mockHistory: DelegationRecord[] = [
-      {
-        evermarkId: '1',
-        amount: BigInt(100e18),
-        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        cycle: Number(currentCycle),
-        isActive: true
-      },
-      {
-        evermarkId: '2',
-        amount: BigInt(50e18),
-        timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-        cycle: Number(currentCycle),
-        isActive: true
-      },
-      {
-        evermarkId: '3',
-        amount: BigInt(200e18),
-        timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-        cycle: Number(currentCycle) - 1,
-        isActive: false
-      }
-    ];
+    // TODO: Replace with real blockchain data reading
+    // For now, return empty array since delegation isn't implemented yet
+    const realHistory: DelegationRecord[] = [];
     
-    setDelegationHistory(mockHistory);
-    setCurrentCycleDelegations(mockHistory.filter(d => d.cycle === Number(currentCycle)));
+    setDelegationHistory(realHistory);
+    setCurrentCycleDelegations(realHistory.filter(d => d.cycle === Number(currentCycle)));
     setIsLoading(false);
   }, [userAddress, currentCycle]);
   
