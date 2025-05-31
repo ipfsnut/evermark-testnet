@@ -11,16 +11,19 @@ import {
   XIcon,
   LoaderIcon,
   InfoIcon,
+  WalletIcon,
+  LinkIcon,
 } from 'lucide-react';
 import { useNavigate } from "react-router-dom";
 import PageContainer from '../layout/PageContainer';
 import { ContractRequired } from '../auth/AuthGuard';
+import { WalletConnect } from '../ConnectButton';
 
 export function EnhancedCreateEvermark() {
   const navigate = useNavigate();
   const profile = useProfile();
   const contractAuth = useContractAuth();
-  const { createEvermark, isCreating, error, success, validateFarcasterInput } = useEvermarkCreation();
+  const { createEvermark, isCreating, error, success, needsWalletConnection, validateFarcasterInput } = useEvermarkCreation();
   
   // Enhanced metadata state
   const [enhancedMetadata, setEnhancedMetadata] = useState<EnhancedMetadata>({
@@ -346,9 +349,27 @@ export function EnhancedCreateEvermark() {
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start">
             <AlertCircleIcon className="h-5 w-5 text-red-600 mr-3 mt-0.5" />
-            <div>
+            <div className="flex-1">
               <p className="text-red-700 font-medium">Error</p>
               <p className="text-red-600 text-sm">{error}</p>
+              
+              {/* ENHANCED: Show wallet connection option for Farcaster users */}
+              {needsWalletConnection && profile.isInFarcaster && (
+                <div className="mt-3 p-3 bg-red-100 rounded-lg border border-red-200">
+                  <div className="flex items-start">
+                    <WalletIcon className="h-4 w-4 text-red-600 mr-2 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-red-700 text-sm font-medium mb-2">
+                        Farcaster transaction capabilities are not available in this environment.
+                      </p>
+                      <p className="text-red-600 text-xs mb-3">
+                        Connect a wallet for reliable blockchain transactions:
+                      </p>
+                      <WalletConnect />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -373,7 +394,10 @@ export function EnhancedCreateEvermark() {
             <div>
               <p className="text-blue-700 font-medium">Processing Transaction</p>
               <p className="text-blue-600 text-sm">
-                Please confirm the transaction in your wallet...
+                {profile.isInFarcaster && !profile.isWalletConnected 
+                  ? "Sending transaction through Farcaster..." 
+                  : "Please confirm the transaction in your wallet..."
+                }
               </p>
             </div>
           </div>
@@ -384,13 +408,42 @@ export function EnhancedCreateEvermark() {
           <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between text-sm">
               <span className="text-blue-700">
-                📱 Running in Farcaster • {profile.authMethod === 'both' ? '✅ Wallet linked' : '⚠️ Wallet needed for blockchain'}
+                📱 Running in Farcaster • {profile.authMethod === 'both' ? '✅ Wallet linked' : '⚠️ Using Frame SDK'}
               </span>
-              {profile.primaryAddress && (
+              {profile.primaryAddress && profile.primaryAddress !== 'farcaster-pending' && (
                 <span className="text-blue-600 font-mono text-xs">
                   {profile.primaryAddress.slice(0, 6)}...{profile.primaryAddress.slice(-4)}
                 </span>
               )}
+            </div>
+            
+            {/* Show Frame SDK transaction warning if no wallet */}
+            {profile.authMethod === 'farcaster' && !needsWalletConnection && (
+              <div className="mt-2 p-2 bg-amber-100 rounded text-xs text-amber-700">
+                <div className="flex items-center">
+                  <InfoIcon className="h-3 w-3 mr-1" />
+                  <span>Transactions will be sent through Farcaster Frame SDK. If this fails, you'll be prompted to connect a wallet.</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Wallet Connection Helper for Farcaster Users */}
+        {profile.isInFarcaster && !profile.isWalletConnected && (
+          <div className="mb-6 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+            <div className="flex items-start">
+              <LinkIcon className="h-5 w-5 text-purple-600 mr-3 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-medium text-purple-900 mb-2">
+                  💡 Recommended: Link a Wallet
+                </h4>
+                <p className="text-sm text-purple-800 mb-3">
+                  For the most reliable transaction experience in Farcaster, consider linking a wallet. 
+                  This provides a backup if Frame SDK transactions aren't available.
+                </p>
+                <WalletConnect />
+              </div>
             </div>
           </div>
         )}
@@ -571,6 +624,9 @@ export function EnhancedCreateEvermark() {
             <li>• <strong>Add cover image:</strong> Make your Evermark visually appealing (optional)</li>
             <li>• <strong>Custom overrides:</strong> Manually adjust title/description if needed</li>
             <li>• <strong>Preview & create:</strong> Review and mint your Evermark to the blockchain</li>
+            {profile.isInFarcaster && (
+              <li>• <strong>Farcaster:</strong> Transactions are sent through Frame SDK or connected wallet</li>
+            )}
           </ul>
         </div>
       </ContractRequired>

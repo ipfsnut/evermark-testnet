@@ -315,25 +315,66 @@ const uploadMetadataToPinata = async (
   }
 };
 
+// ENHANCED: Check Farcaster transaction capabilities
+const checkFarcasterTransactionCapabilities = (): {
+  hasFrameSDK: boolean;
+  hasTransactionMethod: boolean;
+  canSendTransactions: boolean;
+} => {
+  try {
+    const hasFrameSDK = !!(window as any).FrameSDK;
+    const hasTransactionMethod = !!(window as any).FrameSDK?.actions?.sendTransaction;
+    const canSendTransactions = hasFrameSDK && hasTransactionMethod;
+    
+    console.log("🔍 Farcaster transaction capabilities:", {
+      hasFrameSDK,
+      hasTransactionMethod,
+      canSendTransactions,
+      sdkObject: (window as any).FrameSDK ? "present" : "missing"
+    });
+    
+    return { hasFrameSDK, hasTransactionMethod, canSendTransactions };
+  } catch (error) {
+    console.error("Error checking Farcaster capabilities:", error);
+    return { hasFrameSDK: false, hasTransactionMethod: false, canSendTransactions: false };
+  }
+};
+
 export const useEvermarkCreation = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [needsWalletConnection, setNeedsWalletConnection] = useState(false); // NEW: State for wallet connection requirement
   
   // Use ref to prevent multiple simultaneous calls
   const isProcessingRef = useRef(false);
   
   const account = useActiveAccount();
-  const { isInFarcaster, isAuthenticated: isFarcasterAuth } = useFarcasterUser(); // ADDED: Get Farcaster state
+  const { isInFarcaster, isAuthenticated: isFarcasterAuth, hasVerifiedAddress, getPrimaryAddress } = useFarcasterUser(); // ENHANCED: Get verified address info
 
   const createEvermark = async (metadata: EvermarkMetadata) => {
-    // UPDATED: Allow both traditional wallet and Farcaster authentication
+    // ENHANCED: Better authentication and capability checking
     const accountAddress = account?.address;
-    const canProceed = accountAddress || (isInFarcaster && isFarcasterAuth);
+    const farcasterPrimaryAddress = getPrimaryAddress();
+    const hasWalletAccess = accountAddress || (isInFarcaster && isFarcasterAuth && hasVerifiedAddress());
     
-    if (!canProceed) {
+    // Check transaction capabilities for Farcaster users
+    let canSendTransactions = true;
+    if (isInFarcaster && isFarcasterAuth && !accountAddress) {
+      const capabilities = checkFarcasterTransactionCapabilities();
+      canSendTransactions = capabilities.canSendTransactions;
+      
+      if (!canSendTransactions) {
+        console.log("⚠️ Farcaster transaction capabilities not available, will request wallet connection");
+        setNeedsWalletConnection(true);
+        setError("Please connect a wallet to create Evermarks. Farcaster transaction capabilities are not available in this environment.");
+        return { success: false, error: "Wallet connection required", needsWalletConnection: true };
+      }
+    }
+    
+    if (!hasWalletAccess) {
       const errorMessage = isInFarcaster ? 
-        "Please authenticate in Farcaster" : 
+        "Please authenticate in Farcaster or connect a wallet" : 
         "Please connect your wallet";
       setError(errorMessage);
       return { success: false, error: errorMessage };
@@ -348,6 +389,7 @@ export const useEvermarkCreation = () => {
     setIsCreating(true);
     setError(null);
     setSuccess(null);
+    setNeedsWalletConnection(false);
 
     console.log("🚀 Starting Evermark creation process...");
     console.log("🔍 Input metadata:", JSON.stringify(metadata, null, 2));
@@ -514,7 +556,7 @@ export const useEvermarkCreation = () => {
 
       console.log("📤 Sending transaction to blockchain...");
       
-      // UPDATED: Handle both wallet and Farcaster transaction sending
+      // ENHANCED: Better transaction handling with fallback logic
       let result;
       
       if (account) {
@@ -528,29 +570,38 @@ export const useEvermarkCreation = () => {
         // Farcaster Frame SDK flow
         console.log("📱 Using Farcaster Frame SDK for transaction");
         
-        // Try to use Frame SDK directly
-        if ((window as any).FrameSDK?.actions?.sendTransaction) {
-          try {
-            const frameResult = await (window as any).FrameSDK.actions.sendTransaction({
-              chainId: "eip155:8453", // Base chain
-              method: "eth_sendTransaction", 
-              params: {
-                to: transaction.to,
-                data: transaction.data,
-                value: transaction.value?.toString() || "0x0",
-                gas: transaction.gas?.toString(),
-              },
-            });
-            result = { transactionHash: frameResult.transactionHash };
-          } catch (frameError) {
-            console.error("Frame SDK transaction failed:", frameError);
-            throw new Error("Transaction failed in Farcaster. Please try again.");
-          }
-        } else {
-          throw new Error("Farcaster transaction capability not available");
+        // Check capabilities one more time
+        const capabilities = checkFarcasterTransactionCapabilities();
+        
+        if (!capabilities.canSendTransactions) {
+          // This shouldn't happen because we checked earlier, but just in case
+          throw new Error("Farcaster transaction capabilities became unavailable. Please connect a wallet.");
+        }
+        
+        try {
+          const frameSDK = (window as any).FrameSDK;
+          const frameResult = await frameSDK.actions.sendTransaction({
+            chainId: "eip155:8453", // Base chain
+            method: "eth_sendTransaction", 
+            params: {
+              to: transaction.to,
+              data: transaction.data,
+              value: transaction.value?.toString() || "0x0",
+              gas: transaction.gas?.toString(),
+            },
+          });
+          
+          result = { transactionHash: frameResult.transactionHash };
+          console.log("✅ Farcaster transaction successful:", result.transactionHash);
+        } catch (frameError: any) {
+          console.error("Frame SDK transaction failed:", frameError);
+          
+          // If Frame SDK fails, suggest wallet connection
+          setNeedsWalletConnection(true);
+          throw new Error("Transaction failed in Farcaster environment. Please try connecting a wallet for more reliable transactions.");
         }
       } else {
-        throw new Error("No transaction method available");
+        throw new Error("No transaction method available. Please connect a wallet.");
       }
 
       console.log("✅ Transaction successful:", result.transactionHash);
@@ -585,13 +636,16 @@ export const useEvermarkCreation = () => {
           errorMessage = "Contract is currently paused.";
         } else if (error.message.includes("Pinata")) {
           errorMessage = `Upload failed: ${error.message}`;
+        } else if (error.message.includes("Farcaster transaction capabilities") || error.message.includes("connect a wallet")) {
+          errorMessage = error.message;
+          setNeedsWalletConnection(true);
         } else {
           errorMessage = error.message;
         }
       }
       
       setError(`Failed to create Evermark: ${errorMessage}`);
-      return { success: false, error: errorMessage };
+      return { success: false, error: errorMessage, needsWalletConnection: needsWalletConnection };
       
     } finally {
       isProcessingRef.current = false;
@@ -603,6 +657,7 @@ export const useEvermarkCreation = () => {
   const clearMessages = () => {
     setError(null);
     setSuccess(null);
+    setNeedsWalletConnection(false);
   };
 
   // Helper function to test if a string is a valid Farcaster input
@@ -629,6 +684,7 @@ export const useEvermarkCreation = () => {
     isCreating, 
     error, 
     success, 
+    needsWalletConnection, // NEW: Expose wallet connection requirement
     clearMessages,
     validateFarcasterInput,
     // Expose the processing state for additional UI control
