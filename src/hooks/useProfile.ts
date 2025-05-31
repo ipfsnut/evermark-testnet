@@ -77,7 +77,7 @@ export function useProfile(): UnifiedProfile {
   const primaryAddress = walletAddress || 
     (verifiedAddresses && verifiedAddresses.length > 0 
       ? verifiedAddresses[0] 
-      : (isFarcasterAuthenticated ? 'farcaster-pending' : undefined));
+      : undefined); // Don't use 'farcaster-pending'
   
   // Determine the best display name (prioritize Farcaster in Farcaster environment)
   const displayName = (() => {
