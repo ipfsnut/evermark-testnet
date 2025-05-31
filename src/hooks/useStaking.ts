@@ -4,6 +4,7 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { toEther, toWei } from "thirdweb/utils";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, CARD_CATALOG_ABI, EMARK_TOKEN_ABI } from "../lib/contracts";
+import { useFarcasterUser } from "../lib/farcaster";
 
 export interface UnbondingRequest {
   amount: bigint;
@@ -16,6 +17,23 @@ export function useStaking(userAddress?: string) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
+  // ADD FARCASTER USER HOOK
+  const { isInFarcaster, isAuthenticated: isFarcasterAuth, hasVerifiedAddress, getPrimaryAddress } = useFarcasterUser();
+
+  // ENHANCED: Determine the effective user address
+  const effectiveUserAddress = userAddress || (isInFarcaster && isFarcasterAuth && hasVerifiedAddress() ? getPrimaryAddress() : null);
+  const hasWalletAccess = !!userAddress || (isInFarcaster && isFarcasterAuth && hasVerifiedAddress());
+
+  console.log('🔍 Staking Auth Debug:', {
+    userAddress,
+    isInFarcaster,
+    isFarcasterAuth,
+    hasVerifiedAddress: hasVerifiedAddress(),
+    primaryAddress: getPrimaryAddress(),
+    effectiveUserAddress,
+    hasWalletAccess
+  });
+
   const catalogContract = getContract({
     client,
     chain: CHAIN,
@@ -34,9 +52,9 @@ export function useStaking(userAddress?: string) {
   const totalStakedQuery = useReadContract({
     contract: catalogContract,
     method: "balanceOf",
-    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress,
+      enabled: !!effectiveUserAddress,
     },
   });
   
@@ -47,9 +65,9 @@ export function useStaking(userAddress?: string) {
   const votingPowerQuery = useReadContract({
     contract: catalogContract,
     method: "getAvailableVotingPower",
-    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress,
+      enabled: !!effectiveUserAddress,
     },
   });
   
@@ -60,9 +78,9 @@ export function useStaking(userAddress?: string) {
   const unbondingAmountQuery = useReadContract({
     contract: catalogContract,
     method: "getUnbondingAmount",
-    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress,
+      enabled: !!effectiveUserAddress,
     },
   });
   
@@ -87,8 +105,12 @@ export function useStaking(userAddress?: string) {
   const { mutate: sendTransaction } = useSendTransaction();
 
   const approveTokens = async (amount: string) => {
-    if (!userAddress) {
-      return { success: false, error: "Please connect your wallet" };
+    // UPDATE VALIDATION
+    if (!hasWalletAccess) {
+      const errorMessage = isInFarcaster ? 
+        "Please authenticate in Farcaster or connect a wallet" : 
+        "Please connect your wallet";
+      return { success: false, error: errorMessage };
     }
 
     setIsProcessing(true);
@@ -97,6 +119,15 @@ export function useStaking(userAddress?: string) {
     try {
       const amountWei = toWei(amount);
       
+      console.log('🔍 Approval Debug:', {
+        effectiveUserAddress,
+        amount,
+        amountWei: amountWei.toString(),
+        emarkContractAddress: emarkContract.address,
+        spenderAddress: CONTRACTS.CARD_CATALOG,
+        chainId: CHAIN.id
+      });
+
       const approveTransaction = prepareContractCall({
         contract: emarkContract,
         method: "approve",
@@ -133,9 +164,13 @@ export function useStaking(userAddress?: string) {
   
   // Function to stake EMARK tokens (wrap them into WEMARK)
   const stakeTokens = async (amount: string) => {
-    if (!userAddress) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Please connect your wallet" };
+    // UPDATE VALIDATION
+    if (!hasWalletAccess) {
+      const errorMessage = isInFarcaster ? 
+        "Please authenticate in Farcaster or connect a wallet" : 
+        "Please connect your wallet";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
 
     if (!amount || parseFloat(amount) <= 0) {
@@ -262,9 +297,12 @@ export function useStaking(userAddress?: string) {
     }
   };  // Function to request unstaking (unwrap WEMARK back to EMARK)
   const requestUnstake = async (amount: string) => {
-    if (!userAddress) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Please connect your wallet" };
+    if (!hasWalletAccess) {
+      const errorMessage = isInFarcaster ? 
+        "Please authenticate in Farcaster or connect a wallet" : 
+        "Please connect your wallet";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
     
     if (!amount || parseFloat(amount) <= 0) {
@@ -313,9 +351,12 @@ export function useStaking(userAddress?: string) {
   
   // Function to complete unstaking (claim EMARK from unbonded WEMARK)
   const completeUnstake = async (requestIndex: number) => {
-    if (!userAddress) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Please connect your wallet" };
+    if (!hasWalletAccess) {
+      const errorMessage = isInFarcaster ? 
+        "Please authenticate in Farcaster or connect a wallet" : 
+        "Please connect your wallet";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
     
     setIsProcessing(true);
@@ -353,9 +394,12 @@ export function useStaking(userAddress?: string) {
   
   // Function to cancel an unbonding request
   const cancelUnbonding = async (requestIndex: number) => {
-    if (!userAddress) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Please connect your wallet" };
+    if (!hasWalletAccess) {
+      const errorMessage = isInFarcaster ? 
+        "Please authenticate in Farcaster or connect a wallet" : 
+        "Please connect your wallet";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     }
     
     setIsProcessing(true);
@@ -407,6 +451,13 @@ export function useStaking(userAddress?: string) {
     clearMessages: () => {
       setError(null);
       setSuccess(null);
+    },
+    // ADD THESE FOR DEBUGGING
+    authInfo: {
+      effectiveUserAddress,
+      hasWalletAccess,
+      isInFarcaster,
+      isFarcasterAuth
     }
   };
 }
