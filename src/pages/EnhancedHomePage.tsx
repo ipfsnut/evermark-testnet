@@ -101,12 +101,18 @@ const EnhancedHomePage: React.FC = () => {
       <div className="space-y-8">
         {/* Hero Section */}
         <div className="text-center py-16 bg-white rounded-lg shadow-sm">
-          <BookOpenIcon className="mx-auto h-16 w-16 text-purple-600 mb-6" />
+          <div className="flex justify-center mb-6">
+            <img 
+              src="/EvermarkLogo.png" 
+              alt="Evermark Protocol" 
+              className="h-16 w-auto"
+            />
+          </div>
           <h1 className="text-4xl font-serif font-bold text-gray-900 mb-4">
-            Welcome to Evermark
+            Evermark Protocol
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
-            Preserve and curate your favorite content on the blockchain
+            Permanent reference & social discovery for any sort of online content.
           </p>
           
           {isConnected ? (
@@ -123,12 +129,15 @@ const EnhancedHomePage: React.FC = () => {
                 className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-800 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 <BookOpenIcon className="w-5 h-5 mr-2" />
-                My Collection
+                View Collection
               </Link>
             </div>
           ) : (
-            <div className="text-gray-500">
-              Connect your wallet to get started
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md mx-auto">
+              <p className="text-blue-800 font-medium mb-2">Get Started</p>
+              <p className="text-blue-700 text-sm">
+                Connect your wallet to begin creating and collecting permanent references on Base.
+              </p>
             </div>
           )}
         </div>
@@ -151,9 +160,9 @@ const EnhancedHomePage: React.FC = () => {
             <div className="flex items-center">
               <TrendingUpIcon className="h-8 w-8 text-green-600 mr-3" />
               <div>
-                <p className="text-sm text-gray-600">Current Cycle</p>
+                <p className="text-sm text-gray-600">Network</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {stats.currentCycle}
+                  Base Mainnet
                 </p>
               </div>
             </div>
@@ -162,12 +171,12 @@ const EnhancedHomePage: React.FC = () => {
           <div className="bg-white p-6 rounded-lg shadow-sm">
             <div className="flex items-center">
               <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                <span className="text-purple-600 font-bold">$</span>
+                <span className="text-purple-600 font-bold">⚡</span>
               </div>
               <div>
-                <p className="text-sm text-gray-600">Active Auctions</p>
+                <p className="text-sm text-gray-600">Status</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  {stats.activeAuctions}
+                  Live
                 </p>
               </div>
             </div>
@@ -176,7 +185,7 @@ const EnhancedHomePage: React.FC = () => {
 
         {/* Recent Evermarks */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-serif font-bold text-gray-900 mb-4">Recent Evermarks</h2>
+          <h2 className="text-xl font-serif font-bold text-gray-900 mb-4">Latest Evermarks</h2>
           
           {isLoading ? (
             <div className="animate-pulse space-y-4">
@@ -194,7 +203,17 @@ const EnhancedHomePage: React.FC = () => {
           ) : evermarks.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <BookOpenIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-              <p>No Evermarks yet. Create your first one to get started!</p>
+              <p className="text-lg font-medium text-gray-700 mb-2">No Evermarks Yet</p>
+              <p className="text-gray-500">Be the first to create a permanent digital bookmark on the network.</p>
+              {isConnected && (
+                <Link 
+                  to="/create"
+                  className="inline-flex items-center mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Create First Evermark
+                </Link>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -203,12 +222,12 @@ const EnhancedHomePage: React.FC = () => {
               ))}
               
               {evermarks.length > 5 && (
-                <div className="text-center pt-2">
+                <div className="text-center pt-4 border-t border-gray-100">
                   <Link 
                     to="/my-evermarks" 
-                    className="inline-flex items-center text-purple-600 hover:text-purple-700"
+                    className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium"
                   >
-                    View All
+                    View All Evermarks
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
