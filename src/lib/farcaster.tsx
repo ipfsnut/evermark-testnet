@@ -312,6 +312,17 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
 
 export const useFarcasterUser = () => {
   const context = useContext(FarcasterContext);
+  
+  // Add debug logging
+  console.log('🔍 useFarcasterUser Debug:', {
+    isAuthenticated: context.isAuthenticated,
+    isInFarcaster: context.isInFarcaster,
+    user: context.user,
+    verifiedAddresses: context.user?.verifiedAddresses,
+    ethAddresses: context.user?.verifiedAddresses?.eth_addresses,
+    primaryAddress: context.user?.verifiedAddresses?.eth_addresses?.[0]
+  });
+  
   return {
     user: context.user,
     isAuthenticated: context.isAuthenticated,
@@ -322,7 +333,6 @@ export const useFarcasterUser = () => {
     getAvatarUrl: () => context.user?.pfpUrl || '',
     getUserHandle: () => context.user?.username ? `@${context.user.username}` : '',
     getProfileUrl: () => context.user?.username ? `https://farcaster.com/${context.user.username}` : '',
-    // CRITICAL: Expose verified addresses for contract interactions
     getVerifiedAddresses: () => context.user?.verifiedAddresses?.eth_addresses || [],
     hasVerifiedAddress: () => (context.user?.verifiedAddresses?.eth_addresses?.length || 0) > 0,
     getPrimaryAddress: () => context.user?.verifiedAddresses?.eth_addresses?.[0] || null,
