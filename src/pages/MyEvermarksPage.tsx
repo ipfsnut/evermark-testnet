@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useActiveAccount } from "thirdweb/react";
+import { useAccount } from 'wagmi';
 import { 
   BookmarkIcon, 
   PlusIcon, 
@@ -20,6 +21,7 @@ import { useBookshelf } from '../hooks/useBookshelf';
 import { ProfileStatsWidget } from '../components/profile/ProfileStatsWidget';
 import { formatDistanceToNow } from 'date-fns';
 import { toEther } from 'thirdweb/utils';
+import { useFarcasterUser } from '../lib/farcaster';
 
 // Enhanced Evermark Card with Bookshelf Controls
 const EnhancedEvermarkCard: React.FC<{ 
@@ -329,8 +331,27 @@ const SectionHeader: React.FC<{
 );
 
 const EnhancedMyEvermarksPage: React.FC = () => {
-  const account = useActiveAccount();
-  const address = account?.address;
+  // Thirdweb wallet
+  const thirdwebAccount = useActiveAccount();
+  
+  // Wagmi wallet (for Farcaster)
+  const { address: wagmiAddress, isConnected: isWagmiConnected } = useAccount();
+  
+  // Farcaster context
+  const { isInFarcaster } = useFarcasterUser();
+  
+  // Determine active address and connection status
+  const address = thirdwebAccount?.address || wagmiAddress;
+  const isWalletConnected = !!thirdwebAccount?.address || (isInFarcaster && isWagmiConnected && !!wagmiAddress);
+  
+  console.log("🔍 MyEvermarks wallet detection:", {
+    thirdwebAddress: thirdwebAccount?.address,
+    wagmiAddress,
+    isWagmiConnected,
+    isInFarcaster,
+    finalAddress: address,
+    isWalletConnected
+  });
   
   // Existing hooks
   const { evermarks: userOwnedEvermarks, isLoading: isLoadingOwned } = useUserEvermarks(address);
@@ -403,7 +424,7 @@ const EnhancedMyEvermarksPage: React.FC = () => {
   };
 
   // Handle disconnected wallet state
-  if (!address) {
+  if (!isWalletConnected || !address) {
     return (
       <PageContainer title="My Collection">
         <div className="text-center py-12">
@@ -412,8 +433,17 @@ const EnhancedMyEvermarksPage: React.FC = () => {
             Wallet Not Connected
           </h3>
           <p className="text-gray-600 mb-6">
-            Connect your wallet to view your Evermarks collection.
+            {isInFarcaster 
+              ? "Connect your Farcaster wallet to view your Evermarks collection."
+              : "Connect your wallet to view your Evermarks collection."
+            }
           </p>
+          {/* Show current connection status for debugging */}
+          <div className="text-xs text-gray-400 mt-4">
+            <p>Thirdweb: {thirdwebAccount?.address ? '✅ Connected' : '❌ Not connected'}</p>
+            <p>Wagmi: {isWagmiConnected && wagmiAddress ? '✅ Connected' : '❌ Not connected'}</p>
+            <p>Environment: {isInFarcaster ? 'Farcaster' : 'Web App'}</p>
+          </div>
         </div>
       </PageContainer>
     );
