@@ -137,65 +137,125 @@ export function useStaking(userAddress?: string) {
       setError("Please connect your wallet");
       return { success: false, error: "Please connect your wallet" };
     }
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       setError("Please enter a valid amount");
       return { success: false, error: "Please enter a valid amount" };
     }
-    
+
     try {
       // Step 1: Approve tokens
-      console.log("🔐 Step 1: Approving tokens...");
+      console.log("🔐 Step 1: Approving $EMARK tokens...");
       const approvalResult = await approveTokens(amount);
-      
       if (!approvalResult.success) {
         return approvalResult;
       }
-      
-      // Step 2: Stake tokens (your existing code)
-      console.log("🏦 Step 2: Staking tokens...");
+
+      // Step 2: Stake tokens with enhanced debugging
+      console.log("🏦 Step 2: Staking $EMARK tokens...");
       setIsProcessing(true);
       setError(null);
       setSuccess(null);
-      
+
       const amountWei = toWei(amount);
-      
+
+      // Debug the wrap transaction preparation
+      console.log('🔍 Wrap Transaction Debug:', {
+        catalogContractAddress: catalogContract.address,
+        amount: amount,
+        amountWei: amountWei.toString(),
+        userAddress,
+        chainId: CHAIN.id
+      });
+
+      // Check if the catalog contract has the wrap function
+      const wrapFunction = CARD_CATALOG_ABI?.find?.((f: any) => f.name === 'wrap');
+      console.log('🔍 Wrap Function Check:', {
+        wrapFunctionExists: !!wrapFunction,
+        wrapFunction: wrapFunction,
+        catalogABI_length: CARD_CATALOG_ABI?.length
+      });
+
       const transaction = prepareContractCall({
         contract: catalogContract,
         method: "wrap",
         params: [amountWei] as const,
       });
-      
+
+      // Resolve transaction properties if they're functions
+      const transactionTo = typeof transaction.to === 'function' ? await transaction.to() : transaction.to;
+      const transactionData = typeof transaction.data === 'function' ? await transaction.data() : transaction.data;
+
+      // Debug the prepared wrap transaction
+      console.log('🔍 Prepared Wrap Transaction:', {
+        to: transactionTo,
+        data: transactionData,
+        value: transaction.value || '0x0',
+        gas: transaction.gas,
+        dataLength: transactionData?.length,
+        functionSelector: transactionData?.slice(0, 10)
+      });
+
+      // Validate the wrap transaction
+      if (!transactionTo || !transactionData) {
+        throw new Error('Invalid wrap transaction prepared - missing to address or data');
+      }
+
+      if (transactionTo.toLowerCase() !== CONTRACTS.CARD_CATALOG.toLowerCase()) {
+        throw new Error(`Wrap transaction target mismatch: expected ${CONTRACTS.CARD_CATALOG}, got ${transactionTo}`);
+      }
+
+      // Add a small delay to avoid rate limiting
+      console.log("⏳ Waiting 2 seconds to avoid rate limiting...");
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
       console.log("📤 Sending staking transaction...");
       
       return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
         sendTransaction(transaction as any, {
           onSuccess: (result: any) => {
             console.log("✅ Staking transaction successful:", result);
-            
             setTimeout(() => {
               totalStakedQuery.refetch();
               votingPowerQuery.refetch();
             }, 2000);
-            
-            const successMsg = `Successfully staked ${amount} EMARK (converted to WEMARK)`;
+            const successMsg = `Successfully staked ${amount} $EMARK (converted to WEMARK)`;
             setSuccess(successMsg);
             setIsProcessing(false);
             resolve({ success: true, message: successMsg });
           },
           onError: (error: any) => {
             console.error("❌ Staking transaction failed:", error);
-            const errorMsg = error.message || "Failed to stake EMARK tokens";
+            
+            // Enhanced error handling for rate limiting and other issues
+            let errorMsg = "Failed to stake $EMARK tokens";
+            
+            if (error.code === -32603) {
+              if (error.message?.includes('rate limited')) {
+                errorMsg = "Request rate limited. Please wait a moment and try again.";
+              } else {
+                errorMsg = "Network error. Please check your connection and try again.";
+              }
+            } else if (error.code === 4001) {
+              errorMsg = "Transaction was rejected by user.";
+            } else if (error.message?.includes('insufficient funds')) {
+              errorMsg = "Insufficient ETH for gas fees.";
+            } else if (error.message?.includes('execution reverted')) {
+              errorMsg = "Transaction reverted - check your EMARK balance and allowance.";
+            } else if (error.message) {
+              errorMsg = error.message;
+            }
+            
             setError(errorMsg);
             setIsProcessing(false);
             resolve({ success: false, error: errorMsg });
           }
         });
       });
-      
+
     } catch (err: any) {
       console.error("Error in staking flow:", err);
-      const errorMsg = err.message || "Failed to stake EMARK tokens";
+      const errorMsg = err.message || "Failed to stake $EMARK tokens";
       setError(errorMsg);
       setIsProcessing(false);
       return { success: false, error: errorMsg };

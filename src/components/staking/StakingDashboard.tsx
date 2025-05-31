@@ -54,7 +54,7 @@ const StakingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress }
     {
       label: 'Pending Rewards',
       value: toEther(pendingRewards || BigInt(0)),
-      suffix: 'EMARK',
+      suffix: '$EMARK',
       icon: <TrendingUpIcon className="h-5 w-5 text-green-600" />,
       bgColor: 'bg-green-50',
       textColor: 'text-green-600',
@@ -160,7 +160,7 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
           <div>
             <h2 className="text-2xl font-bold mb-2">Staking Dashboard</h2>
             <p className="text-purple-100">
-              Manage your EMARK tokens, earn rewards, and participate in governance
+              Manage your $EMARK tokens, earn rewards, and participate in governance
             </p>
           </div>
           <div className="hidden md:block">
@@ -190,7 +190,7 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
         <CollapsibleSection
           title="Token Staking"
           icon={<CoinsIcon className="h-5 w-5 text-purple-600" />}
-          description="Stake EMARK tokens to earn WEMARK and participate in governance"
+          description="Stake $EMARK tokens to earn WEMARK and participate in governance"
           defaultExpanded={true}
         >
           <div className="mt-4">
@@ -239,10 +239,21 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
           <div>
             <h3 className="font-medium text-blue-900 mb-2">Staking Guide</h3>
             <div className="text-sm text-blue-800 space-y-2">
-              <p><strong>Token Staking:</strong> Stake EMARK to receive WEMARK tokens for voting and earning rewards.</p>
-              <p><strong>Delegation:</strong> Use your WEMARK to vote on quality content and maximize reward multipliers.</p>
-              <p><strong>NFT Staking:</strong> Stake your Evermark NFTs for additional reward streams.</p>
-              <p><strong>Unstaking:</strong> Requires a {stakingStats.formatUnbondingPeriod()} unbonding period for security.</p>
+              <p>
+                <strong>Token Staking:</strong> Stake $EMARK to receive WEMARK tokens for voting and earning rewards.
+              </p>
+              <p>
+                <strong>Two-Step Process:</strong> First approve $EMARK spending, then stake to receive WEMARK.
+              </p>
+              <p>
+                <strong>Delegation:</strong> Use your WEMARK to vote on quality content and maximize reward multipliers.
+              </p>
+              <p>
+                <strong>NFT Staking:</strong> Stake your Evermark NFTs for additional reward streams.
+              </p>
+              <p>
+                <strong>Unstaking:</strong> Requires a {stakingStats.formatUnbondingPeriod()} unbonding period for security.
+              </p>
             </div>
           </div>
         </div>

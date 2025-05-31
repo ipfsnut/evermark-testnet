@@ -9,7 +9,7 @@ import {
   Info as InfoIcon,
 //  DollarSign as AuctionIcon,
   Plus as CreateIcon,
-  User as UserIcon,
+  Copy as CopyIcon,
 //  Bookmark as BookmarkIcon
 } from 'lucide-react';
 
@@ -30,14 +30,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     farcasterUser
   } = useProfile();
   
-  // Define navigation items
+  // Define navigation items (removed Profile)
   const navItems = [
     { path: '/', label: 'Home', icon: <HomeIcon className="h-5 w-5" /> },
     { path: '/leaderboard', label: 'Leaderboard', icon: <TrophyIcon className="h-5 w-5" /> },
   //  { path: '/Market', label: 'Evermarket', icon: <AuctionIcon className="h-5 w-5" /> },
     { path: '/create', label: 'Create', icon: <CreateIcon className="h-5 w-5" /> },
     { path: '/my-evermarks', label: 'My Collection', icon: <BookOpenIcon className="h-5 w-5" /> },
-    { path: '/profile', label: 'Profile', icon: <UserIcon className="h-5 w-5" /> },
+    // Removed: { path: '/profile', label: 'Profile', icon: <UserIcon className="h-5 w-5" /> },
   //  { path: '/bookshelf', label: 'My Bookshelf', icon: <BookmarkIcon className="h-5 w-5" /> },
     { path: '/about', label: 'About', icon: <InfoIcon className="h-5 w-5" /> },
   ];
@@ -54,6 +54,24 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
   const shouldShowProfile = isAuthenticated;
   const profileDisplayName = displayName;
   const profileAvatar = avatar;
+
+  // Copy wallet address to clipboard
+  const copyWalletAddress = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      // You could add a toast notification here if you have one
+      console.log('Wallet address copied to clipboard');
+    } catch (err) {
+      console.error('Failed to copy wallet address:', err);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = address;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+  };
   
   return (
     <>
@@ -75,8 +93,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
         {/* User Profile Section */}
         {shouldShowProfile && (
           <div className="px-6 py-6 border-b border-gray-200">
-            <Link to="/profile" className="flex flex-col items-center" onClick={() => closeSidebar()}>
-              <div className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center mb-2 overflow-hidden">
+            <div className="flex flex-col items-center">
+              {/* Profile Picture - Clickable to go to profile */}
+              <Link 
+                to={walletAddress ? `/${walletAddress}` : '/profile'} 
+                className="h-16 w-16 bg-purple-100 rounded-full flex items-center justify-center mb-2 overflow-hidden hover:ring-2 hover:ring-purple-300 transition-all cursor-pointer"
+                onClick={() => closeSidebar()}
+              >
                 {profileAvatar ? (
                   <img 
                     src={profileAvatar} 
@@ -88,7 +111,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                     {profileDisplayName.charAt(0).toUpperCase()}
                   </span>
                 )}
-              </div>
+              </Link>
+              
               <div className="text-center">
                 <h3 className="font-medium text-gray-900">{profileDisplayName}</h3>
                 <div className="text-sm text-gray-500 mt-1 space-y-1">
@@ -96,11 +120,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                   {handle && (
                     <p className="text-purple-600">{handle}</p>
                   )}
-                  {/* Show wallet address if connected */}
+                  {/* Show wallet address if connected - Clickable to copy */}
                   {walletAddress && (
-                    <p className="font-mono">
-                      {walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
-                    </p>
+                    <button
+                      onClick={() => copyWalletAddress(walletAddress)}
+                      className="font-mono text-gray-600 hover:text-purple-600 transition-colors cursor-pointer flex items-center justify-center gap-1 group"
+                      title="Click to copy wallet address"
+                    >
+                      <span>{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
+                      <CopyIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </button>
                   )}
                   {/* Show Farcaster FID if available */}
                   {farcasterUser?.fid && (
@@ -108,7 +137,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                   )}
                 </div>
               </div>
-            </Link>
+            </div>
           </div>
         )}
         

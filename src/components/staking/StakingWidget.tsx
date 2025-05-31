@@ -103,45 +103,6 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
         </div>
       )}
       
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="flex items-center">
-            <LockIcon className="h-5 w-5 text-purple-600 mr-2" />
-            <div>
-              <p className="text-sm text-gray-600">Total Staked</p>
-              <p className="text-xl font-bold text-gray-900">
-                {isLoadingTotalStaked ? "..." : toEther(totalStaked || BigInt(0))}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="flex items-center">
-            <CoinsIcon className="h-5 w-5 text-green-600 mr-2" />
-            <div>
-              <p className="text-sm text-gray-600">Available Power</p>
-              <p className="text-xl font-bold text-gray-900">
-                {isLoadingVotingPower ? "..." : toEther(availableVotingPower || BigInt(0))}
-              </p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="flex items-center">
-            <CoinsIcon className="h-5 w-5 text-yellow-600 mr-2" />
-            <div>
-              <p className="text-sm text-gray-600">Pending Rewards</p>
-              <p className="text-xl font-bold text-gray-900">
-                {isLoadingRewards ? "..." : toEther(pendingRewards || BigInt(0))}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-      
       {/* Tabs */}
       <div className="flex border-b border-gray-200 mb-6">
         <button
@@ -171,7 +132,8 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
         <div className="space-y-4">
           <div>
             <label htmlFor="stake-amount" className="block text-sm font-medium text-gray-700 mb-2">
-              Amount to Stake (NSI)
+
+              Amount to Stake ($EMARK)
             </label>
             <input
               id="stake-amount"
@@ -183,6 +145,9 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
               min="0"
               step="0.01"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              You'll receive WEMARK tokens for voting and governance
+            </p>
           </div>
           
           <div className="flex space-x-3">
@@ -194,12 +159,14 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
               {isProcessing ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Processing...
+
+                  {stakeAmount ? "Approving & Staking..." : "Processing..."}
                 </>
               ) : (
                 <>
                   <LockIcon className="h-4 w-4 mr-2" />
-                  Stake Tokens
+
+                  Stake $EMARK
                 </>
               )}
             </button>
@@ -223,9 +190,14 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
             </button>
           </div>
           
-          <p className="text-xs text-gray-500">
-            Staking tokens increases your voting power and earns you rewards over time.
-          </p>
+
+
+
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <p className="text-xs text-blue-800">
+              <strong>Two-step process:</strong> First approve $EMARK spending, then stake to receive WEMARK voting tokens.
+            </p>
+          </div>
         </div>
       )}
       
@@ -234,7 +206,8 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
         <div className="space-y-4">
           <div>
             <label htmlFor="unstake-amount" className="block text-sm font-medium text-gray-700 mb-2">
-              Amount to Unstake (NSI)
+
+              Amount to Unstake (WEMARK)
             </label>
             <input
               id="unstake-amount"
@@ -246,6 +219,9 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
               min="0"
               step="0.01"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              You'll receive $EMARK back after the unbonding period
+            </p>
           </div>
           
           <button
@@ -273,7 +249,8 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
           </button>
           
           <p className="text-xs text-gray-500">
-            Unstaking requires a waiting period before your tokens are available again.
+
+            Unstaking requires a waiting period before your $EMARK tokens are available again.
           </p>
           
           {/* Pending Unbonding Requests */}
@@ -286,7 +263,8 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          {toEther(request.amount)} NSI
+
+                          {toEther(request.amount)} $EMARK
                         </p>
                         <div className="flex items-center text-xs text-gray-500 mt-1">
                           <ClockIcon className="h-3 w-3 mr-1" />
@@ -306,7 +284,8 @@ export function StakingWidget({ userAddress }: StakingWidgetProps) {
                             disabled={isProcessing}
                             className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors disabled:opacity-50"
                           >
-                            Claim
+
+                            Claim $EMARK
                           </button>
                         ) : (
                           <button
