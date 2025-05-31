@@ -1,5 +1,6 @@
-import { useActiveAccount } from "thirdweb/react";
+// src/hooks/useProfile.ts - Simplified with WalletProvider
 import { useFarcasterUser } from '../lib/farcaster';
+import { useWalletConnection } from '../providers/WalletProvider';
 
 export interface UnifiedProfile {
   // Authentication state
@@ -37,19 +38,19 @@ export interface UnifiedProfile {
 }
 
 export function useProfile(): UnifiedProfile {
-  // Get wallet data using Thirdweb v5
-  const account = useActiveAccount();
-  const isWalletConnected = !!account;
-  const walletAddress = account?.address;
-  const walletDisplayAddress = account?.address ? 
-    `${account.address.slice(0, 6)}...${account.address.slice(-4)}` : 
-    undefined;
+  // 🎉 SIMPLIFIED: Get wallet data from provider
+  const { 
+    isConnected: isWalletConnected, 
+    address: walletAddress, 
+    displayAddress: walletDisplayAddress,
+    canInteract: canInteractWithContracts,
+    isInFarcaster
+  } = useWalletConnection();
   
   // Get Farcaster data
   const {
     user: farcasterUser,
     isAuthenticated: isFarcasterAuthenticated,
-    isInFarcaster,
     getDisplayName: getFarcasterDisplayName,
     getAvatarUrl,
     getUserHandle,
@@ -70,14 +71,13 @@ export function useProfile(): UnifiedProfile {
   // FIXED: Trust that Farcaster users can interact with contracts
   // Frame SDK doesn't always expose verified addresses even though they exist
   const verifiedAddresses = getVerifiedAddresses();
-  const canInteractWithContracts = isWalletConnected || isFarcasterAuthenticated;
   
   // FIXED: For Farcaster users without exposed verified addresses,
   // we'll handle the actual signing when needed (prompt to link wallet)
   const primaryAddress = walletAddress || 
     (verifiedAddresses && verifiedAddresses.length > 0 
       ? verifiedAddresses[0] 
-      : undefined); // Don't use 'farcaster-pending'
+      : undefined);
   
   // Determine the best display name (prioritize Farcaster in Farcaster environment)
   const displayName = (() => {
@@ -137,7 +137,7 @@ export function useProfile(): UnifiedProfile {
     handle,
     profileUrl: getProfileUrl() || undefined,
     
-    // Contract interaction capability
+    // Contract interaction capability (🎉 SIMPLIFIED: From provider)
     canInteractWithContracts,
     primaryAddress,
   };

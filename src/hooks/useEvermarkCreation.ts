@@ -1,11 +1,11 @@
+// src/hooks/useEvermarkCreation.ts - DRAMATICALLY simplified with WalletProvider
 import { useState, useRef } from "react";
-import { useActiveAccount } from "thirdweb/react";
-import { useAccount, useConnect, useSendTransaction } from "wagmi";
 import { getContract, prepareContractCall, sendTransaction, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
-import { useFarcasterUser } from "../lib/farcaster";
+import { useWalletAuth, useTransactionWallet } from "../providers/WalletProvider";
 
+// Keep all the interface definitions and helper functions...
 interface CastDataSuccess {
   title: string;
   author: string;
@@ -44,32 +44,26 @@ export interface EvermarkMetadata {
   imageFile?: File | null;
 }
 
-// Developer referrer address
 const DEVELOPER_REFERRER = "0x2B27EA7DaA8Bf1dE98407447b269Dfe280753fe3";
 
+// Keep all the helper functions unchanged...
 const uploadToPinata = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file);
 
   const pinataMetadata = JSON.stringify({
     name: `evermark-image-${Date.now()}`,
-    keyvalues: {
-      type: 'evermark-image'
-    }
+    keyvalues: { type: 'evermark-image' }
   });
   formData.append('pinataMetadata', pinataMetadata);
 
-  const pinataOptions = JSON.stringify({
-    cidVersion: 0,
-  });
+  const pinataOptions = JSON.stringify({ cidVersion: 0 });
   formData.append('pinataOptions', pinataOptions);
 
   try {
     const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`,
-      },
+      headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}` },
       body: formData,
     });
 
@@ -206,56 +200,23 @@ const uploadMetadataToPinata = async (
     image: imageUrl || '',
     external_url: castData?.canonicalUrl || metadata.sourceUrl || '',
     attributes: [
-      {
-        trait_type: 'Author',
-        value: metadata.author || 'Unknown Author'
-      },
-      {
-        trait_type: 'Source URL',
-        value: castData?.canonicalUrl || metadata.sourceUrl || 'Direct Upload'
-      },
-      {
-        trait_type: 'Created',
-        value: new Date().toISOString()
-      },
-      {
-        trait_type: 'Content Type',
-        value: castData && isCastDataSuccess(castData) ? 'Farcaster Cast' : 'Custom Content'
-      },
+      { trait_type: 'Author', value: metadata.author || 'Unknown Author' },
+      { trait_type: 'Source URL', value: castData?.canonicalUrl || metadata.sourceUrl || 'Direct Upload' },
+      { trait_type: 'Created', value: new Date().toISOString() },
+      { trait_type: 'Content Type', value: castData && isCastDataSuccess(castData) ? 'Farcaster Cast' : 'Custom Content' },
       ...(castData && isCastDataSuccess(castData) ? [
-        {
-          trait_type: 'Cast Content',
-          value: castData.content
-        },
-        {
-          trait_type: 'Cast Hash',
-          value: castData.castHash
-        },
-        {
-          trait_type: 'Author Username',
-          value: castData.username
-        },
-        {
-          trait_type: 'Author FID',
-          value: castData.authorFid.toString()
-        },
-        {
-          trait_type: 'Cast Timestamp',
-          value: castData.timestamp
-        },
-        {
-          trait_type: 'Platform',
-          value: 'Farcaster'
-        }
+        { trait_type: 'Cast Content', value: castData.content },
+        { trait_type: 'Cast Hash', value: castData.castHash },
+        { trait_type: 'Author Username', value: castData.username },
+        { trait_type: 'Author FID', value: castData.authorFid.toString() },
+        { trait_type: 'Cast Timestamp', value: castData.timestamp },
+        { trait_type: 'Platform', value: 'Farcaster' }
       ] : [])
     ],
     ...(castData && isCastDataSuccess(castData) && {
       farcaster_data: {
         content: castData.content,
-        author: {
-          username: castData.username,
-          fid: castData.authorFid
-        },
+        author: { username: castData.username, fid: castData.authorFid },
         cast_hash: castData.castHash,
         timestamp: castData.timestamp,
         embeds: castData.embeds,
@@ -307,66 +268,30 @@ export const useEvermarkCreation = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [needsWalletConnection, setNeedsWalletConnection] = useState(false);
   
   const isProcessingRef = useRef(false);
   
-  // Thirdweb hooks (for regular web app)
-  const thirdwebAccount = useActiveAccount();
-  
-  // Wagmi hooks (for Farcaster Frame)
+  // 🎉 MASSIVELY SIMPLIFIED: Use the wallet provider instead of 100+ lines of complex detection logic
+  const { isConnected, canInteract, requireConnection, error: walletError } = useWalletAuth();
   const { 
-    isConnected: isWagmiConnected, 
-    address: wagmiAddress,
-    connector: wagmiConnector 
-  } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { 
-    sendTransactionAsync: sendWagmiTransaction, 
-    isPending: isWagmiPending,
-    error: wagmiError 
-  } = useSendTransaction();
-  
-  const { isInFarcaster, isAuthenticated: isFarcasterAuth } = useFarcasterUser();
+    useThirdweb, 
+    useWagmi, 
+    thirdwebAccount, 
+    sendWagmiTransaction,
+    isTransactionPending 
+  } = useTransactionWallet();
 
   const createEvermark = async (metadata: EvermarkMetadata) => {
-    // Determine which wallet system to use
-    const useThirdweb = !isInFarcaster && thirdwebAccount?.address;
-    const useWagmi = isInFarcaster && isWagmiConnected && wagmiAddress;
-    
-    console.log("🔍 Wallet detection:", {
-      isInFarcaster,
-      useThirdweb,
-      useWagmi,
-      thirdwebAddress: thirdwebAccount?.address,
-      wagmiAddress,
-      isWagmiConnected
-    });
-
-    // Check if we have wallet access
-    if (!useThirdweb && !useWagmi) {
-      if (isInFarcaster) {
-        // Try to connect Farcaster wallet
-        if (connectors.length > 0) {
-          setNeedsWalletConnection(true);
-          try {
-            console.log("🔌 Attempting to connect Farcaster wallet...");
-            connect({ connector: connectors[0] });
-            setError("Connecting to your Farcaster wallet...");
-            return { success: false, error: "Connecting wallet...", needsWalletConnection: true };
-          } catch (connectError) {
-            console.error("Auto-connect failed:", connectError);
-            setError("Failed to connect Farcaster wallet. Please try again.");
-            return { success: false, error: "Connection failed", needsWalletConnection: true };
-          }
-        } else {
-          setError("No Farcaster wallet connector available.");
-          return { success: false, error: "No connector available" };
-        }
-      } else {
-        setError("Please connect your wallet to create Evermarks.");
-        return { success: false, error: "Wallet connection required" };
+    // 🎉 SIMPLIFIED: Just one line to handle wallet connection!
+    if (!canInteract) {
+      console.log("🔌 Wallet not connected, attempting to connect...");
+      const connectionResult = await requireConnection();
+      if (!connectionResult.success) {
+        setError(connectionResult.error || "Failed to connect wallet");
+        return { success: false, error: connectionResult.error || "Connection failed" };
       }
+      // Wait a moment for connection to stabilize
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     if (isProcessingRef.current) {
@@ -378,7 +303,6 @@ export const useEvermarkCreation = () => {
     setIsCreating(true);
     setError(null);
     setSuccess(null);
-    setNeedsWalletConnection(false);
 
     console.log("🚀 Starting Evermark creation process...");
     console.log("🔍 Using wallet system:", useThirdweb ? "Thirdweb" : "Wagmi");
@@ -401,9 +325,6 @@ export const useEvermarkCreation = () => {
     }
 
     const providedAuthor = metadata.author?.trim();
-    if (!providedAuthor) {
-      console.log("⚠️ No author provided, using fallback");
-    }
 
     try {
       // Get contract
@@ -416,25 +337,20 @@ export const useEvermarkCreation = () => {
 
       // Check contract state and get the actual minting fee
       console.log("🔍 Checking contract state and minting fee...");
-      console.log("🔍 Contract address:", CONTRACTS.EVERMARK_NFT);
-      console.log("🔍 Chain:", CHAIN);
       
       let mintingFee: bigint;
       
       try {
-        console.log("🔍 Checking if contract is paused...");
         const isPaused = await readContract({
           contract,
           method: "paused",
           params: []
         });
-        console.log("🔍 Contract paused status:", isPaused);
         
         if (isPaused) {
           throw new Error("Contract is currently paused");
         }
 
-        console.log("🔍 Reading MINTING_FEE from contract...");
         mintingFee = await readContract({
           contract,
           method: "MINTING_FEE",
@@ -442,12 +358,9 @@ export const useEvermarkCreation = () => {
         });
         
         console.log("💰 Contract minting fee:", mintingFee.toString(), "wei");
-        console.log("💰 Minting fee in ETH:", Number(mintingFee) / 1e18);
         
       } catch (stateError: any) {
         console.error("❌ Contract state check failed:", stateError);
-        console.error("❌ Error details:", stateError.message);
-        console.error("❌ Error stack:", stateError.stack);
         mintingFee = BigInt("1000000000000000"); // 0.001 ETH as fallback
         console.warn("⚠️ Using fallback minting fee:", mintingFee.toString());
       }
@@ -472,10 +385,6 @@ export const useEvermarkCreation = () => {
       let castData: CastData | undefined = undefined;
       
       // Check if it's Farcaster-related input and fetch data
-      console.log("🔍 Checking if input is Farcaster-related...");
-      console.log("🔍 Source URL/Input:", metadata.sourceUrl);
-      console.log("🔍 Provided Author:", providedAuthor);
-      
       if (metadata.sourceUrl && isFarcasterInput(metadata.sourceUrl)) {
         console.log("🎯 Detected Farcaster input, fetching cast data...");
         try {
@@ -483,39 +392,17 @@ export const useEvermarkCreation = () => {
           
           if (isCastDataSuccess(castData)) {
             actualTitle = castData.title;
-            // Only override author if none was provided
             if (!providedAuthor) {
               actualAuthor = castData.author;
-              console.log("✅ Using fetched author (no manual author provided):", actualAuthor);
-            } else {
-              console.log("✅ Keeping manually provided author:", actualAuthor);
             }
-            console.log("✅ Using fetched cast data:", { 
-              title: actualTitle,
-              author: actualAuthor,
-              canonicalUrl: castData.canonicalUrl
-            });
-          } else {
-            console.log("❌ Cast data fetch failed or returned error:", castData.error);
           }
         } catch (fetchError: any) {
           console.error("❌ Error fetching cast data:", fetchError);
-          // Continue with original metadata if cast fetch fails
         }
-      } else {
-        console.log("❌ Input not recognized as Farcaster-related, using provided data");
       }
 
-      // Upload metadata to Pinata with the processed data
+      // Upload metadata to Pinata
       console.log("📝 Uploading metadata to Pinata...");
-      console.log("📝 Final metadata before upload:", {
-        title: actualTitle,
-        author: actualAuthor,
-        sourceUrl: metadata.sourceUrl,
-        description: metadata.description,
-        hasCastData: !!castData && isCastDataSuccess(castData)
-      });
-      
       try {
         metadataURI = await uploadMetadataToPinata({
           ...metadata,
@@ -528,34 +415,20 @@ export const useEvermarkCreation = () => {
         throw new Error(`Metadata upload failed: ${metadataError.message}`);
       }
 
-      // Small delay to ensure uploads are fully processed
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-      console.log("🔧 Preparing transaction with params:", {
-        metadataURI,
-        title: actualTitle,
-        author: actualAuthor,
-        referrer: DEVELOPER_REFERRER,
-        value: mintingFee.toString()
-      });
 
       console.log("📤 Sending transaction to blockchain...");
       
       let result: { transactionHash: string };
       
+      // 🎉 SIMPLIFIED: Use the provider's clean transaction logic
       if (useThirdweb) {
-        // Thirdweb flow for regular web app
         console.log("💳 Using Thirdweb for transaction");
         
         const transaction = prepareContractCall({
           contract,
           method: "mintEvermarkWithReferral",
-          params: [
-            metadataURI,
-            actualTitle,
-            actualAuthor,
-            DEVELOPER_REFERRER
-          ],
+          params: [metadataURI, actualTitle, actualAuthor, DEVELOPER_REFERRER],
           value: mintingFee,
         });
 
@@ -567,24 +440,16 @@ export const useEvermarkCreation = () => {
         result = { transactionHash: thirdwebResult.transactionHash };
         
       } else if (useWagmi) {
-        // Wagmi flow for Farcaster Frame
         console.log("📱 Using Wagmi for Farcaster transaction");
         
-        // Prepare contract call data
         const transaction = prepareContractCall({
           contract,
           method: "mintEvermarkWithReferral",
-          params: [
-            metadataURI,
-            actualTitle,
-            actualAuthor,
-            DEVELOPER_REFERRER
-          ],
+          params: [metadataURI, actualTitle, actualAuthor, DEVELOPER_REFERRER],
           value: mintingFee,
         });
 
         try {
-          // Resolve the data field if it's a function
           let transactionData: `0x${string}`;
           
           if (!transaction.data) {
@@ -601,13 +466,6 @@ export const useEvermarkCreation = () => {
             transactionData = transaction.data as `0x${string}`;
           }
 
-          console.log("🔧 Wagmi transaction params:", {
-            to: transaction.to,
-            data: transactionData,
-            value: mintingFee.toString(),
-            gas: transaction.gas?.toString()
-          });
-
           const wagmiTxHash = await sendWagmiTransaction({
             to: transaction.to as `0x${string}`,
             data: transactionData,
@@ -623,7 +481,6 @@ export const useEvermarkCreation = () => {
           throw new Error(`Farcaster transaction failed: ${wagmiTxError.message}`);
         }
       } else {
-        // This should never happen due to our earlier checks, but just in case
         throw new Error("No transaction method available. Please connect a wallet.");
       }
 
@@ -677,10 +534,8 @@ export const useEvermarkCreation = () => {
   const clearMessages = () => {
     setError(null);
     setSuccess(null);
-    setNeedsWalletConnection(false);
   };
 
-  // Helper function to test if a string is a valid Farcaster input
   const validateFarcasterInput = (input: string): { isValid: boolean; type: string; hash?: string } => {
     if (!input) return { isValid: false, type: 'empty' };
     
@@ -701,21 +556,19 @@ export const useEvermarkCreation = () => {
 
   return { 
     createEvermark, 
-    isCreating: isCreating || isWagmiPending, // Include Wagmi pending state
-    error: error || wagmiError?.message || null, // Include Wagmi errors
+    isCreating: isCreating || isTransactionPending, // Include provider's pending state
+    error: error || walletError || null, // Include provider's errors
     success, 
-    needsWalletConnection,
     clearMessages,
     validateFarcasterInput,
-    // Expose the processing state for additional UI control
     isProcessing: isProcessingRef.current,
-    // Expose wallet connection info
+    
+    // 🎉 SIMPLIFIED: Expose clean wallet info from provider
     walletInfo: {
-      isInFarcaster,
-      thirdwebConnected: !!thirdwebAccount?.address,
-      wagmiConnected: isWagmiConnected,
-      activeAddress: thirdwebAccount?.address || wagmiAddress,
-      connector: wagmiConnector?.name
+      isConnected,
+      canInteract,
+      useThirdweb,
+      useWagmi
     }
   };
 };

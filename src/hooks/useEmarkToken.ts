@@ -1,15 +1,20 @@
-import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/react";
+// src/hooks/useEmarkToken.ts - Dramatically simplified with WalletProvider
+import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EMARK_TOKEN_ABI } from "../lib/contracts";
 import { useState, useCallback } from "react";
 import { toWei } from "thirdweb/utils";
+import { useWalletAuth, useTransactionWallet } from "../providers/WalletProvider";
 
 export function useEmarkToken() {
-  const account = useActiveAccount();
   const [isTransacting, setIsTransacting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // 🎉 SIMPLIFIED: Use wallet provider instead of manual checks
+  const { isConnected, address, requireConnection } = useWalletAuth();
+  const { thirdwebAccount, canInteract } = useTransactionWallet();
   
   const contract = getContract({
     client,
@@ -18,13 +23,13 @@ export function useEmarkToken() {
     abi: EMARK_TOKEN_ABI,
   });
 
-  // Get user's EMARK balance
+  // 🎉 SIMPLIFIED: Contract queries (much cleaner with guaranteed address)
   const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useReadContract({
     contract,
     method: "balanceOf",
-    params: account?.address ? [account.address] : ["0x0000000000000000000000000000000000000000"],
+    params: address ? [address] : ["0x0000000000000000000000000000000000000000"],
     queryOptions: {
-      enabled: !!account?.address,
+      enabled: !!address,
     },
   });
 
@@ -32,13 +37,13 @@ export function useEmarkToken() {
   const { data: stakingAllowance, refetch: refetchStakingAllowance } = useReadContract({
     contract,
     method: "allowance",
-    params: account?.address ? [account.address, CONTRACTS.CARD_CATALOG] : ["0x0000000000000000000000000000000000000000", CONTRACTS.CARD_CATALOG],
+    params: address ? [address, CONTRACTS.CARD_CATALOG] : ["0x0000000000000000000000000000000000000000", CONTRACTS.CARD_CATALOG],
     queryOptions: {
-      enabled: !!account?.address,
+      enabled: !!address,
     },
   });
 
-  // Get token info
+  // Token info (these don't need wallet connection)
   const { data: name } = useReadContract({
     contract,
     method: "name",
@@ -65,11 +70,18 @@ export function useEmarkToken() {
 
   const { mutate: sendTransaction } = useSendTransaction();
 
-  // Approve CardCatalog for staking
+  // 🎉 SIMPLIFIED: Approve CardCatalog for staking with auto-connection
   const approveStaking = useCallback(async (amount: string) => {
-    if (!account?.address) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Please connect your wallet" };
+    // Auto-connect if needed (handles both thirdweb and Farcaster)
+    if (!canInteract) {
+      const connectionResult = await requireConnection();
+      if (!connectionResult.success) {
+        const errorMsg = connectionResult.error || "Please connect your wallet";
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
+      }
+      // Give connection a moment to stabilize
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     setIsTransacting(true);
@@ -85,6 +97,7 @@ export function useEmarkToken() {
         params: [CONTRACTS.CARD_CATALOG, amountWei],
       });
 
+      // 🎉 SIMPLIFIED: Use thirdweb transaction (provider handles wallet detection)
       await sendTransaction(transaction as any);
 
       // Refetch allowance after approval
@@ -97,19 +110,37 @@ export function useEmarkToken() {
       return { success: true, message: successMsg };
     } catch (err: any) {
       console.error("Error approving tokens:", err);
-      const errorMsg = err.message || "Failed to approve tokens";
+      let errorMsg = "Failed to approve tokens";
+      
+      // Better error handling
+      if (err.message) {
+        if (err.message.includes("insufficient funds")) {
+          errorMsg = "Insufficient funds for gas fees";
+        } else if (err.message.includes("user rejected")) {
+          errorMsg = "Transaction was rejected by user";
+        } else {
+          errorMsg = err.message;
+        }
+      }
+      
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsTransacting(false);
     }
-  }, [account?.address, contract, sendTransaction, refetchStakingAllowance]);
+  }, [canInteract, requireConnection, contract, sendTransaction, refetchStakingAllowance]);
 
-  // Transfer tokens
+  // 🎉 SIMPLIFIED: Transfer tokens with auto-connection
   const transfer = useCallback(async (to: string, amount: string) => {
-    if (!account?.address) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Please connect your wallet" };
+    // Auto-connect if needed
+    if (!canInteract) {
+      const connectionResult = await requireConnection();
+      if (!connectionResult.success) {
+        const errorMsg = connectionResult.error || "Please connect your wallet";
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     setIsTransacting(true);
@@ -125,6 +156,7 @@ export function useEmarkToken() {
         params: [to, amountWei],
       });
 
+      // 🎉 SIMPLIFIED: Use thirdweb transaction
       await sendTransaction(transaction as any);
 
       // Refetch balance after transfer
@@ -137,13 +169,27 @@ export function useEmarkToken() {
       return { success: true, message: successMsg };
     } catch (err: any) {
       console.error("Error transferring tokens:", err);
-      const errorMsg = err.message || "Failed to transfer tokens";
+      let errorMsg = "Failed to transfer tokens";
+      
+      // Better error handling
+      if (err.message) {
+        if (err.message.includes("insufficient funds")) {
+          errorMsg = "Insufficient funds for transaction and gas fees";
+        } else if (err.message.includes("user rejected")) {
+          errorMsg = "Transaction was rejected by user";
+        } else if (err.message.includes("ERC20: transfer amount exceeds balance")) {
+          errorMsg = "Insufficient EMARK balance";
+        } else {
+          errorMsg = err.message;
+        }
+      }
+      
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsTransacting(false);
     }
-  }, [account?.address, contract, sendTransaction, refetchBalance]);
+  }, [canInteract, requireConnection, contract, sendTransaction, refetchBalance]);
 
   return {
     // Token info
@@ -156,7 +202,7 @@ export function useEmarkToken() {
     balance: balance || 0n,
     stakingAllowance: stakingAllowance || 0n,
     balanceLoading,
-    isConnected: !!account,
+    isConnected, // 🎉 SIMPLIFIED: From provider
     
     // Actions
     approveStaking,
@@ -174,5 +220,10 @@ export function useEmarkToken() {
     // Utilities
     refetchBalance,
     refetchStakingAllowance,
+    
+    // 🎉 NEW: Enhanced capabilities from provider
+    canInteract,
+    userAddress: address,
+    requireConnection, // Expose for manual connection if needed
   };
 }

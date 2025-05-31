@@ -5,6 +5,7 @@ import { AppThirdwebProvider } from './lib/thirdweb';
 import { FarcasterProvider, useFarcasterUser } from './lib/farcaster';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import { WalletProvider } from './providers/WalletProvider'; // 🎉 ADD THE WALLET PROVIDER
 
 // Core pages only
 import EnhancedHomePage from './pages/EnhancedHomePage';
@@ -113,8 +114,10 @@ function App() {
     <ErrorBoundary>
       <FarcasterProvider>
         <AppThirdwebProvider>
-          <DebugInfo />
-          <AppContent />
+          <WalletProvider>
+            <DebugInfo />
+            <AppContent />
+          </WalletProvider>
         </AppThirdwebProvider>
       </FarcasterProvider>
     </ErrorBoundary>

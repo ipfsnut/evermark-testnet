@@ -1,66 +1,41 @@
-import { useActiveAccount, useConnect, useDisconnect } from "thirdweb/react";
+// src/hooks/useWallet.ts - Now just a thin, backward-compatible wrapper
+import { useWalletConnection } from "../providers/WalletProvider";
 import { useFarcasterUser } from "../lib/farcaster";
 
 export function useWallet() {
-  const account = useActiveAccount();
-  const { connect, isConnecting } = useConnect();
-  const { disconnect } = useDisconnect();
+  // 🎉 SIMPLIFIED: Everything comes from the provider now
+  const walletConnection = useWalletConnection();
+  const { user: farcasterUser } = useFarcasterUser();
   
-  // Add Farcaster support
-  const { 
-    isInFarcaster, 
-    isAuthenticated: isFarcasterAuth, 
-    hasVerifiedAddress, 
-    getPrimaryAddress,
-    user 
-  } = useFarcasterUser();
-
-  // Enhanced connection detection
-  const hasWalletAccess = !!(
-    account?.address || 
-    (isInFarcaster && isFarcasterAuth && hasVerifiedAddress())
-  );
-
-  const effectiveAddress = account?.address || 
-    (isInFarcaster && isFarcasterAuth && hasVerifiedAddress() ? getPrimaryAddress() : null);
-
-  // Add the missing getConnectionType function
-  const getConnectionType = () => {
-    if (account?.address) return 'wallet';
-    if (isInFarcaster && isFarcasterAuth && hasVerifiedAddress()) return 'farcaster';
-    return 'none';
-  };
-
-  // Add debug logging
+  // Debug logging to see the transformation
   console.log('🔍 useWallet Debug:', {
-    thirdwebAddress: account?.address,
-    farcasterAddress: effectiveAddress,
-    isInFarcaster,
-    isFarcasterAuth,
-    hasVerifiedAddress: hasVerifiedAddress(),
-    hasWalletAccess,
-    connectionType: getConnectionType()
+    thirdwebAddress: walletConnection.thirdwebAccount?.address,
+    wagmiAddress: walletConnection.wagmiAddress,
+    isInFarcaster: walletConnection.isInFarcaster,
+    connectionType: walletConnection.connectionType,
+    canInteract: walletConnection.canInteract
   });
 
   return {
-    // Keep existing interface for backward compatibility
-    account,
-    address: effectiveAddress, // Enhanced to include Farcaster
-    isConnected: hasWalletAccess, // Enhanced to include Farcaster
-    isConnecting,
-    isDisconnecting: false,
-    connect,
-    disconnect,
-    displayAddress: effectiveAddress ? 
-      `${effectiveAddress.substring(0, 6)}...${effectiveAddress.substring(effectiveAddress.length - 4)}` : 
-      '',
+    // ✅ Backward compatibility interface (existing code keeps working)
+    account: walletConnection.thirdwebAccount,
+    address: walletConnection.address,
+    isConnected: walletConnection.isConnected,
+    isConnecting: walletConnection.isConnecting,
+    isDisconnecting: false, // Not implemented yet
+    connect: walletConnection.connectWallet,
+    disconnect: walletConnection.disconnect,
+    displayAddress: walletConnection.displayAddress || '',
     
-    // New Farcaster-aware properties
-    hasWalletAccess,
-    isThirdwebConnected: !!account?.address,
-    isFarcasterConnected: isInFarcaster && isFarcasterAuth && hasVerifiedAddress(),
-    isInFarcaster,
-    farcasterUser: user,
-    getConnectionType // Add this function
+    // 🎉 Enhanced properties (new capabilities)
+    hasWalletAccess: walletConnection.canInteract,
+    isThirdwebConnected: walletConnection.useThirdweb,
+    isFarcasterConnected: walletConnection.useWagmi && walletConnection.wagmiConnected,
+    isInFarcaster: walletConnection.isInFarcaster,
+    farcasterUser,
+    getConnectionType: () => walletConnection.connectionType,
+    
+    // 🎉 Direct access to provider state (for advanced usage)
+    walletProvider: walletConnection
   };
 }
