@@ -54,6 +54,18 @@ const EvermarkListItem: React.FC<{ evermark: any }> = ({ evermark }) => {
             <span className="text-gray-400">•</span>
             <span>{formatDistanceToNow(new Date(evermark.creationTime), { addSuffix: true })}</span>
           </div>
+          {evermark.creator && (
+            <div className="text-xs text-gray-500 mt-1">
+              <span>Created by </span>
+              <Link 
+                to={`/${evermark.creator}`}
+                className="text-purple-600 hover:text-purple-800 font-medium"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {evermark.creator.slice(0, 6)}...{evermark.creator.slice(-4)}
+              </Link>
+            </div>
+          )}
           {evermark.description && (
             <p className="text-sm text-gray-600 mt-2 line-clamp-2">{evermark.description}</p>
           )}

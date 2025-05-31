@@ -2,7 +2,7 @@
 
 ## What is Evermark?
 
-Evermark Protocol is a decentralized system for creating permanent, verifiable references to online content. Built on the Base blockchain, it allows users to "bookmark" any digital content and ensure it remains accessible and attributable forever.
+Evermark Protocol is a decentralized system for creating permanent, verifiable references to online content. Built on the Base blockchain, it allows users to mark any digital content and ensure it remains accessible and attributable forever.
 
 ## Key Features
 
@@ -14,10 +14,10 @@ Evermark Protocol is a decentralized system for creating permanent, verifiable r
 ### Social Discovery
 - Discover content through community curation
 - Build personal collections of valuable references
-- Share and explore bookmarked content
+- Share and explore evermarked content in Farcaster or via PWA or webapp
 
 ### Farcaster Integration
-- Native support for Farcaster casts
+- Native support for Farcaster casts 
 - Seamless wallet integration in Farcaster frames
 - Social sharing and discovery features
 
@@ -40,9 +40,9 @@ The protocol consists of several interconnected smart contracts:
 ## Getting Started
 
 1. Connect your wallet (MetaMask, Coinbase Wallet, or Farcaster)
-2. Create your first Evermark by submitting a URL
-3. Build your collection and discover content from others
-4. Participate in the community through voting and curation
+2. Create your first Evermark by submitting a URL, DOI, or ISBN to share something meaningful on the network
+3. Build your collection and discover content from others to earn rewards
+4. Participate in the skin-in-the-game curation community through staking and voting
 
 ## Technical Details
 
