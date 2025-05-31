@@ -17,10 +17,12 @@ import { StakingWidget } from './StakingWidget';
 import { NFTStakingPanel } from './NFTStakingPanel';
 import { RewardsCalculator } from '../rewards/RewardsCalculator';
 import { DelegationHistory } from '../voting/DelegationHistory';
-import { useStaking, useStakingStats } from '../../hooks/useStaking';
+import { useStaking } from '../../hooks/useStaking';
+import { useStakingStats } from '../../hooks/useStakingStats';
 import { useRewards } from '../../hooks/useRewards';
 import { useDelegationHistory } from '../../hooks/useDelegationHistory';
 import { toEther } from 'thirdweb/utils';
+import { useWallet } from '../../hooks/useWallet';
 
 interface StakingDashboardProps {
   userAddress: string;
@@ -138,9 +140,10 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
   className = '' 
 }) => {
   const account = useActiveAccount();
+  const { isConnected, getConnectionType } = useWallet();
   const stakingStats = useStakingStats();
 
-  if (!account || !userAddress) {
+  if (!isConnected || !userAddress) {
     return (
       <div className={`bg-white rounded-lg shadow-sm p-6 border border-gray-200 ${className}`}>
         <div className="text-center py-8">
@@ -172,7 +175,15 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
         <div className="mt-4 p-3 bg-white/10 rounded-lg backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <span className="text-sm text-purple-100">Current Staking APY</span>
-            <span className="text-lg font-bold">~12.5%</span>
+
+            <div className="text-right">
+              <span className="text-lg font-bold">
+                {stakingStats.currentAPY.toFixed(1)}%
+              </span>
+              <div className="text-xs text-purple-200">
+                {stakingStats.isAPYFromContract ? '📊 Live' : '⚠️ No data'}
+              </div>
+            </div>
           </div>
           <div className="flex items-center justify-between mt-1">
             <span className="text-sm text-purple-100">Unbonding Period</span>
@@ -220,7 +231,8 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
           </div>
         </CollapsibleSection>
 
-        {/* NFT Staking */}
+        {/* NFT Staking - HIDDEN FOR NOW */}
+        {/* 
         <CollapsibleSection
           title="NFT Staking"
           icon={<TabletIcon className="h-5 w-5 text-amber-600" />}
@@ -230,6 +242,7 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
             <NFTStakingPanel />
           </div>
         </CollapsibleSection>
+        */}
       </div>
 
       {/* Help Section */}
@@ -247,9 +260,6 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
               </p>
               <p>
                 <strong>Delegation:</strong> Use your WEMARK to vote on quality content and maximize reward multipliers.
-              </p>
-              <p>
-                <strong>NFT Staking:</strong> Stake your Evermark NFTs for additional reward streams.
               </p>
               <p>
                 <strong>Unstaking:</strong> Requires a {stakingStats.formatUnbondingPeriod()} unbonding period for security.

@@ -4,11 +4,30 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, REWARDS_ABI } from "../lib/contracts";
 import { toEther } from "thirdweb/utils";
+import { useFarcasterUser } from "../lib/farcaster";
+import { formatEmarkWithSymbol } from "../utils/formatters";
 
 export function useRewards(userAddress?: string) {
   const [isClaimingRewards, setIsClaimingRewards] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // ADD FARCASTER USER HOOK
+  const { isInFarcaster, isAuthenticated: isFarcasterAuth, hasVerifiedAddress, getPrimaryAddress } = useFarcasterUser();
+
+  // ENHANCED: Determine the effective user address
+  const effectiveUserAddress = userAddress || (isInFarcaster && isFarcasterAuth && hasVerifiedAddress() ? getPrimaryAddress() : null);
+  const hasWalletAccess = !!userAddress || (isInFarcaster && isFarcasterAuth && hasVerifiedAddress());
+
+  console.log('🔍 Rewards Auth Debug:', {
+    userAddress,
+    isInFarcaster,
+    isFarcasterAuth,
+    hasVerifiedAddress: hasVerifiedAddress(),
+    primaryAddress: getPrimaryAddress(),
+    effectiveUserAddress,
+    hasWalletAccess
+  });
   
   const rewardsContract = useMemo(() => getContract({
     client,
@@ -17,27 +36,30 @@ export function useRewards(userAddress?: string) {
     abi: REWARDS_ABI,
   }), []);
   
-  // Get pending rewards using the correct method name
+  // UPDATE: Use effectiveUserAddress
   const pendingRewardsResult = useReadContract({
     contract: rewardsContract,
     method: "getUserRewardSummary",
-    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress,
+      enabled: !!effectiveUserAddress,
     },
   });
   
   // Extract total pending from the reward summary
   const pendingRewards = pendingRewardsResult.data?.totalPending;
-  const isLoadingRewards = userAddress ? pendingRewardsResult.isLoading : false;
-  const rewardsError = userAddress ? pendingRewardsResult.error : null;
+  const isLoadingRewards = effectiveUserAddress ? pendingRewardsResult.isLoading : false;
+  const rewardsError = effectiveUserAddress ? pendingRewardsResult.error : null;
   
   const { mutate: sendTransaction } = useSendTransaction();
   
   // Function to claim all available rewards
   const claimRewards = useCallback(async () => {
-    if (!userAddress) {
-      const errorMsg = "Please connect your wallet";
+    // UPDATE VALIDATION
+    if (!hasWalletAccess) {
+      const errorMsg = isInFarcaster ? 
+        "Please authenticate in Farcaster or connect a wallet" : 
+        "Please connect your wallet";
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -53,36 +75,66 @@ export function useRewards(userAddress?: string) {
     setSuccess(null);
     
     try {
+      console.log('🎁 Claiming rewards for:', effectiveUserAddress);
+      
       const transaction = prepareContractCall({
         contract: rewardsContract,
         method: "claimAllRewards",
         params: [] as const,
       });
       
-      await sendTransaction(transaction as any);
-      
-      // Refetch pending rewards after successful claim
-      setTimeout(() => {
-        pendingRewardsResult.refetch?.();
-      }, 2000);
-      
-      const successMsg = `Successfully claimed ${toEther(pendingRewards)} EMARK tokens!`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+      return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
+        sendTransaction(transaction as any, {
+          onSuccess: (result: any) => {
+            console.log("✅ Rewards claim successful:", result);
+            
+            // Refetch pending rewards after successful claim
+            setTimeout(() => {
+              pendingRewardsResult.refetch?.();
+            }, 2000);
+            
+            // Update the claimRewards success message to use real data
+            const successMsg = `Successfully claimed ${formatEmarkWithSymbol(pendingRewards)}!`;
+            setSuccess(successMsg);
+            setIsClaimingRewards(false);
+            resolve({ success: true, message: successMsg });
+          },
+          onError: (error: any) => {
+            console.error("❌ Rewards claim failed:", error);
+            
+            let errorMsg = "Failed to claim rewards";
+            if (error.code === 4001) {
+              errorMsg = "Transaction was rejected by user";
+            } else if (error.message?.includes('insufficient funds')) {
+              errorMsg = "Insufficient ETH for gas fees";
+            } else if (error.message?.includes('execution reverted')) {
+              errorMsg = "Transaction reverted - no rewards available or already claimed";
+            } else if (error.message) {
+              errorMsg = error.message;
+            }
+            
+            setError(errorMsg);
+            setIsClaimingRewards(false);
+            resolve({ success: false, error: errorMsg });
+          }
+        });
+      });
     } catch (err: any) {
       console.error("Error claiming rewards:", err);
       const errorMsg = err.message || "Failed to claim rewards";
       setError(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
       setIsClaimingRewards(false);
+      return { success: false, error: errorMsg };
     }
-  }, [userAddress, pendingRewards, rewardsContract, sendTransaction, pendingRewardsResult]);
+  }, [effectiveUserAddress, pendingRewards, rewardsContract, sendTransaction, pendingRewardsResult, hasWalletAccess, isInFarcaster]);
   
   // Function to claim rewards for a specific week
   const claimWeeklyRewards = useCallback(async (week: number) => {
-    if (!userAddress) {
-      const errorMsg = "Please connect your wallet";
+    // UPDATE VALIDATION
+    if (!hasWalletAccess) {
+      const errorMsg = isInFarcaster ? 
+        "Please authenticate in Farcaster or connect a wallet" : 
+        "Please connect your wallet";
       setError(errorMsg);
       return { success: false, error: errorMsg };
     }
@@ -92,31 +144,46 @@ export function useRewards(userAddress?: string) {
     setSuccess(null);
     
     try {
+      console.log('🎁 Claiming weekly rewards for week:', week, 'user:', effectiveUserAddress);
+      
       const transaction = prepareContractCall({
         contract: rewardsContract,
         method: "claimWeeklyRewards",
         params: [BigInt(week)] as const,
       });
       
-      await sendTransaction(transaction as any);
-      
-      // Refetch pending rewards after successful claim
-      setTimeout(() => {
-        pendingRewardsResult.refetch?.();
-      }, 2000);
-      
-      const successMsg = `Successfully claimed EMARK rewards for week ${week}!`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+      return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
+        sendTransaction(transaction as any, {
+          onSuccess: (result: any) => {
+            console.log("✅ Weekly rewards claim successful:", result);
+            
+            // Refetch pending rewards after successful claim
+            setTimeout(() => {
+              pendingRewardsResult.refetch?.();
+            }, 2000);
+            
+            const successMsg = `Successfully claimed EMARK rewards for week ${week}!`;
+            setSuccess(successMsg);
+            setIsClaimingRewards(false);
+            resolve({ success: true, message: successMsg });
+          },
+          onError: (error: any) => {
+            console.error("❌ Weekly rewards claim failed:", error);
+            const errorMsg = error.message || "Failed to claim weekly rewards";
+            setError(errorMsg);
+            setIsClaimingRewards(false);
+            resolve({ success: false, error: errorMsg });
+          }
+        });
+      });
     } catch (err: any) {
       console.error("Error claiming weekly rewards:", err);
       const errorMsg = err.message || "Failed to claim weekly rewards";
       setError(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
       setIsClaimingRewards(false);
+      return { success: false, error: errorMsg };
     }
-  }, [userAddress, rewardsContract, sendTransaction, pendingRewardsResult]);
+  }, [effectiveUserAddress, rewardsContract, sendTransaction, pendingRewardsResult, hasWalletAccess, isInFarcaster]);
   
   // Clear messages
   const clearMessages = useCallback(() => {
@@ -142,123 +209,22 @@ export function useRewards(userAddress?: string) {
     claimWeeklyRewards,
     clearMessages,
     refetch: pendingRewardsResult.refetch,
-  };
-}
-
-// Hook for current week information
-export function useCurrentWeek() {
-  const rewardsContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.REWARDS,
-    abi: REWARDS_ABI,
-  }), []);
-  
-  const { data: currentWeekInfo, isLoading, error } = useReadContract({
-    contract: rewardsContract,
-    method: "getCurrentWeekInfo",
-    params: [],
-  });
-  
-  return {
-    currentWeekInfo,
-    isLoading,
-    error,
-    currentWeek: currentWeekInfo?.week,
-    weekStartTime: currentWeekInfo?.startTime,
-    weekEndTime: currentWeekInfo?.endTime,
-    totalPool: currentWeekInfo?.totalPool,
-    timeRemaining: currentWeekInfo?.timeRemaining,
-    isFinalized: currentWeekInfo?.finalized,
-  };
-}
-
-// Hook for week-specific information
-export function useWeekInfo(weekNumber: number) {
-  const rewardsContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.REWARDS,
-    abi: REWARDS_ABI,
-  }), []);
-  
-  const { data: weekInfo, isLoading, error } = useReadContract({
-    contract: rewardsContract,
-    method: "getWeekInfo",
-    params: [BigInt(weekNumber)],
-    queryOptions: {
-      enabled: weekNumber > 0,
-    },
-  });
-  
-  return {
-    weekInfo,
-    isLoading,
-    error,
-  };
-}
-
-// Hook for rewards distribution info (for transparency/admin)
-export function useRewardsInfo() {
-  const rewardsContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.REWARDS,
-    abi: REWARDS_ABI,
-  }), []);
-  
-  // Get total rewards distributed
-  const { data: totalDistributed } = useReadContract({
-    contract: rewardsContract,
-    method: "totalRewardsDistributed",
-    params: [],
-  });
-  
-  // Get total token staker rewards
-  const { data: totalTokenStakerRewards } = useReadContract({
-    contract: rewardsContract,
-    method: "totalTokenStakerRewards",
-    params: [],
-  });
-  
-  // Get total creator rewards
-  const { data: totalCreatorRewards } = useReadContract({
-    contract: rewardsContract,
-    method: "totalCreatorRewards",
-    params: [],
-  });
-  
-  // Get total NFT staker rewards
-  const { data: totalNftStakerRewards } = useReadContract({
-    contract: rewardsContract,
-    method: "totalNftStakerRewards",
-    params: [],
-  });
-  
-  return {
-    totalDistributed: totalDistributed || BigInt(0),
-    totalTokenStakerRewards: totalTokenStakerRewards || BigInt(0),
-    totalCreatorRewards: totalCreatorRewards || BigInt(0),
-    totalNftStakerRewards: totalNftStakerRewards || BigInt(0),
-  };
-}
-
-// Hook for tracking total rewards distributed (for stats/dashboard)
-export function useRewardsStats() {
-  const rewardsInfo = useRewardsInfo();
-  const currentWeek = useCurrentWeek();
-  
-  return {
-    ...rewardsInfo,
-    currentWeek: currentWeek.currentWeek || 0,
-    currentWeekPool: currentWeek.totalPool || BigInt(0),
-    isCurrentWeekFinalized: currentWeek.isFinalized || false,
-    timeRemainingInWeek: currentWeek.timeRemaining || 0,
+    // ADD THESE FOR DEBUGGING
+    authInfo: {
+      effectiveUserAddress,
+      hasWalletAccess,
+      isInFarcaster,
+      isFarcasterAuth
+    }
   };
 }
 
 // Hook for user's reward calculation for a specific week
 export function useUserWeeklyRewards(userAddress?: string, week?: number) {
+  // ADD FARCASTER SUPPORT
+  const { isInFarcaster, isAuthenticated: isFarcasterAuth, hasVerifiedAddress, getPrimaryAddress } = useFarcasterUser();
+  const effectiveUserAddress = userAddress || (isInFarcaster && isFarcasterAuth && hasVerifiedAddress() ? getPrimaryAddress() : null);
+
   const rewardsContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
@@ -270,11 +236,11 @@ export function useUserWeeklyRewards(userAddress?: string, week?: number) {
     contract: rewardsContract,
     method: "calculateUserWeeklyRewards",
     params: [
-      userAddress || "0x0000000000000000000000000000000000000000",
+      effectiveUserAddress || "0x0000000000000000000000000000000000000000",
       BigInt(week || 0)
     ] as const,
     queryOptions: {
-      enabled: !!userAddress && !!week && week > 0,
+      enabled: !!effectiveUserAddress && !!week && week > 0,
     },
   });
   
@@ -288,5 +254,102 @@ export function useUserWeeklyRewards(userAddress?: string, week?: number) {
       (weeklyRewards[2] || BigInt(0)) : BigInt(0),
     isLoading,
     error,
+    effectiveUserAddress // ADD THIS FOR DEBUGGING
+  };
+}
+
+// Hook to get current week number
+export function useCurrentWeek() {
+  const rewardsContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.REWARDS,
+    abi: REWARDS_ABI,
+  }), []);
+  
+  const { data: currentWeek, isLoading, error } = useReadContract({
+    contract: rewardsContract,
+    method: "getCurrentWeek",
+    params: [] as const,
+  });
+  
+  return {
+    currentWeek: currentWeek ? Number(currentWeek) : 0,
+    isLoading,
+    error
+  };
+}
+
+// Hook to get week information
+export function useWeekInfo(week?: number) {
+  const rewardsContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.REWARDS,
+    abi: REWARDS_ABI,
+  }), []);
+  
+  const { data: weekInfo, isLoading, error } = useReadContract({
+    contract: rewardsContract,
+    method: "getWeekInfo",
+    params: [BigInt(week || 0)] as const,
+    queryOptions: {
+      enabled: !!week && week > 0,
+    },
+  });
+  
+  return {
+    weekInfo,
+    isLoading,
+    error
+  };
+}
+
+// Hook to get general rewards information
+export function useRewardsInfo() {
+  const rewardsContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.REWARDS,
+    abi: REWARDS_ABI,
+  }), []);
+  
+  const { data: rewardsInfo, isLoading, error } = useReadContract({
+    contract: rewardsContract,
+    method: "getRewardsInfo",
+    params: [] as const,
+  });
+  
+  return {
+    rewardsInfo,
+    isLoading,
+    error
+  };
+}
+
+// Hook to get rewards statistics
+export function useRewardsStats() {
+  const rewardsContract = useMemo(() => getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.REWARDS,
+    abi: REWARDS_ABI,
+  }), []);
+  
+  const { data: totalDistributed } = useReadContract({
+    contract: rewardsContract,
+    method: "getTotalDistributed",
+    params: [] as const,
+  });
+  
+  const { data: totalParticipants } = useReadContract({
+    contract: rewardsContract,
+    method: "getTotalParticipants",
+    params: [] as const,
+  });
+  
+  return {
+    totalDistributed: totalDistributed || BigInt(0),
+    totalParticipants: totalParticipants ? Number(totalParticipants) : 0,
   };
 }
