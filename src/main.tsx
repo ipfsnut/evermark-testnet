@@ -1,26 +1,38 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import { ThirdwebProvider } from "thirdweb/react"
 import { WagmiProvider } from 'wagmi'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import App from './App.tsx'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import ErrorBoundary from './components/ErrorBoundary';
+import App from './App.tsx';
 import { FarcasterProvider } from './lib/farcaster'
 import { wagmiConfig } from './lib/wagmi'
-import { client } from './lib/thirdweb'
-import './index.css'
+import './index.css';
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={wagmiConfig}>
-        <ThirdwebProvider>
-          <FarcasterProvider>
-            <App />
-          </FarcasterProvider>
-        </ThirdwebProvider>
-      </WagmiProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <WagmiProvider config={wagmiConfig}>
+          <ThirdwebProvider>
+            <FarcasterProvider>
+              <BrowserRouter>
+                <App />
+              </BrowserRouter>
+            </FarcasterProvider>
+          </ThirdwebProvider>
+        </WagmiProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </React.StrictMode>,
 );
