@@ -17,6 +17,7 @@ import MyEvermarksPage from './pages/MyEvermarksPage';
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import { EvermarkDetail } from './components/evermark/EvermarkDetail';
 import { ShareRedirect } from './components/sharing/ShareButton';
+import AboutPage from './pages/AboutPage';
 
 function DebugInfo() {
   const { isInFarcaster, isReady } = useFarcasterUser();
@@ -61,6 +62,7 @@ function AppContent() {
           <Route path="/my-evermarks" element={<MyEvermarksPage />} />
           <Route path="/create" element={<EnhancedCreateEvermark />} />
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
+          <Route path="/about" element={<AboutPage />} />
           
           {/* Share functionality */}
           <Route path="/share/:id" element={<ShareRedirect />} />

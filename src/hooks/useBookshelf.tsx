@@ -13,8 +13,8 @@ export interface BookshelfData {
   currentReading: BookshelfItem[];
 }
 
-const MAX_FAVORITES = 6;
-const MAX_CURRENT_READING = 4;
+const MAX_FAVORITES = 3;
+const MAX_CURRENT_READING = 10;
 
 export function useBookshelf(userAddress?: string) {
   const [bookshelfData, setBookshelfData] = useState<BookshelfData>({

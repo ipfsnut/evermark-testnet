@@ -6,6 +6,7 @@ import {
   Home as HomeIcon, 
   BookOpen as BookOpenIcon,
   Trophy as TrophyIcon,
+  Info as InfoIcon,
 //  DollarSign as AuctionIcon,
   Plus as CreateIcon,
   User as UserIcon,
@@ -38,6 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     { path: '/my-evermarks', label: 'My Collection', icon: <BookOpenIcon className="h-5 w-5" /> },
     { path: '/profile', label: 'Profile', icon: <UserIcon className="h-5 w-5" /> },
   //  { path: '/bookshelf', label: 'My Bookshelf', icon: <BookmarkIcon className="h-5 w-5" /> },
+    { path: '/about', label: 'About', icon: <InfoIcon className="h-5 w-5" /> },
   ];
   
   // Check if a nav item is active
