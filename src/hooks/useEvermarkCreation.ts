@@ -4,6 +4,7 @@ import { getContract, prepareContractCall, sendTransaction, readContract } from 
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
 
+
 interface CastDataSuccess {
   title: string;
   author: string;
@@ -324,13 +325,15 @@ export const useEvermarkCreation = () => {
   
   const account = useActiveAccount();
 
-  const createEvermark = async (metadata: EvermarkMetadata) => {
-    const accountAddress = account?.address;
-    
-    if (!accountAddress) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Please connect your wallet" };
-    }
+const createEvermark = async (metadata: EvermarkMetadata) => {
+  // Use account address if available (webapp), otherwise get from Frame SDK (Farcaster)
+  const accountAddress = account?.address;
+  
+  if (!accountAddress && !account) {
+    setError("Please connect your wallet or authenticate");
+    return { success: false, error: "Please connect your wallet or authenticate" };
+  }
+
 
     if (isProcessingRef.current) {
       console.warn("Transaction already in progress");
