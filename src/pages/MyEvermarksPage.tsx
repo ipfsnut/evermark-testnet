@@ -1,6 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { useActiveAccount } from "thirdweb/react";
-import { useAccount } from 'wagmi';
 import { 
   BookmarkIcon, 
   PlusIcon, 
@@ -21,7 +19,7 @@ import { useBookshelf } from '../hooks/useBookshelf';
 import { ProfileStatsWidget } from '../components/profile/ProfileStatsWidget';
 import { formatDistanceToNow } from 'date-fns';
 import { toEther } from 'thirdweb/utils';
-import { useFarcasterUser } from '../lib/farcaster';
+import { useWalletAuth } from '../providers/WalletProvider'; // 🎉 SIMPLIFIED IMPORT
 
 // Enhanced Evermark Card with Bookshelf Controls
 const EnhancedEvermarkCard: React.FC<{ 
@@ -299,7 +297,7 @@ const BookshelfQuickStats: React.FC<{ userAddress: string }> = ({ userAddress })
   );
 };
 
-// Section Header Component (unchanged)
+// Section Header Component
 const SectionHeader: React.FC<{ 
   title: string; 
   count: number; 
@@ -331,29 +329,15 @@ const SectionHeader: React.FC<{
 );
 
 const EnhancedMyEvermarksPage: React.FC = () => {
-  // Thirdweb wallet
-  const thirdwebAccount = useActiveAccount();
+  // 🎉 SIMPLIFIED: Single hook replaces 15+ lines of complex wallet detection
+  const { isConnected, address, requireConnection } = useWalletAuth();
   
-  // Wagmi wallet (for Farcaster)
-  const { address: wagmiAddress, isConnected: isWagmiConnected } = useAccount();
-  
-  // Farcaster context
-  const { isInFarcaster } = useFarcasterUser();
-  
-  // Determine active address and connection status
-  const address = thirdwebAccount?.address || wagmiAddress;
-  const isWalletConnected = !!thirdwebAccount?.address || (isInFarcaster && isWagmiConnected && !!wagmiAddress);
-  
-  console.log("🔍 MyEvermarks wallet detection:", {
-    thirdwebAddress: thirdwebAccount?.address,
-    wagmiAddress,
-    isWagmiConnected,
-    isInFarcaster,
-    finalAddress: address,
-    isWalletConnected
+  console.log("🔍 MyEvermarks wallet detection (SIMPLIFIED):", {
+    isConnected,
+    address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null,
   });
   
-  // Existing hooks
+  // All hooks now use the clean address from provider
   const { evermarks: userOwnedEvermarks, isLoading: isLoadingOwned } = useUserEvermarks(address);
   const { evermarks: allEvermarks } = useEvermarks();
   const { 
@@ -423,8 +407,8 @@ const EnhancedMyEvermarksPage: React.FC = () => {
     }));
   };
 
-  // Handle disconnected wallet state
-  if (!isWalletConnected || !address) {
+  // 🎉 SIMPLIFIED: Clean disconnected state handling with auto-connection
+  if (!isConnected || !address) {
     return (
       <PageContainer title="My Collection">
         <div className="text-center py-12">
@@ -433,17 +417,14 @@ const EnhancedMyEvermarksPage: React.FC = () => {
             Wallet Not Connected
           </h3>
           <p className="text-gray-600 mb-6">
-            {isInFarcaster 
-              ? "Connect your Farcaster wallet to view your Evermarks collection."
-              : "Connect your wallet to view your Evermarks collection."
-            }
+            Connect your wallet to view your Evermarks collection.
           </p>
-          {/* Show current connection status for debugging */}
-          <div className="text-xs text-gray-400 mt-4">
-            <p>Thirdweb: {thirdwebAccount?.address ? '✅ Connected' : '❌ Not connected'}</p>
-            <p>Wagmi: {isWagmiConnected && wagmiAddress ? '✅ Connected' : '❌ Not connected'}</p>
-            <p>Environment: {isInFarcaster ? 'Farcaster' : 'Web App'}</p>
-          </div>
+          <button
+            onClick={requireConnection}
+            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            Connect Wallet
+          </button>
         </div>
       </PageContainer>
     );

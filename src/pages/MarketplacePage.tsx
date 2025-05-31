@@ -1,9 +1,8 @@
-// MarketplacePage.tsx - Correct Thirdweb v5.100.1 implementation
+// MarketplacePage.tsx - OPTIMIZED with WalletProvider and auto-connection
 
 import * as React from "react";
 import { useState } from "react";
 import { 
-  useActiveAccount, 
   useActiveWalletChain,
   useReadContract,
   useSendTransaction 
@@ -21,13 +20,15 @@ import {
 } from "thirdweb/extensions/marketplace";
 import { client } from "../lib/thirdweb";
 import { CHAIN } from "../lib/contracts";
+import { useWalletAuth } from '../providers/WalletProvider'; // 🎉 SIMPLIFIED IMPORT
 import PageContainer from "../components/layout/PageContainer";
 
 const MARKETPLACE_CONTRACT_ADDRESS = import.meta.env.VITE_MARKETPLACE_ADDRESS || "";
 const EVERMARK_NFT_ADDRESS = import.meta.env.VITE_EVERMARK_NFT_ADDRESS || "";
 
 export function MarketplacePage() {
-  const account = useActiveAccount();
+  // 🎉 SIMPLIFIED: Single hook replaces direct thirdweb usage with auto-connection
+  const { isConnected, address, requireConnection } = useWalletAuth();
   const activeChain = useActiveWalletChain();
   const { mutateAsync: sendTransaction } = useSendTransaction();
 
@@ -36,6 +37,13 @@ export function MarketplacePage() {
     tokenId: "",
     price: "",
     quantity: 1,
+  });
+
+  console.log("🔍 Marketplace wallet detection (SIMPLIFIED):", {
+    isConnected,
+    address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null,
+    marketplaceContract: MARKETPLACE_CONTRACT_ADDRESS ? 'Configured' : 'Missing',
+    nftContract: EVERMARK_NFT_ADDRESS ? 'Configured' : 'Missing'
   });
 
   // Get marketplace contract
@@ -94,154 +102,153 @@ export function MarketplacePage() {
 
   // Filter user's listings
   const userListings = React.useMemo(() => {
-    if (!account?.address) return [];
+    if (!address) return [];
     return listings.filter(
-      listing => listing.seller.toLowerCase() === account.address.toLowerCase()
+      listing => listing.seller.toLowerCase() === address.toLowerCase()
     );
-  }, [listings, account?.address]);
+  }, [listings, address]);
 
-  // Create listing function
+  // 🎉 ENHANCED: Auto-connection wrapper for marketplace functions
+  const withAutoConnection = async (action: () => Promise<any>) => {
+    if (!isConnected) {
+      console.log("🔌 Auto-connecting wallet for marketplace action...");
+      const connectionResult = await requireConnection();
+      if (!connectionResult.success) {
+        throw new Error(connectionResult.error || "Failed to connect wallet");
+      }
+      // Wait for connection to stabilize
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    return action();
+  };
+
+  // Create listing function with auto-connection
   const handleCreateListing = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!account?.address) {
-      alert("Please connect your wallet");
-      return;
-    }
-
+    
     try {
-      console.log("Creating listing with data:", createListingData);
-      
-      const transaction = createListing({
-        contract,
-        assetContractAddress: EVERMARK_NFT_ADDRESS, // Fixed to EverMark NFTs only
-        tokenId: BigInt(createListingData.tokenId),
-        quantity: BigInt(createListingData.quantity),
-        currencyContractAddress: NATIVE_TOKEN_ADDRESS, // currencyContractAddress instead of currency
-        pricePerToken: createListingData.price,
-        startTimestamp: new Date(), // Date object, not bigint
-        endTimestamp: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000), // Date object, 1 week from now
-      });
+      await withAutoConnection(async () => {
+        console.log("Creating listing with data:", createListingData);
+        
+        const transaction = createListing({
+          contract,
+          assetContractAddress: EVERMARK_NFT_ADDRESS, // Fixed to EverMark NFTs only
+          tokenId: BigInt(createListingData.tokenId),
+          quantity: BigInt(createListingData.quantity),
+          currencyContractAddress: NATIVE_TOKEN_ADDRESS, // currencyContractAddress instead of currency
+          pricePerToken: createListingData.price,
+          startTimestamp: new Date(), // Date object, not bigint
+          endTimestamp: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000), // Date object, 1 week from now
+        });
 
-      console.log("Sending create listing transaction...");
-      const result = await sendTransaction(transaction);
-      console.log("Transaction result:", result);
-      
-      setShowCreateForm(false);
-      setCreateListingData({
-        tokenId: "",
-        price: "",
-        quantity: 1,
+        console.log("Sending create listing transaction...");
+        const result = await sendTransaction(transaction);
+        console.log("Transaction result:", result);
+        
+        setShowCreateForm(false);
+        setCreateListingData({
+          tokenId: "",
+          price: "",
+          quantity: 1,
+        });
+        
+        // Refetch listings after a short delay
+        setTimeout(() => {
+          console.log("Refetching listings...");
+          refetchListings();
+        }, 3000);
+        
+        alert("Listing created successfully!");
       });
-      
-      // Refetch listings after a short delay
-      setTimeout(() => {
-        console.log("Refetching listings...");
-        refetchListings();
-      }, 3000);
-      
-      alert("Listing created successfully!");
-      
     } catch (error) {
       console.error("Failed to create listing:", error);
       alert(`Failed to create listing: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
-  // Buy item function
+  // Buy item function with auto-connection
   const handleBuyItem = async (listingId: string, quantity: number = 1) => {
-    if (!account?.address) {
-      alert("Please connect your wallet");
-      return;
-    }
-
     try {
-      console.log("Buying item:", { listingId, quantity });
-      
-      const transaction = buyFromListing({
-        contract,
-        listingId: BigInt(listingId),
-        quantity: BigInt(quantity),
-        recipient: account.address, // recipient instead of buyFor
-      });
+      await withAutoConnection(async () => {
+        console.log("Buying item:", { listingId, quantity });
+        
+        const transaction = buyFromListing({
+          contract,
+          listingId: BigInt(listingId),
+          quantity: BigInt(quantity),
+          recipient: address!, // We know address exists after auto-connection
+        });
 
-      console.log("Sending buy transaction...");
-      const result = await sendTransaction(transaction);
-      console.log("Buy transaction result:", result);
-      
-      setTimeout(() => {
-        console.log("Refetching listings after purchase...");
-        refetchListings();
-      }, 3000);
-      
-      alert("Purchase successful!");
-      
+        console.log("Sending buy transaction...");
+        const result = await sendTransaction(transaction);
+        console.log("Buy transaction result:", result);
+        
+        setTimeout(() => {
+          console.log("Refetching listings after purchase...");
+          refetchListings();
+        }, 3000);
+        
+        alert("Purchase successful!");
+      });
     } catch (error) {
       console.error("Failed to buy item:", error);
       alert(`Failed to buy item: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
-  // Make offer function
+  // Make offer function with auto-connection
   const handleMakeOffer = async (listing: any) => {
-    if (!account?.address) {
-      alert("Please connect your wallet");
-      return;
-    }
-
     const price = prompt("Enter your offer price in ETH (e.g., 0.1):");
     if (!price) return;
 
     try {
-      console.log("Making offer:", { listing, price });
-      
-      const transaction = makeOffer({
-        contract,
-        assetContractAddress: listing.assetContractAddress, // assetContractAddress instead of assetContract
-        tokenId: BigInt(listing.tokenId),
-        quantity: BigInt(1),
-        currencyContractAddress: NATIVE_TOKEN_ADDRESS, // currencyContractAddress instead of currency
-        totalOffer: price, // totalOffer instead of totalPrice
-        offerExpiresAt: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000), // Date object, 1 week
-      });
+      await withAutoConnection(async () => {
+        console.log("Making offer:", { listing, price });
+        
+        const transaction = makeOffer({
+          contract,
+          assetContractAddress: listing.assetContractAddress, // assetContractAddress instead of assetContract
+          tokenId: BigInt(listing.tokenId),
+          quantity: BigInt(1),
+          currencyContractAddress: NATIVE_TOKEN_ADDRESS, // currencyContractAddress instead of currency
+          totalOffer: price, // totalOffer instead of totalPrice
+          offerExpiresAt: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000), // Date object, 1 week
+        });
 
-      console.log("Sending offer transaction...");
-      const result = await sendTransaction(transaction);
-      console.log("Offer transaction result:", result);
-      
-      alert("Offer made successfully!");
-      
+        console.log("Sending offer transaction...");
+        const result = await sendTransaction(transaction);
+        console.log("Offer transaction result:", result);
+        
+        alert("Offer made successfully!");
+      });
     } catch (error) {
       console.error("Failed to make offer:", error);
       alert(`Failed to make offer: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
 
-  // Cancel listing function
+  // Cancel listing function with auto-connection
   const handleCancelListing = async (listingId: string) => {
-    if (!account?.address) {
-      alert("Please connect your wallet");
-      return;
-    }
-
     try {
-      console.log("Cancelling listing:", listingId);
-      
-      const transaction = cancelListing({
-        contract,
-        listingId: BigInt(listingId),
-      });
+      await withAutoConnection(async () => {
+        console.log("Cancelling listing:", listingId);
+        
+        const transaction = cancelListing({
+          contract,
+          listingId: BigInt(listingId),
+        });
 
-      console.log("Sending cancel transaction...");
-      const result = await sendTransaction(transaction);
-      console.log("Cancel transaction result:", result);
-      
-      setTimeout(() => {
-        console.log("Refetching listings after cancel...");
-        refetchListings();
-      }, 3000);
-      
-      alert("Listing cancelled successfully!");
-      
+        console.log("Sending cancel transaction...");
+        const result = await sendTransaction(transaction);
+        console.log("Cancel transaction result:", result);
+        
+        setTimeout(() => {
+          console.log("Refetching listings after cancel...");
+          refetchListings();
+        }, 3000);
+        
+        alert("Listing cancelled successfully!");
+      });
     } catch (error) {
       console.error("Failed to cancel listing:", error);
       alert(`Failed to cancel listing: ${error instanceof Error ? error.message : String(error)}`);
@@ -254,12 +261,13 @@ export function MarketplacePage() {
     console.log("- Marketplace contract:", MARKETPLACE_CONTRACT_ADDRESS);
     console.log("- EverMark NFT contract:", EVERMARK_NFT_ADDRESS);
     console.log("- Active chain:", activeChain?.name || activeChain?.id);
-    console.log("- Account:", account?.address);
+    console.log("- Wallet connected:", isConnected);
+    console.log("- Address:", address);
     console.log("- Loading:", isLoading);
     console.log("- Error:", error);
     console.log("- Raw data:", allListingsData);
     console.log("- Filtered EverMark listings:", listings);
-  }, [MARKETPLACE_CONTRACT_ADDRESS, EVERMARK_NFT_ADDRESS, activeChain, account, isLoading, error, allListingsData, listings]);
+  }, [MARKETPLACE_CONTRACT_ADDRESS, EVERMARK_NFT_ADDRESS, activeChain, isConnected, address, isLoading, error, allListingsData, listings]);
 
   // Early return checks
   if (!MARKETPLACE_CONTRACT_ADDRESS) {
@@ -286,31 +294,31 @@ export function MarketplacePage() {
     );
   }
 
-  if (!account?.address) {
-    return (
-      <PageContainer>
-        <div className="text-center py-16">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">EverMark Marketplace</h1>
-          <p className="text-gray-600">Please connect your wallet to use the marketplace.</p>
-        </div>
-      </PageContainer>
-    );
-  }
-
   return (
     <PageContainer>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold text-gray-900">EverMark Marketplace</h1>
-          <button 
-            onClick={() => {
-              console.log("Manual refresh clicked");
-              refetchListings();
-            }}
-            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-          >
-            Refresh
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => {
+                console.log("Manual refresh clicked");
+                refetchListings();
+              }}
+              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+            >
+              Refresh
+            </button>
+            {/* 🎉 ENHANCED: Auto-connection for wallet access */}
+            {!isConnected && (
+              <button
+                onClick={requireConnection}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                Connect Wallet
+              </button>
+            )}
+          </div>
         </div>
         
         {error && (
@@ -334,190 +342,208 @@ export function MarketplacePage() {
           <p>Marketplace Contract: {MARKETPLACE_CONTRACT_ADDRESS}</p>
           <p>EverMark NFT Contract: {EVERMARK_NFT_ADDRESS}</p>
           <p>Chain: {activeChain?.name || activeChain?.id || 'Unknown'}</p>
+          <p>Wallet Connected: {isConnected ? 'Yes' : 'No'}</p>
+          <p>Address: {address || 'None'}</p>
           <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
           <p>Raw listings count: {allListingsData?.length || 0}</p>
           <p>EverMark listings count: {listings.length}</p>
         </div>
 
-        {/* Create Listing Button */}
-        <div>
-          <button 
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            {showCreateForm ? "Cancel" : "List Your EverMark"}
-          </button>
-        </div>
-
-        {/* Create Listing Form */}
-        {showCreateForm && (
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold mb-4">Create New EverMark Listing</h3>
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>NFT Collection:</strong> EverMark NFTs ({EVERMARK_NFT_ADDRESS})
-              </p>
-              <p className="text-xs text-blue-600 mt-1">
-                This marketplace is exclusive to EverMark NFTs from your collection.
-              </p>
-            </div>
-            <form onSubmit={handleCreateListing} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  EverMark Token ID:
-                </label>
-                <input
-                  type="text"
-                  value={createListingData.tokenId}
-                  onChange={(e) => setCreateListingData({
-                    ...createListingData,
-                    tokenId: e.target.value
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="1"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Price (ETH):
-                </label>
-                <input
-                  type="text"
-                  placeholder="0.1"
-                  value={createListingData.price}
-                  onChange={(e) => setCreateListingData({
-                    ...createListingData,
-                    price: e.target.value
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity:
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={createListingData.quantity}
-                  onChange={(e) => setCreateListingData({
-                    ...createListingData,
-                    quantity: parseInt(e.target.value) || 1
-                  })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
+        {/* 🎉 ENHANCED: Conditional wallet connection prompt */}
+        {!isConnected ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+            <h3 className="text-lg font-medium text-blue-900 mb-2">Connect Your Wallet</h3>
+            <p className="text-blue-700 mb-4">You need to connect your wallet to use the marketplace features.</p>
+            <button
+              onClick={requireConnection}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Connect Wallet
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Create Listing Button */}
+            <div>
               <button 
-                type="submit"
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                onClick={() => setShowCreateForm(!showCreateForm)}
+                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
               >
-                Create EverMark Listing
+                {showCreateForm ? "Cancel" : "List Your EverMark"}
               </button>
-            </form>
-          </div>
-        )}
+            </div>
 
-        {/* Your Listings */}
-        {userListings.length > 0 && (
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">
-              Your EverMark Listings ({userListings.length})
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {userListings.map((listing) => (
-                <div key={listing.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="font-medium text-gray-900 mb-2">{listing.asset.name}</h4>
-                  {listing.asset.image && (
-                    <img 
-                      src={listing.asset.image} 
-                      alt={listing.asset.name}
-                      className="w-full h-48 object-cover rounded-lg mb-3"
-                    />
-                  )}
-                  <p className="text-sm text-gray-600 mb-2">Price: {listing.price} ETH</p>
-                  <p className="text-sm text-gray-600 mb-3">Quantity: {listing.quantity}</p>
-                  <button
-                    onClick={() => handleCancelListing(listing.id)}
-                    className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                  >
-                    Cancel Listing
-                  </button>
+            {/* Create Listing Form */}
+            {showCreateForm && (
+              <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold mb-4">Create New EverMark Listing</h3>
+                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>NFT Collection:</strong> EverMark NFTs ({EVERMARK_NFT_ADDRESS})
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    This marketplace is exclusive to EverMark NFTs from your collection.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* All Marketplace Listings */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">
-            All EverMark Listings ({listings.length})
-          </h2>
-          {isLoading ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600">Loading EverMark listings...</p>
-            </div>
-          ) : listings.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600">No EverMark listings found. List the first one!</p>
-              <p className="text-sm text-gray-500 mt-2">
-                Check the debug info above for connection details.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {listings.map((listing) => {
-                const isOwnListing = listing.seller?.toLowerCase() === account.address?.toLowerCase();
-                return (
-                  <div 
-                    key={listing.id} 
-                    className={`border rounded-lg p-4 ${
-                      isOwnListing ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'
-                    }`}
-                  >
-                    <h4 className="font-medium text-gray-900 mb-2">{listing.asset.name}</h4>
-                    {listing.asset.image && (
-                      <img 
-                        src={listing.asset.image} 
-                        alt={listing.asset.name}
-                        className="w-full h-48 object-cover rounded-lg mb-3"
-                      />
-                    )}
-                    {listing.asset.description && (
-                      <p className="text-sm text-gray-600 mb-2">{listing.asset.description}</p>
-                    )}
-                    <p className="text-sm text-gray-600 mb-2">Price: {listing.price} ETH</p>
-                    <p className="text-sm text-gray-600 mb-2">Quantity: {listing.quantity}</p>
-                    <p className="text-sm text-gray-600 mb-3">
-                      Seller: {listing.seller ? `${listing.seller.slice(0, 6)}...${listing.seller.slice(-4)}` : 'Unknown'}
-                    </p>
-                    
-                    {isOwnListing ? (
-                      <p className="text-yellow-700 font-medium text-center">Your Listing</p>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleBuyItem(listing.id, 1)}
-                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                        >
-                          Buy Now
-                        </button>
-                        <button
-                          onClick={() => handleMakeOffer(listing)}
-                          className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          Make Offer
-                        </button>
-                      </div>
-                    )}
+                <form onSubmit={handleCreateListing} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      EverMark Token ID:
+                    </label>
+                    <input
+                      type="text"
+                      value={createListingData.tokenId}
+                      onChange={(e) => setCreateListingData({
+                        ...createListingData,
+                        tokenId: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="1"
+                      required
+                    />
                   </div>
-                );
-              })}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Price (ETH):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="0.1"
+                      value={createListingData.price}
+                      onChange={(e) => setCreateListingData({
+                        ...createListingData,
+                        price: e.target.value
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Quantity:
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={createListingData.quantity}
+                      onChange={(e) => setCreateListingData({
+                        ...createListingData,
+                        quantity: parseInt(e.target.value) || 1
+                      })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Create EverMark Listing
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* Your Listings */}
+            {userListings.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  Your EverMark Listings ({userListings.length})
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {userListings.map((listing) => (
+                    <div key={listing.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-2">{listing.asset.name}</h4>
+                      {listing.asset.image && (
+                        <img 
+                          src={listing.asset.image} 
+                          alt={listing.asset.name}
+                          className="w-full h-48 object-cover rounded-lg mb-3"
+                        />
+                      )}
+                      <p className="text-sm text-gray-600 mb-2">Price: {listing.price} ETH</p>
+                      <p className="text-sm text-gray-600 mb-3">Quantity: {listing.quantity}</p>
+                      <button
+                        onClick={() => handleCancelListing(listing.id)}
+                        className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                      >
+                        Cancel Listing
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* All Marketplace Listings */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                All EverMark Listings ({listings.length})
+              </h2>
+              {isLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">Loading EverMark listings...</p>
+                </div>
+              ) : listings.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No EverMark listings found. List the first one!</p>
+                  <p className="text-sm text-gray-500 mt-2">
+                    Check the debug info above for connection details.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {listings.map((listing) => {
+                    const isOwnListing = listing.seller?.toLowerCase() === address?.toLowerCase();
+                    return (
+                      <div 
+                        key={listing.id} 
+                        className={`border rounded-lg p-4 ${
+                          isOwnListing ? 'bg-yellow-50 border-yellow-200' : 'bg-white border-gray-200'
+                        }`}
+                      >
+                        <h4 className="font-medium text-gray-900 mb-2">{listing.asset.name}</h4>
+                        {listing.asset.image && (
+                          <img 
+                            src={listing.asset.image} 
+                            alt={listing.asset.name}
+                            className="w-full h-48 object-cover rounded-lg mb-3"
+                          />
+                        )}
+                        {listing.asset.description && (
+                          <p className="text-sm text-gray-600 mb-2">{listing.asset.description}</p>
+                        )}
+                        <p className="text-sm text-gray-600 mb-2">Price: {listing.price} ETH</p>
+                        <p className="text-sm text-gray-600 mb-2">Quantity: {listing.quantity}</p>
+                        <p className="text-sm text-gray-600 mb-3">
+                          Seller: {listing.seller ? `${listing.seller.slice(0, 6)}...${listing.seller.slice(-4)}` : 'Unknown'}
+                        </p>
+                        
+                        {isOwnListing ? (
+                          <p className="text-yellow-700 font-medium text-center">Your Listing</p>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleBuyItem(listing.id, 1)}
+                              className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                            >
+                              Buy Now
+                            </button>
+                            <button
+                              onClick={() => handleMakeOffer(listing)}
+                              className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              Make Offer
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </PageContainer>
   );

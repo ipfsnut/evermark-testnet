@@ -1,3 +1,4 @@
+
 import { ConnectButton } from "thirdweb/react";
 import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
@@ -5,6 +6,15 @@ import { client } from "../lib/thirdweb";
 import { base } from "thirdweb/chains";
 import { useFarcasterUser } from "../lib/farcaster";
 import { useActiveAccount } from "thirdweb/react";
+
+// Try to import your WalletProvider hooks (with fallback if they don't exist yet)
+let useWalletConnection: any = null;
+try {
+  const walletProvider = require('../providers/WalletProvider');
+  useWalletConnection = walletProvider.useWalletConnection;
+} catch (e) {
+  console.log('WalletProvider not available yet, using direct hooks');
+}
 
 const wallets = [
   inAppWallet({
@@ -20,17 +30,23 @@ const wallets = [
 export function WalletConnect() {
   const { isInFarcaster, isAuthenticated: isFarcasterAuth, user } = useFarcasterUser();
   
-  // Thirdweb hooks (for regular web app)
-  const thirdwebAccount = useActiveAccount();
+  // Try to use WalletProvider if available
+  const walletProviderState = useWalletConnection ? useWalletConnection() : null;
   
-  // Wagmi hooks (for Farcaster Frame)
+  // Fallback to direct hooks if WalletProvider not available
+  const thirdwebAccount = useActiveAccount();
   const { 
     isConnected: isWagmiConnected, 
     address: wagmiAddress,
-    connector: wagmiConnector 
   } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  
+  // Use WalletProvider state if available, otherwise use direct hooks
+  const isConnected = walletProviderState?.isConnected ?? (thirdwebAccount ? true : isWagmiConnected);
+  const address = walletProviderState?.address ?? (thirdwebAccount?.address || wagmiAddress);
+  const displayAddress = walletProviderState?.displayAddress ?? 
+    (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '');
 
   // In Farcaster mini-app with authenticated user
   if (isInFarcaster && isFarcasterAuth && user) {
@@ -51,12 +67,15 @@ export function WalletConnect() {
         </div>
         
         {/* Wallet connection status for Farcaster */}
-        {isWagmiConnected ? (
+        {isConnected ? (
           <div className="flex items-center space-x-2">
             <div 
               className="w-2 h-2 rounded-full bg-green-500" 
-              title={`Wallet Connected: ${wagmiAddress?.slice(0, 6)}...${wagmiAddress?.slice(-4)}`}
+              title={`Wallet Connected: ${displayAddress}`}
             />
+            <span className="text-xs text-gray-600 font-mono">
+              {displayAddress}
+            </span>
             <button
               onClick={() => disconnect()}
               className="text-xs text-gray-500 hover:text-gray-700"
@@ -113,8 +132,13 @@ export function WalletConnect() {
           }
         }}
       />
-      {thirdwebAccount && (
-        <div className="ml-2 w-2 h-2 bg-green-500 rounded-full" title="Wallet Connected" />
+      {isConnected && (
+        <div className="ml-2 flex items-center space-x-1">
+          <div className="w-2 h-2 bg-green-500 rounded-full" title="Wallet Connected" />
+          {displayAddress && (
+            <span className="text-xs text-gray-600 font-mono">{displayAddress}</span>
+          )}
+        </div>
       )}
     </div>
   );

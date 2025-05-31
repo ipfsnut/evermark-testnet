@@ -1,7 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useActiveAccount } from "thirdweb/react";
-import { useAccount } from 'wagmi';
 import {
   UserIcon,
   HeartIcon,
@@ -9,13 +7,12 @@ import {
   PlusIcon,
   ExternalLinkIcon,
   ImageIcon,
-  // ClockIcon,
   BookmarkIcon
 } from 'lucide-react';
 import PageContainer from '../components/layout/PageContainer';
 import { useUserEvermarks } from '../hooks/useEvermarks';
 import { useBookshelf } from '../hooks/useBookshelf';
-import { useFarcasterUser } from '../lib/farcaster';
+import { useWalletAuth } from '../providers/WalletProvider'; // 🎉 SIMPLIFIED IMPORT
 import { formatDistanceToNow } from 'date-fns';
 
 // Simple Evermark card for public profiles
@@ -149,7 +146,7 @@ const ProfileHeader: React.FC<{
             to="/profile"
             className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
           >
-            Edit Profile
+            My Evermark
           </Link>
         )}
       </div>
@@ -176,10 +173,14 @@ const ProfileHeader: React.FC<{
 const PublicProfilePage: React.FC = () => {
   const { address: profileAddress } = useParams<{ address: string }>();
   
-  // Current user's wallet
-  const thirdwebAccount = useActiveAccount();
-  const { address: wagmiAddress } = useAccount();
-  const currentUserAddress = thirdwebAccount?.address || wagmiAddress;
+  // 🎉 SIMPLIFIED: Single line replaces 6 lines of complex manual detection
+  const { address: currentUserAddress } = useWalletAuth();
+  
+  console.log("🔍 PublicProfile wallet detection (SIMPLIFIED):", {
+    profileAddress,
+    currentUserAddress: currentUserAddress ? `${currentUserAddress.slice(0, 6)}...${currentUserAddress.slice(-4)}` : null,
+    isOwnProfile: currentUserAddress?.toLowerCase() === profileAddress?.toLowerCase()
+  });
   
   // Check if this is the user's own profile
   const isOwnProfile = currentUserAddress?.toLowerCase() === profileAddress?.toLowerCase();
@@ -196,13 +197,13 @@ const PublicProfilePage: React.FC = () => {
   
   const favoriteEvermarks = useMemo(() => {
     return allEvermarks.filter(evermark => 
-      bookshelfData.favorites.some(fav => fav.evermarkId === evermark.id) // Fixed: access evermarkId property
+      bookshelfData.favorites.some(fav => fav.evermarkId === evermark.id)
     );
   }, [allEvermarks, bookshelfData.favorites]);
   
   const currentReadingEvermarks = useMemo(() => {
     return allEvermarks.filter(evermark => 
-      bookshelfData.currentReading.some(reading => reading.evermarkId === evermark.id) // Fixed: access evermarkId property
+      bookshelfData.currentReading.some(reading => reading.evermarkId === evermark.id)
     );
   }, [allEvermarks, bookshelfData.currentReading]);
   

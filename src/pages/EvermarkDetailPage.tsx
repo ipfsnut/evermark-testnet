@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeftIcon, BookmarkIcon, UserIcon, CalendarIcon, ExternalLinkIcon, ShieldIcon, MessageCircleIcon } from 'lucide-react';
-import { useActiveAccount } from "thirdweb/react";
 import { VotingPanel } from '../components/voting/VotingPanel';
 import { getContract, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
+import { useWalletAuth } from '../providers/WalletProvider'; // 🎉 SIMPLIFIED IMPORT
 
 interface EvermarkData {
   id: string;
@@ -49,10 +49,19 @@ const fetchIPFSMetadata = async (metadataURI: string) => {
 
 const EvermarkDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const account = useActiveAccount();
+  
+  // 🎉 SIMPLIFIED: Single line replaces direct thirdweb hook usage
+  const { address } = useWalletAuth();
+  
   const [evermark, setEvermark] = useState<EvermarkData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  console.log("🔍 EvermarkDetail wallet detection (SIMPLIFIED):", {
+    evermarkId: id,
+    userAddress: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null,
+    isOwner: evermark ? address?.toLowerCase() === evermark.creator.toLowerCase() : false
+  });
 
   useEffect(() => {
     const fetchEvermarkDetails = async () => {
@@ -177,7 +186,8 @@ const EvermarkDetailPage: React.FC = () => {
     );
   }
   
-  const isOwner = account && account.address.toLowerCase() === evermark.creator.toLowerCase();
+  // 🎉 SIMPLIFIED: Clean owner check using provider address
+  const isOwner = address ? address.toLowerCase() === evermark.creator.toLowerCase() : false;
   
   return (
     <div className="max-w-4xl mx-auto">

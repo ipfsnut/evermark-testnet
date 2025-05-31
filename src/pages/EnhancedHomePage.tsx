@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useActiveAccount } from "thirdweb/react";
 import { PlusIcon, BookOpenIcon, TrendingUpIcon, ExternalLinkIcon, ImageIcon, UserIcon } from 'lucide-react';
 import { useEvermarks } from '../hooks/useEvermarks';
+import { useWalletAuth } from '../providers/WalletProvider'; // 🎉 SIMPLIFIED IMPORT
 import { formatDistanceToNow } from 'date-fns';
 import PageContainer from '../components/layout/PageContainer';
 
@@ -92,9 +92,15 @@ const EvermarkListItem: React.FC<{ evermark: any }> = ({ evermark }) => {
 };
 
 const EnhancedHomePage: React.FC = () => {
-  const account = useActiveAccount();
-  const isConnected = !!account;
+  // 🎉 SIMPLIFIED: Single line replaces 3 lines of direct thirdweb usage
+  const { isConnected, address, requireConnection } = useWalletAuth();
   const { evermarks, isLoading } = useEvermarks();
+
+  console.log("🔍 HomePage wallet detection (SIMPLIFIED):", {
+    isConnected,
+    address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null,
+    evermarksCount: evermarks.length
+  });
 
   // Static stats to prevent constant refetching
   const stats = useMemo(() => ({
@@ -127,6 +133,7 @@ const EnhancedHomePage: React.FC = () => {
             Permanent reference & social discovery for any sort of online content.
           </p>
           
+          {/* 🎉 SIMPLIFIED: Clean connection state handling with auto-connection */}
           {isConnected ? (
             <div className="flex flex-wrap gap-4 justify-center">
               <Link
@@ -147,9 +154,15 @@ const EnhancedHomePage: React.FC = () => {
           ) : (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-md mx-auto">
               <p className="text-blue-800 font-medium mb-2">Get Started</p>
-              <p className="text-blue-700 text-sm">
+              <p className="text-blue-700 text-sm mb-4">
                 Connect your wallet to begin creating and collecting permanent references on Base.
               </p>
+              <button
+                onClick={requireConnection}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Connect Wallet
+              </button>
             </div>
           )}
         </div>
@@ -216,15 +229,23 @@ const EnhancedHomePage: React.FC = () => {
             <div className="text-center py-8 text-gray-500">
               <BookOpenIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
               <p className="text-lg font-medium text-gray-700 mb-2">No Evermarks Yet</p>
-              <p className="text-gray-500">Be the first to create a permanent digital bookmark on the network.</p>
-              {isConnected && (
+              <p className="text-gray-500 mb-4">Be the first to create a permanent digital bookmark on the network.</p>
+              {isConnected ? (
                 <Link 
                   to="/create"
-                  className="inline-flex items-center mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                  className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
                 >
                   <PlusIcon className="w-4 h-4 mr-2" />
                   Create First Evermark
                 </Link>
+              ) : (
+                <button
+                  onClick={requireConnection}
+                  className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  <PlusIcon className="w-4 h-4 mr-2" />
+                  Connect & Create First Evermark
+                </button>
               )}
             </div>
           ) : (
