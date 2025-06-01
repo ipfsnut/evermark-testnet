@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useActiveAccount, useReadContract } from "thirdweb/react";
+import { useReadContract } from "thirdweb/react";
 import { getContract } from "thirdweb";
 import { client } from "../../lib/thirdweb";
 import { CHAIN, CONTRACTS, REWARDS_ABI, EMARK_TOKEN_ABI, NFT_STAKING_ABI } from "../../lib/contracts";
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { useRewards } from '../../hooks/useRewards';
 import { formatEmark, formatEmarkWithSymbol, formatWEmarkWithSymbol } from '../../utils/formatters';
-import { useWallet } from '../../hooks/useWallet';
+import { useWalletAuth } from '../../providers/WalletProvider';
 
 interface RewardComponent {
   name: string;
@@ -28,16 +28,14 @@ interface RewardComponent {
 }
 
 export const RewardsCalculator: React.FC = () => {
-  const account = useActiveAccount();
-  const address = account?.address;
-  
+  const { address, isConnected } = useWalletAuth();
   const { authInfo } = useRewards(address);
   const { delegationStats, getConsistencyBonus, currentCycle } = useDelegationHistory(address);
   const [showDetails, setShowDetails] = useState(false);
-  
+
   const hasWalletAccess = !!address || authInfo?.hasWalletAccess;
   const effectiveAddress = address || authInfo?.effectiveUserAddress;
-  
+
   // Get contracts
   const rewardsContract = useMemo(() => getContract({
     client,
@@ -45,28 +43,28 @@ export const RewardsCalculator: React.FC = () => {
     address: CONTRACTS.REWARDS,
     abi: REWARDS_ABI,
   }), []);
-  
+
   const emarkContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
     address: CONTRACTS.EMARK_TOKEN,
     abi: EMARK_TOKEN_ABI,
   }), []);
-  
+
   const stakingContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
     address: CONTRACTS.NFT_STAKING,
     abi: NFT_STAKING_ABI,
   }), []);
-  
+
   // Get current week from rewards contract
   const { data: currentWeek, isLoading: isLoadingWeek } = useReadContract({
     contract: rewardsContract,
     method: "getCurrentWeek",
     params: [],
   });
-  
+
   // Get user's wEMARK (staked EMARK) balance
   const { data: wEmarkBalance, isLoading: isLoadingStaked } = useReadContract({
     contract: stakingContract,
@@ -76,7 +74,7 @@ export const RewardsCalculator: React.FC = () => {
       enabled: !!effectiveAddress,
     },
   });
-  
+
   // Alternative: If the above method doesn't exist, try getting from user staking info
   const { data: userStakingInfo, isLoading: isLoadingNftStaking } = useReadContract({
     contract: stakingContract,
@@ -86,7 +84,7 @@ export const RewardsCalculator: React.FC = () => {
       enabled: !!effectiveAddress,
     },
   });
-  
+
   // Get user's regular EMARK balance (for display purposes)
   const { data: emarkBalance } = useReadContract({
     contract: emarkContract,
@@ -96,7 +94,7 @@ export const RewardsCalculator: React.FC = () => {
       enabled: !!effectiveAddress,
     },
   });
-  
+
   // Get user's projected rewards for current week
   const { data: projectedWeeklyRewards, isLoading: isLoadingProjected } = useReadContract({
     contract: rewardsContract,
@@ -109,7 +107,7 @@ export const RewardsCalculator: React.FC = () => {
       enabled: !!effectiveAddress && !!currentWeek,
     },
   });
-  
+
   // Get user's creator rewards from leaderboard
   const { data: creatorRewards, isLoading: isLoadingCreator } = useReadContract({
     contract: rewardsContract,
@@ -119,9 +117,8 @@ export const RewardsCalculator: React.FC = () => {
       enabled: !!effectiveAddress,
     },
   });
-  
-  const { isConnected, getConnectionType } = useWallet();
 
+  // Handle wallet connection state
   if (!isConnected) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
@@ -129,23 +126,20 @@ export const RewardsCalculator: React.FC = () => {
           <CalculatorIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Rewards Calculator</h3>
           <p className="text-gray-600">
-            {getConnectionType() === 'farcaster' 
-              ? 'Loading your rewards data...'
-              : 'Connect your wallet to calculate potential rewards'
-            }
+            Connect your wallet to calculate potential rewards
           </p>
         </div>
       </div>
     );
   }
-  
+
   // Use the correct staked balance - prioritize direct staked balance, fallback to staking info
   const actualStakedBalance = wEmarkBalance || userStakingInfo?.totalStaked || BigInt(0);
-  
+
   // Calculate reward components from real contract data
   const rewardComponents = useMemo((): RewardComponent[] => {
     const components: RewardComponent[] = [];
-    
+
     // 1. wEMARK Staking Rewards (from projected weekly rewards)
     const stakingReward = projectedWeeklyRewards?.[0] || BigInt(0);
     components.push({
@@ -156,7 +150,7 @@ export const RewardsCalculator: React.FC = () => {
       icon: <LockIcon className="h-4 w-4 text-purple-600" />,
       isLoading: isLoadingProjected || isLoadingStaked
     });
-    
+
     // 2. Delegation/Voting Rewards (from projected weekly rewards)
     const delegationReward = projectedWeeklyRewards?.[1] || BigInt(0);
     components.push({
@@ -167,7 +161,7 @@ export const RewardsCalculator: React.FC = () => {
       icon: <VoteIcon className="h-4 w-4 text-blue-600" />,
       isLoading: isLoadingProjected
     });
-    
+
     // 3. NFT Staking Rewards (from projected weekly rewards)
     const nftReward = projectedWeeklyRewards?.[2] || BigInt(0);
     if (nftReward > BigInt(0)) {
@@ -180,7 +174,7 @@ export const RewardsCalculator: React.FC = () => {
         isLoading: isLoadingProjected || isLoadingNftStaking
       });
     }
-    
+
     // 4. Creator Rewards (from leaderboard performance)
     const creatorAmount = creatorRewards || BigInt(0);
     if (creatorAmount > BigInt(0)) {
@@ -193,13 +187,11 @@ export const RewardsCalculator: React.FC = () => {
         isLoading: isLoadingCreator
       });
     }
-    
+
     // 5. Consistency Bonus (calculated from delegation history)
     const consistencyBonus = getConsistencyBonus();
     if (consistencyBonus > 0) {
-      const bonusAmount = BigInt(
-        Math.floor(Number(delegationReward) * consistencyBonus)
-      );
+      const bonusAmount = BigInt(Math.floor(Number(delegationReward) * consistencyBonus));
       components.push({
         name: 'Consistency Bonus',
         amount: bonusAmount,
@@ -208,7 +200,7 @@ export const RewardsCalculator: React.FC = () => {
         icon: <ClockIcon className="h-4 w-4 text-green-600" />
       });
     }
-    
+
     return components;
   }, [
     projectedWeeklyRewards,
@@ -222,29 +214,28 @@ export const RewardsCalculator: React.FC = () => {
     isLoadingNftStaking,
     isLoadingCreator
   ]);
-  
+
   // Calculate totals
   const totalWeeklyRewards = rewardComponents.reduce(
     (sum, component) => sum + component.amount,
     BigInt(0)
   );
-  
   const projectedMonthlyRewards = totalWeeklyRewards * BigInt(4);
   const projectedYearlyRewards = totalWeeklyRewards * BigInt(52);
-  
+
   // Format the amounts with proper decimals
   const weeklyFormatted = formatEmark(totalWeeklyRewards, 2);
   const monthlyFormatted = formatEmark(projectedMonthlyRewards, 2);
   const yearlyFormatted = formatEmark(projectedYearlyRewards, 2);
-  
+
   // Calculate APY based on total staked value
   const totalStakedValue = actualStakedBalance + (userStakingInfo?.totalValue || BigInt(0));
   const effectiveAPY = totalStakedValue > BigInt(0) && yearlyFormatted
     ? ((parseFloat(yearlyFormatted) / parseFloat(formatEmark(totalStakedValue, 6) || '1')) * 100)
     : 0;
-  
+
   const isLoading = isLoadingWeek || isLoadingProjected || isLoadingStaked;
-  
+
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
       <div className="flex items-center justify-between mb-4">
@@ -262,14 +253,14 @@ export const RewardsCalculator: React.FC = () => {
           <InfoIcon className="h-5 w-5" />
         </button>
       </div>
-      
+
       {/* Current Week Info */}
       <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
         <p className="text-sm text-blue-800">
           <strong>Week {currentWeek || 'Loading...'}:</strong> Rewards calculated from live contract data
         </p>
       </div>
-      
+
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-lg">
@@ -286,7 +277,7 @@ export const RewardsCalculator: React.FC = () => {
           </p>
           <p className="text-xs text-gray-600 mt-1">$EMARK tokens</p>
         </div>
-        
+
         <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-lg">
           <div className="flex items-center mb-2">
             <CoinsIcon className="h-5 w-5 text-blue-600 mr-2" />
@@ -301,7 +292,7 @@ export const RewardsCalculator: React.FC = () => {
           </p>
           <p className="text-xs text-gray-600 mt-1">$EMARK tokens</p>
         </div>
-        
+
         <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-lg">
           <div className="flex items-center mb-2">
             <CoinsIcon className="h-5 w-5 text-green-600 mr-2" />
@@ -317,14 +308,12 @@ export const RewardsCalculator: React.FC = () => {
           <p className="text-xs text-gray-600 mt-1">$EMARK tokens</p>
         </div>
       </div>
-      
+
       {/* Breakdown */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-700">Live Reward Breakdown</h4>
-        
         {rewardComponents.map((component, index) => {
           const componentFormatted = formatEmark(component.amount, 4);
-          
           return (
             <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center">
@@ -357,7 +346,7 @@ export const RewardsCalculator: React.FC = () => {
           );
         })}
       </div>
-      
+
       {/* Contract Data Details */}
       {showDetails && (
         <div className="mt-6 space-y-4">
@@ -384,7 +373,7 @@ export const RewardsCalculator: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
             <h4 className="text-sm font-medium text-green-900 mb-2">How to Maximize $EMARK Rewards</h4>
             <ul className="text-sm text-green-800 space-y-1">
@@ -396,24 +385,18 @@ export const RewardsCalculator: React.FC = () => {
               <li>• <strong>Compound rewards:</strong> Stake earned $EMARK for exponential growth</li>
             </ul>
           </div>
-          
+
           <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
             <h4 className="text-sm font-medium text-amber-900 mb-2">Token Types Explained</h4>
             <div className="text-sm text-amber-800 space-y-2">
-              <div>
-                <strong>$EMARK:</strong> Liquid token for transactions, minting, and trading
-              </div>
-              <div>
-                <strong>wEMARK:</strong> Wrapped/staked $EMARK that earns rewards but is locked
-              </div>
-              <div>
-                <strong>NFTs:</strong> Evermark NFTs that can be staked for additional rewards
-              </div>
+              <div><strong>$EMARK:</strong> Liquid token for transactions, minting, and trading</div>
+              <div><strong>wEMARK:</strong> Wrapped/staked $EMARK that earns rewards but is locked</div>
+              <div><strong>NFTs:</strong> Evermark NFTs that can be staked for additional rewards</div>
             </div>
           </div>
         </div>
       )}
-      
+
       {/* APY Display */}
       <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
         <div className="flex items-center justify-between">
@@ -439,11 +422,11 @@ export const RewardsCalculator: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Real-time Update Notice */}
       <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
         <p className="text-xs text-gray-600 text-center">
-          💡 <strong>Live Data:</strong> All calculations use real-time data from mainnet contracts. 
+          💡 <strong>Live Data:</strong> All calculations use real-time data from mainnet contracts.
           wEMARK represents your staked $EMARK position earning rewards.
         </p>
       </div>

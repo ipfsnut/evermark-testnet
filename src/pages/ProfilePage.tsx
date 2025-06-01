@@ -1,9 +1,9 @@
-// src/pages/ProfilePage.tsx - Updated to use StakingDashboard
+// src/pages/ProfilePage.tsx - Updated to use WrappingDashboard
 import React, { useState } from 'react';
 import { useProfile, useContractAuth } from '../hooks/useProfile';
 import { useUserEvermarks } from '../hooks/useEvermarks';
 import { Link } from 'react-router-dom';
-import { StakingDashboard } from '../components/staking/StakingDashboard';
+import { WrappingDashboard } from '../components/wrapping/WrappingDashboard';
 import { AuthGuard, AuthStatusBadge } from '../components/auth/AuthGuard';
 import { 
   UserIcon, 
@@ -21,7 +21,7 @@ const ProfilePage: React.FC = () => {
   const profile = useProfile();
   const contractAuth = useContractAuth();
   const { evermarks, isLoading: isLoadingEvermarks } = useUserEvermarks(profile.primaryAddress);
-  const [activeTab, setActiveTab] = useState<'overview' | 'staking'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'wrapping'>('overview');
 
   return (
     <AuthGuard>
@@ -51,16 +51,16 @@ const ProfilePage: React.FC = () => {
             
             {contractAuth.canInteract && (
               <button
-                onClick={() => setActiveTab('staking')}
+                onClick={() => setActiveTab('wrapping')}
                 className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                  activeTab === 'staking'
+                  activeTab === 'wrapping'
                     ? 'bg-purple-600 text-white'
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-center justify-center space-x-2">
                   <CoinsIcon className="h-4 w-4" />
-                  <span>Staking & Rewards</span>
+                  <span>Wrapping & Rewards</span>
                 </div>
               </button>
             )}
@@ -187,10 +187,10 @@ const ProfilePage: React.FC = () => {
                   </p>
                   {contractAuth.canInteract && (
                     <button
-                      onClick={() => setActiveTab('staking')}
+                      onClick={() => setActiveTab('wrapping')}
                       className="text-sm text-blue-600 hover:underline mt-1 inline-flex items-center"
                     >
-                      Manage Staking
+                      Manage Wrapping
                       <ChevronRightIcon className="w-3 h-3 ml-1" />
                     </button>
                   )}
@@ -291,7 +291,7 @@ const ProfilePage: React.FC = () => {
 
                 {contractAuth.canInteract && (
                   <button
-                    onClick={() => setActiveTab('staking')}
+                    onClick={() => setActiveTab('wrapping')}
                     className="p-4 border border-gray-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-colors group text-left"
                   >
                     <div className="flex items-center">
@@ -299,8 +299,8 @@ const ProfilePage: React.FC = () => {
                         <CoinsIcon className="h-5 w-5 text-amber-600" />
                       </div>
                       <div>
-                        <h4 className="font-medium text-gray-900">Staking Hub</h4>
-                        <p className="text-sm text-gray-600">Manage rewards</p>
+                        <h4 className="font-medium text-gray-900">Wrapping Hub</h4>
+                        <p className="text-sm text-gray-600">Manage tokens & rewards</p>
                       </div>
                     </div>
                   </button>
@@ -310,9 +310,28 @@ const ProfilePage: React.FC = () => {
           </div>
         )}
 
-        {/* Staking Dashboard Tab */}
-        {activeTab === 'staking' && contractAuth.canInteract && profile.primaryAddress && (
-          <StakingDashboard userAddress={profile.primaryAddress} />
+        {/* Wrapping Tab */}
+        {activeTab === 'wrapping' && contractAuth.canInteract && profile.primaryAddress && (
+          <div className="space-y-6">
+            <WrappingDashboard 
+              userAddress={profile.primaryAddress}
+              className="w-full"
+            />
+          </div>
+        )}
+
+        {/* Show message if trying to access wrapping without proper auth */}
+        {activeTab === 'wrapping' && !contractAuth.canInteract && (
+          <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div className="text-center py-8">
+              <CoinsIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Wrapping Not Available</h3>
+              <p className="text-gray-600 mb-4">
+                Connect your wallet to access wrapping and rewards features
+              </p>
+              <AuthStatusBadge />
+            </div>
+          </div>
         )}
       </div>
     </AuthGuard>

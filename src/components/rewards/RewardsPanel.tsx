@@ -1,12 +1,11 @@
 import { useEffect } from "react";
-import { useActiveAccount } from "thirdweb/react";
 import { useRewards } from "../../hooks/useRewards";
 import { CoinsIcon, AlertCircleIcon, CheckCircleIcon, GiftIcon } from 'lucide-react';
 import { formatEmark, formatEmarkWithSymbol } from "../../utils/formatters";
+import { useWalletAuth } from "../../providers/WalletProvider";
 
 export function RewardsPanel() {
-  const account = useActiveAccount();
-  const address = account?.address;
+  const { address } = useWalletAuth();
   
   const {
     pendingRewards,

@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useReadContract, useSendTransaction, useActiveAccount } from "thirdweb/react";
+import { useReadContract, useSendTransaction } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
 import { toEther, toWei } from "thirdweb/utils";
 import { client } from "../../lib/thirdweb";
 import { CONTRACTS, CHAIN, VOTING_ABI } from "../../lib/contracts";
 import { VoteIcon, TrendingUpIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react';
+import { useWalletAuth } from "../../providers/WalletProvider";
 
 interface VotingPanelProps {
   evermarkId: string;
@@ -12,7 +13,7 @@ interface VotingPanelProps {
 }
 
 export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
-  const account = useActiveAccount();
+  const { address, isConnected } = useWalletAuth(); // Fixed: use consistent naming
   const [voteAmount, setVoteAmount] = useState("");
   const [isVoting, setIsVoting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +29,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   // Get current votes for this Evermark
   const { data: currentVotes, isLoading: isLoadingVotes, refetch: refetchVotes } = useReadContract({
     contract: votingContract,
-    method: "getEvermarkVotes", // FIXED: Use redeployed contract method name
+    method: "getEvermarkVotes",
     params: [BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!evermarkId && evermarkId !== "0",
@@ -36,10 +37,10 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   });
 
   // Get user votes for this Evermark
-  const userVotesQuery = account ? useReadContract({
+  const userVotesQuery = address ? useReadContract({
     contract: votingContract,
-    method: "getUserVotesForEvermark", // FIXED: Use redeployed contract method name
-    params: [account.address, BigInt(evermarkId || "0")] as const,
+    method: "getUserVotesForEvermark",
+    params: [address, BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!evermarkId && evermarkId !== "0",
     },
@@ -52,9 +53,9 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   const votingPowerQuery = useReadContract({
     contract: votingContract,
     method: "getRemainingVotingPower",
-    params: [account?.address || ""] as const,
+    params: [address || ""] as const,
     queryOptions: {
-      enabled: !!account?.address,
+      enabled: !!address,
     },
   });
 
@@ -75,7 +76,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   }, [success, error]);
   
   const handleVote = async () => {
-    if (!account) {
+    if (!address) {
       setError("Please connect your wallet");
       return;
     }
@@ -141,7 +142,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   };
   
   const handleUnvote = async () => {
-    if (!account || !userVotes || userVotes === BigInt(0)) {
+    if (!address || !userVotes || userVotes === BigInt(0)) {
       setError("No votes to withdraw");
       return;
     }
@@ -199,7 +200,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
     }
   };
   
-  if (!account) {
+  if (!address) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <div className="text-center py-8">

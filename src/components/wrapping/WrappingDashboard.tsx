@@ -1,6 +1,4 @@
-// src/components/staking/StakingDashboard.tsx
 import React, { useState } from 'react';
-import { useActiveAccount } from "thirdweb/react";
 import { 
   CoinsIcon, 
   LockIcon, 
@@ -13,34 +11,34 @@ import {
   ChevronUpIcon,
   InfoIcon
 } from 'lucide-react';
-import { StakingWidget } from './StakingWidget';
-import { NFTStakingPanel } from './NFTStakingPanel';
+import { WrappingWidget } from './WrappingWidget';
+//import { NFTWrappingPanel } from './NFTWrappingPanel';
 import { RewardsCalculator } from '../rewards/RewardsCalculator';
 import { DelegationHistory } from '../voting/DelegationHistory';
-import { useStaking } from '../../hooks/useStaking';
-import { useStakingStats } from '../../hooks/useStakingStats';
+import { useWrapping } from '../../hooks/useWrapping';
+import { useWrappingStats } from '../../hooks/useWrappingStats';
 import { useRewards } from '../../hooks/useRewards';
 import { useDelegationHistory } from '../../hooks/useDelegationHistory';
 import { toEther } from 'thirdweb/utils';
-import { useWallet } from '../../hooks/useWallet';
+import { useWalletAuth } from '../../providers/WalletProvider';
 
-interface StakingDashboardProps {
+interface WrappingDashboardProps {
   userAddress: string;
   className?: string;
 }
 
 // Quick Stats Overview Component
-const StakingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress }) => {
-  const { totalStaked, availableVotingPower } = useStaking(userAddress);
+const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress }) => {
+  const { totalWrapped, availableVotingPower } = useWrapping(userAddress);
   const { pendingRewards } = useRewards(userAddress);
   const { delegationStats } = useDelegationHistory(userAddress);
-  const stakingStats = useStakingStats();
+  const wrappingStats = useWrappingStats();
 
   const stats = [
     {
-      label: 'Total Staked',
-      value: toEther(totalStaked || BigInt(0)),
-      suffix: 'WEMARK',
+      label: 'Total Wrapped',
+      value: toEther(totalWrapped || BigInt(0)),
+      suffix: 'wEMARK',
       icon: <LockIcon className="h-5 w-5 text-purple-600" />,
       bgColor: 'bg-purple-50',
       textColor: 'text-purple-600',
@@ -48,7 +46,7 @@ const StakingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress }
     {
       label: 'Voting Power',
       value: toEther(availableVotingPower || BigInt(0)),
-      suffix: 'WEMARK',
+      suffix: 'wEMARK',
       icon: <CoinsIcon className="h-5 w-5 text-blue-600" />,
       bgColor: 'bg-blue-50',
       textColor: 'text-blue-600',
@@ -134,22 +132,22 @@ const CollapsibleSection: React.FC<{
   );
 };
 
-// Main Staking Dashboard Component
-export const StakingDashboard: React.FC<StakingDashboardProps> = ({ 
+// Main Wrapping Dashboard Component
+export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({ 
   userAddress, 
   className = '' 
 }) => {
-  const account = useActiveAccount();
-  const { isConnected, getConnectionType } = useWallet();
-  const stakingStats = useStakingStats();
+  const { isConnected, address } = useWalletAuth();
+
+  const wrappingStats = useWrappingStats();
 
   if (!isConnected || !userAddress) {
     return (
       <div className={`bg-white rounded-lg shadow-sm p-6 border border-gray-200 ${className}`}>
         <div className="text-center py-8">
           <LockIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Staking Dashboard</h3>
-          <p className="text-gray-600">Connect your wallet to access staking features</p>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Wrapping Dashboard</h3>
+          <p className="text-gray-600">Connect your wallet to access wrapping features</p>
         </div>
       </div>
     );
@@ -161,9 +159,9 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg p-6 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-2">Staking Dashboard</h2>
+            <h2 className="text-2xl font-bold mb-2">Wrapping Dashboard</h2>
             <p className="text-purple-100">
-              Manage your $EMARK tokens, earn rewards, and participate in governance
+              Wrap your $EMARK tokens, earn rewards, and participate in governance
             </p>
           </div>
           <div className="hidden md:block">
@@ -171,41 +169,38 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
           </div>
         </div>
         
-        {/* Quick APY Info */}
+        {/* Quick Unbonding Info */}
         <div className="mt-4 p-3 bg-white/10 rounded-lg backdrop-blur-sm">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-purple-100">Current Staking APY</span>
-
-            <div className="text-right">
-              <span className="text-lg font-bold">
-                {stakingStats.currentAPY.toFixed(1)}%
-              </span>
-              <div className="text-xs text-purple-200">
-                {stakingStats.isAPYFromContract ? '📊 Live' : '⚠️ No data'}
-              </div>
-            </div>
+            <span className="text-sm text-purple-100">Unbonding Period</span>
+            <span className="text-sm">{wrappingStats.formatUnbondingPeriod()}</span>
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-sm text-purple-100">Unbonding Period</span>
-            <span className="text-sm">{stakingStats.formatUnbondingPeriod()}</span>
+            <span className="text-sm text-purple-100">Total Protocol Wrapped</span>
+            <div className="text-right">
+              <span className="text-lg font-bold">
+                {toEther(wrappingStats.totalProtocolWrapped)}
+              </span>
+              <div className="text-xs text-purple-200">wEMARK</div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Quick Stats Overview */}
-      <StakingStatsOverview userAddress={userAddress} />
+      <WrappingStatsOverview userAddress={userAddress} />
 
-      {/* Staking Sections */}
+      {/* Wrapping Sections */}
       <div className="space-y-4">
-        {/* Token Staking */}
+        {/* Token Wrapping */}
         <CollapsibleSection
-          title="Token Staking"
+          title="Token Wrapping"
           icon={<CoinsIcon className="h-5 w-5 text-purple-600" />}
-          description="Stake $EMARK tokens to earn WEMARK and participate in governance"
+          description="Wrap $EMARK tokens to earn wEMARK and participate in governance"
           defaultExpanded={true}
         >
           <div className="mt-4">
-            <StakingWidget userAddress={userAddress} />
+            <WrappingWidget userAddress={userAddress} />
           </div>
         </CollapsibleSection>
 
@@ -213,7 +208,7 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
         <CollapsibleSection
           title="Rewards Calculator"
           icon={<CalculatorIcon className="h-5 w-5 text-green-600" />}
-          description="Calculate potential rewards based on your staking and delegation activity"
+          description="Calculate potential rewards based on your wrapping and delegation activity"
         >
           <div className="mt-4">
             <RewardsCalculator />
@@ -231,15 +226,15 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
           </div>
         </CollapsibleSection>
 
-        {/* NFT Staking - HIDDEN FOR NOW */}
+        {/* NFT Wrapping - HIDDEN FOR NOW */}
         {/* 
         <CollapsibleSection
-          title="NFT Staking"
+          title="NFT Wrapping"
           icon={<TabletIcon className="h-5 w-5 text-amber-600" />}
-          description="Stake your Evermark NFTs for additional rewards"
+          description="Wrap your Evermark NFTs for additional rewards"
         >
           <div className="mt-4">
-            <NFTStakingPanel />
+            <NFTWrappingPanel />
           </div>
         </CollapsibleSection>
         */}
@@ -250,19 +245,19 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
         <div className="flex items-start">
           <InfoIcon className="h-6 w-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
           <div>
-            <h3 className="font-medium text-blue-900 mb-2">Staking Guide</h3>
+            <h3 className="font-medium text-blue-900 mb-2">Wrapping Guide</h3>
             <div className="text-sm text-blue-800 space-y-2">
               <p>
-                <strong>Token Staking:</strong> Stake $EMARK to receive WEMARK tokens for voting and earning rewards.
+                <strong>Token Wrapping:</strong> Wrap $EMARK to receive wEMARK tokens for voting and earning rewards.
               </p>
               <p>
-                <strong>Two-Step Process:</strong> First approve $EMARK spending, then stake to receive WEMARK.
+                <strong>Two-Step Process:</strong> First approve $EMARK spending, then wrap to receive wEMARK.
               </p>
               <p>
-                <strong>Delegation:</strong> Use your WEMARK to vote on quality content and maximize reward multipliers.
+                <strong>Delegation:</strong> Use your wEMARK to vote on quality content and maximize reward multipliers.
               </p>
               <p>
-                <strong>Unstaking:</strong> Requires a {stakingStats.formatUnbondingPeriod()} unbonding period for security.
+                <strong>Unwrapping:</strong> Requires a {wrappingStats.formatUnbondingPeriod()} unbonding period for security.
               </p>
             </div>
           </div>
@@ -272,4 +267,4 @@ export const StakingDashboard: React.FC<StakingDashboardProps> = ({
   );
 };
 
-export default StakingDashboard;
+export default WrappingDashboard;
