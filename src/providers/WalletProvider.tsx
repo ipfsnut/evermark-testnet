@@ -52,6 +52,7 @@ interface WalletProviderProps {
 export function WalletProvider({ children }: WalletProviderProps) {
   const [error, setError] = useState<string>();
   const [isConnecting, setIsConnecting] = useState(false);
+  const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
   
   // Thirdweb hooks (for regular web app)
   const thirdwebAccount = useActiveAccount();
@@ -62,7 +63,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     address: wagmiAddress,
     connector: wagmiConnector 
   } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { connect, connectors, isPending: isConnectPending } = useConnect();
   const { 
     sendTransactionAsync: sendWagmiTransaction, 
     isPending: isWagmiPending,
@@ -71,7 +72,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
   
   const { isInFarcaster, isAuthenticated: isFarcasterAuth } = useFarcasterUser();
   
-  // Determine which wallet system to use (copied from working logic)
+  // Determine which wallet system to use
   const useThirdweb = !isInFarcaster && !!thirdwebAccount?.address;
   const useWagmi = isInFarcaster && isWagmiConnected && !!wagmiAddress;
   
@@ -90,16 +91,70 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const needsConnection = !isConnected;
   const canInteract = isConnected;
   
-  // Auto-connect Farcaster wallet on mount (copied from working logic)
-  useEffect(() => {
-    if (isInFarcaster && !isWagmiConnected && !isConnecting && connectors.length > 0) {
-      console.log("🔌 Auto-connecting Farcaster wallet on mount...");
-      connectWallet();
+  // Auto-connect logic with better error handling
+  const attemptAutoConnect = useCallback(async () => {
+    if (hasAttemptedAutoConnect || isConnecting || isConnected) {
+      return;
     }
-  }, [isInFarcaster, isWagmiConnected, connectors.length]);
+    
+    console.log("🔍 Checking auto-connect conditions:", {
+      isInFarcaster,
+      isFarcasterAuth,
+      isWagmiConnected,
+      connectorsLength: connectors.length,
+      hasAttemptedAutoConnect
+    });
+    
+    if (isInFarcaster && isFarcasterAuth && !isWagmiConnected && connectors.length > 0) {
+      console.log("🔌 Auto-connecting Farcaster wallet...");
+      setHasAttemptedAutoConnect(true);
+      setIsConnecting(true);
+      
+      try {
+        const connector = connectors[0];
+        console.log("🔌 Using connector:", connector.name, connector.id);
+        
+        await connect({ connector });
+        console.log("✅ Auto-connection successful");
+      } catch (error: any) {
+        console.error("❌ Auto-connection failed:", error);
+        setError(`Auto-connection failed: ${error.message}`);
+      } finally {
+        setIsConnecting(false);
+      }
+    } else {
+      setHasAttemptedAutoConnect(true);
+    }
+  }, [
+    isInFarcaster, 
+    isFarcasterAuth, 
+    isWagmiConnected, 
+    connectors, 
+    connect, 
+    hasAttemptedAutoConnect, 
+    isConnecting, 
+    isConnected
+  ]);
+  
+  // Auto-connect effect with delay for mobile
+  useEffect(() => {
+    // Add a small delay to ensure all hooks are initialized
+    const timer = setTimeout(() => {
+      attemptAutoConnect();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [attemptAutoConnect]);
+  
+  // Reset auto-connect attempt when context changes
+  useEffect(() => {
+    if (!isInFarcaster || !isFarcasterAuth) {
+      setHasAttemptedAutoConnect(false);
+    }
+  }, [isInFarcaster, isFarcasterAuth]);
   
   const connectWallet = useCallback(async () => {
-    if (isConnecting) {
+    if (isConnecting || isConnectPending) {
       return { success: false, error: "Connection already in progress" };
     }
     
@@ -108,32 +163,36 @@ export function WalletProvider({ children }: WalletProviderProps) {
     
     try {
       if (isInFarcaster) {
-        // Try to connect Farcaster wallet (copied from working logic)
+        // Try to connect Farcaster wallet
         if (connectors.length > 0) {
-          console.log("🔌 Attempting to connect Farcaster wallet...");
-          await connect({ connector: connectors[0] });
-          console.log("✅ Farcaster wallet connected successfully");
+          console.log("🔌 Manual Farcaster wallet connection...");
+          const connector = connectors[0];
+          console.log("🔌 Using connector:", connector.name, connector.id);
+          
+          await connect({ connector });
+          console.log("✅ Manual Farcaster wallet connected successfully");
           return { success: true };
         } else {
           const errorMsg = "No Farcaster wallet connector available";
+          console.error("❌", errorMsg);
           setError(errorMsg);
           return { success: false, error: errorMsg };
         }
       } else {
-        // For regular web app, user needs to manually connect
-        const errorMsg = "Please connect your wallet manually";
+        // For regular web app, user needs to manually connect via Thirdweb UI
+        const errorMsg = "Please use the Connect Wallet button to connect";
         setError(errorMsg);
         return { success: false, error: errorMsg };
       }
     } catch (connectError: any) {
-      console.error("❌ Wallet connection failed:", connectError);
+      console.error("❌ Manual wallet connection failed:", connectError);
       const errorMsg = `Failed to connect wallet: ${connectError.message}`;
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsConnecting(false);
     }
-  }, [isInFarcaster, connectors, connect, isConnecting]);
+  }, [isInFarcaster, connectors, connect, isConnecting, isConnectPending]);
   
   const disconnect = useCallback(() => {
     // Handle disconnection based on connection type
@@ -145,11 +204,13 @@ export function WalletProvider({ children }: WalletProviderProps) {
       console.log("Disconnecting Wagmi wallet");
     }
     setError(undefined);
+    setHasAttemptedAutoConnect(false);
   }, [useThirdweb, useWagmi]);
   
-  // Debug logging (copied from working version)
+  // Enhanced debug logging
   console.log("🔍 WalletProvider state:", {
     isInFarcaster,
+    isFarcasterAuth,
     useThirdweb,
     useWagmi,
     thirdwebAddress: thirdwebAccount?.address,
@@ -157,13 +218,18 @@ export function WalletProvider({ children }: WalletProviderProps) {
     isWagmiConnected,
     isConnected,
     connectionType,
-    canInteract
+    canInteract,
+    connectorsAvailable: connectors.length,
+    connectorNames: connectors.map(c => c.name),
+    hasAttemptedAutoConnect,
+    isConnecting: isConnecting || isConnectPending,
+    error
   });
   
   const value: WalletConnection = {
     // Connection state
     isConnected,
-    isConnecting,
+    isConnecting: isConnecting || isConnectPending,
     connectionType,
     
     // Addresses
@@ -224,7 +290,7 @@ export function useWalletAuth() {
     needsConnection,
     connectWallet,
     error,
-    canInteract, // 🎉 FIXED: Added canInteract
+    canInteract,
     requireConnection: async () => {
       if (!isConnected) {
         return await connectWallet();
