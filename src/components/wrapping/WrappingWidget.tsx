@@ -61,22 +61,46 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
   
   const handleWrap = async () => {
     if (!wrapAmount || parseFloat(wrapAmount) <= 0) return;
-    const result = await wrapTokens(toWei(wrapAmount));
-    if (result.success) {
+    try {
+      await wrapTokens(toWei(wrapAmount));
       setWrapAmount("");
+    } catch (error) {
+      console.error("Wrap failed:", error);
     }
   };
   
   const handleRequestUnwrap = async () => {
     if (!unwrapAmount || parseFloat(unwrapAmount) <= 0) return;
-    const result = await requestUnwrap(toWei(unwrapAmount));
-    if (result.success) {
+    try {
+      await requestUnwrap(toWei(unwrapAmount));
       setUnwrapAmount("");
+    } catch (error) {
+      console.error("Unwrap request failed:", error);
+    }
+  };
+  
+  const handleCompleteUnwrap = async () => {
+    try {
+      await completeUnwrap();
+    } catch (error) {
+      console.error("Complete unwrap failed:", error);
+    }
+  };
+  
+  const handleCancelUnbonding = async () => {
+    try {
+      await cancelUnbonding();
+    } catch (error) {
+      console.error("Cancel unbonding failed:", error);
     }
   };
   
   const handleClaimRewards = async () => {
-    await claimRewards();
+    try {
+      await claimRewards();
+    } catch (error) {
+      console.error("Claim rewards failed:", error);
+    }
   };
   
   const isUnbondingReady = () => {
@@ -272,7 +296,7 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
                   <div className="flex space-x-2">
                     {isUnbondingReady() ? (
                       <button
-                        onClick={() => completeUnwrap()}
+                        onClick={handleCompleteUnwrap}
                         disabled={isUnwrapping}
                         className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors disabled:opacity-50"
                       >
@@ -280,7 +304,7 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
                       </button>
                     ) : (
                       <button
-                        onClick={() => cancelUnbonding()}
+                        onClick={handleCancelUnbonding}
                         disabled={isUnwrapping}
                         className="p-1 text-gray-500 hover:text-red-600 transition-colors disabled:opacity-50"
                         title="Cancel unbonding"

@@ -167,7 +167,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
           </div>
         </div>
         
-        {/* Quick Unbonding Info */}
+        {/* Quick Unbonding Info - FIXED */}
         <div className="mt-4 p-3 bg-white/10 rounded-lg backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <span className="text-sm text-purple-100">Unbonding Period</span>
@@ -220,7 +220,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
         </CollapsibleSection>
       </div>
 
-      {/* Help Section */}
+      {/* Help Section - FIXED */}
       <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
         <div className="flex items-start">
           <InfoIcon className="h-6 w-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
