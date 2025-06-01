@@ -1,3 +1,4 @@
+// src/components/wrapping/WrappingDashboard.tsx
 import React, { useState } from 'react';
 import { 
   CoinsIcon, 
@@ -12,7 +13,6 @@ import {
   InfoIcon
 } from 'lucide-react';
 import { WrappingWidget } from './WrappingWidget';
-//import { NFTWrappingPanel } from './NFTWrappingPanel';
 import { RewardsCalculator } from '../rewards/RewardsCalculator';
 import { DelegationHistory } from '../voting/DelegationHistory';
 import { useWrapping } from '../../hooks/useWrapping';
@@ -32,7 +32,6 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
   const { totalWrapped, availableVotingPower } = useWrapping(userAddress);
   const { pendingRewards } = useRewards(userAddress);
   const { delegationStats } = useDelegationHistory(userAddress);
-  const wrappingStats = useWrappingStats();
 
   const stats = [
     {
@@ -61,7 +60,7 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
     },
     {
       label: 'Delegation Usage',
-      value: delegationStats.delegationPercentage.toFixed(1),
+      value: delegationStats?.delegationPercentage?.toFixed(1) || '0.0',
       suffix: '%',
       icon: <CalculatorIcon className="h-5 w-5 text-amber-600" />,
       bgColor: 'bg-amber-50',
@@ -137,8 +136,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
   userAddress, 
   className = '' 
 }) => {
-  const { isConnected, address } = useWalletAuth();
-
+  const { isConnected } = useWalletAuth();
   const wrappingStats = useWrappingStats();
 
   if (!isConnected || !userAddress) {
@@ -161,7 +159,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
           <div>
             <h2 className="text-2xl font-bold mb-2">Wrapping Dashboard</h2>
             <p className="text-purple-100">
-              Wrap your $EMARK tokens, earn rewards, and participate in governance
+              Wrap your $EMARK tokens to receive wEMARK for voting and governance
             </p>
           </div>
           <div className="hidden md:block">
@@ -173,16 +171,11 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
         <div className="mt-4 p-3 bg-white/10 rounded-lg backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <span className="text-sm text-purple-100">Unbonding Period</span>
-            <span className="text-sm">{wrappingStats.formatUnbondingPeriod()}</span>
+            <span className="text-lg font-bold">{wrappingStats.formatUnbondingPeriod()}</span>
           </div>
           <div className="flex items-center justify-between mt-1">
             <span className="text-sm text-purple-100">Total Protocol Wrapped</span>
-            <div className="text-right">
-              <span className="text-lg font-bold">
-                {toEther(wrappingStats.totalProtocolWrapped)}
-              </span>
-              <div className="text-xs text-purple-200">wEMARK</div>
-            </div>
+            <span className="text-sm">{toEther(wrappingStats.totalProtocolWrapped)} wEMARK</span>
           </div>
         </div>
       </div>
@@ -196,7 +189,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
         <CollapsibleSection
           title="Token Wrapping"
           icon={<CoinsIcon className="h-5 w-5 text-purple-600" />}
-          description="Wrap $EMARK tokens to earn wEMARK and participate in governance"
+          description="Wrap $EMARK tokens to receive wEMARK for voting and governance"
           defaultExpanded={true}
         >
           <div className="mt-4">
@@ -225,19 +218,6 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
             <DelegationHistory />
           </div>
         </CollapsibleSection>
-
-        {/* NFT Wrapping - HIDDEN FOR NOW */}
-        {/* 
-        <CollapsibleSection
-          title="NFT Wrapping"
-          icon={<TabletIcon className="h-5 w-5 text-amber-600" />}
-          description="Wrap your Evermark NFTs for additional rewards"
-        >
-          <div className="mt-4">
-            <NFTWrappingPanel />
-          </div>
-        </CollapsibleSection>
-        */}
       </div>
 
       {/* Help Section */}
@@ -248,13 +228,13 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
             <h3 className="font-medium text-blue-900 mb-2">Wrapping Guide</h3>
             <div className="text-sm text-blue-800 space-y-2">
               <p>
-                <strong>Token Wrapping:</strong> Wrap $EMARK to receive wEMARK tokens for voting and earning rewards.
+                <strong>Token Wrapping:</strong> Wrap $EMARK to receive wEMARK tokens for voting and governance participation.
               </p>
               <p>
                 <strong>Two-Step Process:</strong> First approve $EMARK spending, then wrap to receive wEMARK.
               </p>
               <p>
-                <strong>Delegation:</strong> Use your wEMARK to vote on quality content and maximize reward multipliers.
+                <strong>Delegation:</strong> Use your wEMARK to vote on quality content and participate in governance.
               </p>
               <p>
                 <strong>Unwrapping:</strong> Requires a {wrappingStats.formatUnbondingPeriod()} unbonding period for security.
