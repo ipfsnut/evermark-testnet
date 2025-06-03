@@ -124,24 +124,32 @@ export function WalletProvider({ children }: WalletProviderProps) {
   const { 
     isInFarcaster: farcasterUserDetected, 
     isReady: farcasterReady,
-    hasVerifiedAddress
   } = useFarcasterUser();
   
-  const shouldUseFarcaster = farcasterUserDetected && farcasterReady && hasVerifiedAddress();
+  // ✅ SIMPLE FIX: Wait for Farcaster to be ready before deciding
+  if (farcasterUserDetected && !farcasterReady) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
+          <p className="text-sm text-gray-600">Loading Farcaster...</p>
+        </div>
+      </div>
+    );
+  }
   
-  console.log('🔍 WALLET ROUTING DEBUG:', {
+  const shouldUseFarcaster = farcasterUserDetected && farcasterReady;
+  
+  console.log('🎯 WALLET PROVIDER ROUTING (FIXED):', {
     farcasterUserDetected,
     farcasterReady,
-    hasVerifiedAddressResult: hasVerifiedAddress(),
     shouldUseFarcaster,
-    finalDecision: shouldUseFarcaster ? 'FARCASTER PROVIDER' : 'THIRDWEB PROVIDER'
+    decision: shouldUseFarcaster ? 'FARCASTER' : 'THIRDWEB'
   });
 
   if (shouldUseFarcaster) {
-    console.log('📱 Using Farcaster Wallet Provider');
     return <FarcasterWalletProvider>{children}</FarcasterWalletProvider>;
   } else {
-    console.log('🖥️ Using Thirdweb Wallet Provider');
     return <ThirdwebWalletProvider>{children}</ThirdwebWalletProvider>;
   }
 }
