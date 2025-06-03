@@ -1,9 +1,10 @@
-// src/hooks/useEvermarkCreation.ts - Simplified with unified WalletProvider
-import { useState, useRef } from "react";
+// src/hooks/useEvermarkCreation.ts - Fixed with unified WalletProvider patterns
+import { useState, useRef, useCallback } from "react";
 import { getContract, prepareContractCall, readContract } from "thirdweb";
+import { encodeFunctionData } from "viem"; // ✅ Add Viem for Farcaster transactions
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
-import { useWalletConnection } from "../providers/WalletProvider";
+import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ Use unified provider
 
 // Enhanced metadata interface with all fields
 export interface EvermarkMetadata {
@@ -194,335 +195,316 @@ const fetchCastDataFromPinata = async (input: string): Promise<CastData> => {
     if (!castHash) {
       throw new Error("Could not extract valid cast hash from input");
     }
-
-    let username = "unknown";
-    let canonicalUrl = input;
+    console.log("📡 Fetching cast data for hash:", castHash);
     
-    if (input.includes('farcaster.xyz/')) {
-      const urlParts = input.split('/');
-      const usernameIndex = urlParts.findIndex(part => part === 'farcaster.xyz') + 1;
-      if (usernameIndex > 0 && urlParts[usernameIndex]) {
-        username = urlParts[usernameIndex];
-        canonicalUrl = input;
-      }
-    } else {
-      canonicalUrl = `https://farcaster.xyz/unknown/${castHash}`;
-    }
-
-    console.log("✅ Using extracted info:", { username, castHash, canonicalUrl });
-
-    const extractedData: CastDataSuccess = {
-      title: `Cast by @${username}`,
-      author: username,
-      content: `Farcaster cast ${castHash}`,
-      timestamp: new Date().toISOString(),
-      castHash: castHash,
-      username: username,
-      authorFid: 0,
-      embeds: [],
-      mentions: [],
-      parentHash: "",
-      rootParentHash: "",
-      canonicalUrl: canonicalUrl
-    };
-
-    console.log("✅ Created cast data from URL parsing:", extractedData);
-    return extractedData;
-
-  } catch (error: any) {
-    console.error("❌ Failed to process cast:", error);
-    
-    const errorData: CastDataError = {
-      title: "Farcaster Cast",
-      author: "Unknown Author",
-      content: "Failed to process cast",
-      timestamp: new Date().toISOString(),
-      error: error.message,
-      canonicalUrl: input.includes('http') ? input : `https://farcaster.xyz/unknown/${input}`
-    };
-    
-    return errorData;
-  }
-};
-
-// Enhanced metadata upload to Pinata
-const uploadMetadataToPinata = async (
-  metadata: EvermarkMetadata, 
-  imageUrl?: string, 
-  castData?: CastData
-): Promise<string> => {
-  const jwt = import.meta.env.VITE_PINATA_JWT;
-  
-  if (!jwt) {
-    throw new Error("Pinata JWT token not found");
-  }
-
-  const metadataObject = {
-    name: metadata.title,
-    description: metadata.description,
-    image: imageUrl || '',
-    external_url: castData?.canonicalUrl || metadata.sourceUrl || '',
-    
-    // ✅ Enhanced attributes including custom fields
-    attributes: [
-      { trait_type: 'Author', value: metadata.author || 'Unknown Author' },
-      { trait_type: 'Content Type', value: metadata.contentType || 'Custom' },
-      { trait_type: 'Source URL', value: castData?.canonicalUrl || metadata.sourceUrl || 'Direct Upload' },
-      { trait_type: 'Created', value: new Date().toISOString() },
-      
-      // ✅ Custom fields as attributes
-      ...(metadata.customFields?.map(field => ({
-        trait_type: field.key,
-        value: field.value
-      })) || []),
-      
-      // ✅ Type-specific attributes
-      ...(metadata.doi ? [{ trait_type: 'DOI', value: metadata.doi }] : []),
-      ...(metadata.isbn ? [{ trait_type: 'ISBN', value: metadata.isbn }] : []),
-      ...(metadata.journal ? [{ trait_type: 'Journal', value: metadata.journal }] : []),
-      ...(metadata.publisher ? [{ trait_type: 'Publisher', value: metadata.publisher }] : []),
-      ...(metadata.publicationDate ? [{ trait_type: 'Publication Date', value: metadata.publicationDate }] : []),
-      ...(metadata.volume ? [{ trait_type: 'Volume', value: metadata.volume }] : []),
-      ...(metadata.issue ? [{ trait_type: 'Issue', value: metadata.issue }] : []),
-      ...(metadata.pages ? [{ trait_type: 'Pages', value: metadata.pages }] : []),
-      
-      // ✅ Farcaster-specific attributes
-      ...(castData && isCastDataSuccess(castData) ? [
-        { trait_type: 'Cast Content', value: castData.content },
-        { trait_type: 'Cast Hash', value: castData.castHash },
-        { trait_type: 'Author Username', value: castData.username },
-        { trait_type: 'Author FID', value: castData.authorFid.toString() },
-        { trait_type: 'Cast Timestamp', value: castData.timestamp },
-        { trait_type: 'Platform', value: 'Farcaster' }
-      ] : [])
-    ],
-    
-    // ✅ Tags
-    ...(metadata.tags && metadata.tags.length > 0 && {
-      tags: metadata.tags
-    }),
-    
-    // ✅ Enhanced metadata section for rich data
-    enhanced_metadata: {
-      content_type: metadata.contentType,
-      custom_fields: metadata.customFields || [],
-      tags: metadata.tags || [],
-      type_specific_data: {
-        ...(metadata.contentType === 'DOI' && {
-          doi: metadata.doi,
-          journal: metadata.journal,
-          volume: metadata.volume,
-          issue: metadata.issue,
-          pages: metadata.pages,
-          publication_date: metadata.publicationDate
-        }),
-        ...(metadata.contentType === 'ISBN' && {
-          isbn: metadata.isbn,
-          publisher: metadata.publisher,
-          publication_date: metadata.publicationDate
-        }),
-        ...(metadata.contentType === 'Cast' && {
-          cast_url: metadata.castUrl
-        }),
-        ...(metadata.contentType === 'URL' && {
-          url: metadata.url
-        })
-      }
-    },
-    
-    // ✅ Farcaster data if available
-    ...(castData && isCastDataSuccess(castData) && {
-      farcaster_data: {
-        content: castData.content,
-        author: { username: castData.username, fid: castData.authorFid },
-        cast_hash: castData.castHash,
-        timestamp: castData.timestamp,
-        embeds: castData.embeds,
-        mentions: castData.mentions,
-        parent_hash: castData.parentHash,
-        root_parent_hash: castData.rootParentHash,
-        canonical_url: castData.canonicalUrl
-      }
-    })
-  };
-
-  console.log("📝 Uploading enhanced metadata object:", JSON.stringify(metadataObject, null, 2));
-
-  try {
-    const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
-      method: 'POST',
+    const response = await fetch(`https://api.pinata.cloud/v3/farcaster/casts/${castHash}`, {
+      method: 'GET',
       headers: {
+        'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${jwt}`,
       },
-      body: JSON.stringify({
-        pinataContent: metadataObject,
-        pinataMetadata: {
-          name: `evermark-metadata-${Date.now()}`,
-          keyvalues: {
-            type: 'evermark-metadata',
-            title: metadata.title,
-            content_type: metadata.contentType || 'custom',
-            platform: castData && isCastDataSuccess(castData) ? 'farcaster' : 'general'
-          }
-        }
-      }),
     });
 
     if (!response.ok) {
-      throw new Error(`Metadata upload failed: ${response.statusText}`);
+      throw new Error(`Failed to fetch cast data: ${response.status} ${response.statusText}`);
     }
 
     const result = await response.json();
-    const metadataURI = `ipfs://${result.IpfsHash}`;
-    console.log("✅ Enhanced metadata uploaded with IPFS URI:", metadataURI);
-    return metadataURI;
+    console.log("📦 Raw cast data from Pinata:", result);
+
+    if (!result.data) {
+      throw new Error("No cast data found");
+    }
+
+    const cast = result.data;
+    const canonicalUrl = `https://warpcast.com/${cast.author?.username || 'unknown'}/${castHash}`;
+
+    return {
+      title: `Cast by @${cast.author?.username || 'unknown'}`,
+      author: cast.author?.display_name || cast.author?.username || 'Unknown',
+      content: cast.text || '',
+      timestamp: cast.timestamp || new Date().toISOString(),
+      castHash: castHash,
+      username: cast.author?.username || 'unknown',
+      authorFid: cast.author?.fid || 0,
+      embeds: cast.embeds || [],
+      mentions: cast.mentions || [],
+      parentHash: cast.parent_hash || '',
+      rootParentHash: cast.root_parent_hash || '',
+      canonicalUrl: canonicalUrl,
+    };
+
   } catch (error) {
-    console.error('Enhanced metadata upload error:', error);
-    throw error;
+    console.error("❌ Error fetching cast data:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    return {
+      title: "Failed to load cast",
+      author: "Unknown",
+      content: `Error: ${errorMessage}`,
+      timestamp: new Date().toISOString(),
+      error: errorMessage,
+      canonicalUrl: input,
+    };
   }
 };
 
-export const useEvermarkCreation = () => {
+export function useEvermarkCreation() {
   const [isCreating, setIsCreating] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
-  const isProcessingRef = useRef(false);
-  
-  // ✅ SIMPLIFIED: Use unified wallet provider
-  const { 
-    isConnected, 
-    canInteract, 
-    requireConnection, 
-    sendTransaction,
-    isTransactionPending,
-    error: walletError 
-  } = useWalletConnection();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const createEvermark = async (metadata: EvermarkMetadata): Promise<CreateEvermarkResult> => {
-    // Prevent concurrent executions
-    if (isProcessingRef.current) {
-      console.log("⚠️ Creation already in progress, skipping");
-      return { success: false, error: "Creation already in progress" };
-    }
+  // ✅ FIXED: Use unified wallet provider (following patterns.md)
+  const { address, requireConnection } = useWalletAuth();
+  const { sendTransaction, walletType } = useWalletConnection();
 
-    isProcessingRef.current = true;
-    setIsCreating(true);
-    setError(null);
-    setSuccess(null);
+  const contract = getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.EVERMARK_NFT,
+    abi: EVERMARK_NFT_ABI,
+  });
 
-    try {
-      console.log("🚀 Starting Evermark creation with enhanced metadata:", metadata);
-
-      // ✅ SIMPLIFIED: Use unified wallet connection
-      if (!canInteract) {
-        console.log("🔌 Wallet not connected, attempting connection...");
-        const connectionResult = await requireConnection();
-        if (!connectionResult.success) {
-          throw new Error(connectionResult.error || "Failed to connect wallet");
-        }
-        // Give connection a moment to stabilize
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-
-      // Validate metadata
-      const validation = validateMetadata(metadata);
-      if (!validation.isValid) {
-        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
-      }
-
-      // Get contract instance
+  // ✅ FIXED: Add environment-aware transaction preparation (following patterns.md)
+  const prepareTransaction = useCallback((contractAddress: string, abi: any[], functionName: string, params: any[]) => {
+    if (walletType === 'farcaster') {
+      // Use Viem for Farcaster (Wagmi)
+      const data = encodeFunctionData({
+        abi,
+        functionName,
+        args: params,
+      });
+      
+      return {
+        to: contractAddress as `0x${string}`,
+        data,
+      };
+    } else {
+      // Use Thirdweb for desktop
       const contract = getContract({
         client,
         chain: CHAIN,
-        address: CONTRACTS.EVERMARK_NFT,
-        abi: EVERMARK_NFT_ABI,
+        address: contractAddress,
+        abi,
       });
-
-      // Get minting fee
-      console.log("💰 Getting minting fee...");
-      const mintingFee = await readContract({
+      
+      return prepareContractCall({
         contract,
-        method: "mintingFee",
-        params: [],
+        method: functionName,
+        params,
       });
-      console.log("✅ Minting fee:", mintingFee.toString());
+    }
+  }, [walletType]);
 
-      let imageUrl = '';
-      let castData: CastData | null = null;
+  const createEvermark = useCallback(async (metadata: EvermarkMetadata): Promise<CreateEvermarkResult> => {
+    // ✅ FIXED: Use unified connection check (following patterns.md)
+    const connectionResult = await requireConnection();
+    if (!connectionResult.success) {
+      const errorMsg = "Please connect your wallet to create an Evermark";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
 
-      // Handle image upload
+    // Validate metadata
+    const validation = validateMetadata(metadata);
+    if (!validation.isValid) {
+      const errorMsg = `Validation failed: ${validation.errors.join(', ')}`;
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    setIsCreating(true);
+    setError(null);
+    setSuccess(null);
+    setUploadProgress(0);
+    setCurrentStep("Starting creation process...");
+
+    // Create abort controller for this operation
+    abortControllerRef.current = new AbortController();
+
+    try {
+      console.log("🚀 Starting Evermark creation process...");
+      console.log("🔧 Using wallet type:", walletType);
+      console.log("📝 Metadata:", metadata);
+
+      let imageUrl = "";
+      let castData: CastDataSuccess | null = null;
+
+      // Step 1: Handle image upload if present
       if (metadata.imageFile) {
-        console.log("🖼️ Uploading image to IPFS...");
+        setCurrentStep("Uploading image to IPFS...");
+        setUploadProgress(10);
+        
         try {
           imageUrl = await uploadToPinata(metadata.imageFile);
           console.log("✅ Image uploaded:", imageUrl);
-        } catch (imageError) {
-          console.error("❌ Image upload failed:", imageError);
-          // Continue without image rather than failing completely
-          setError("Image upload failed, continuing without image");
+          setUploadProgress(25);
+        } catch (error) {
+          console.error("❌ Image upload failed:", error);
+          throw new Error(`Image upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
 
-      // Handle Farcaster cast processing
-      const sourceUrl = metadata.sourceUrl || metadata.castUrl || '';
-      if (sourceUrl && isFarcasterInput(sourceUrl)) {
-        console.log("📱 Processing Farcaster cast...");
+      // Step 2: Handle Farcaster cast data if needed
+      if (isFarcasterInput(metadata.sourceUrl)) {
+        setCurrentStep("Fetching Farcaster cast data...");
+        setUploadProgress(35);
+        
         try {
-          castData = await fetchCastDataFromPinata(sourceUrl);
-          console.log("✅ Cast data processed:", castData);
+          const fetchedCastData = await fetchCastDataFromPinata(metadata.sourceUrl);
           
-          // Update metadata with cast data if successful
-          if (isCastDataSuccess(castData)) {
-            // Enhance metadata with cast information
-            metadata.title = metadata.title || castData.title;
-            metadata.author = metadata.author || castData.author;
-            metadata.description = metadata.description || castData.content;
-            
-            // Add cast-specific custom fields
-            const castFields = [
-              { key: 'cast_hash', value: castData.castHash },
-              { key: 'cast_author', value: castData.username },
-              { key: 'cast_timestamp', value: castData.timestamp },
-              { key: 'platform', value: 'Farcaster' }
-            ];
-            
-            metadata.customFields = [
-              ...(metadata.customFields || []),
-              ...castFields.filter(newField => 
-                !metadata.customFields?.some(existing => existing.key === newField.key)
-              )
-            ];
+          if (isCastDataSuccess(fetchedCastData)) {
+            castData = fetchedCastData;
+            console.log("✅ Cast data fetched successfully:", castData);
+          } else {
+            console.warn("⚠️ Cast data fetch had errors:", fetchedCastData.error);
           }
-        } catch (castError) {
-          console.error("❌ Cast processing failed:", castError);
-          // Continue with original metadata
-          setError("Cast processing failed, using provided metadata");
+          
+          setUploadProgress(50);
+        } catch (error) {
+          console.error("❌ Cast data fetch failed:", error);
+          // Don't throw here - we can still create the Evermark without cast data
         }
       }
 
-      // Upload enhanced metadata to IPFS
-      console.log("📝 Uploading enhanced metadata to IPFS...");
-      const metadataURI = await uploadMetadataToPinata(metadata, imageUrl, castData || undefined); // ✅ Convert null to undefined
-      console.log("✅ Enhanced metadata uploaded:", metadataURI);
-      // Prepare transaction
-      const actualTitle = metadata.title || "Untitled Evermark";
-      const actualAuthor = metadata.author || "Unknown Author";
+      // Step 3: Build comprehensive metadata
+      setCurrentStep("Building metadata...");
+      setUploadProgress(60);
 
-      console.log("⛓️ Preparing blockchain transaction...");
-      const transaction = prepareContractCall({
-        contract,
-        method: "mintEvermarkWithReferral",
-        params: [metadataURI, actualTitle, actualAuthor, DEVELOPER_REFERRER],
-        value: mintingFee,
+      const comprehensiveMetadata = {
+        name: metadata.title,
+        description: metadata.description,
+        image: imageUrl,
+        external_url: metadata.sourceUrl,
+        
+        // Core attributes
+        attributes: [
+          { trait_type: "Author", value: metadata.author },
+          { trait_type: "Source URL", value: metadata.sourceUrl },
+          { trait_type: "Content Type", value: metadata.contentType || 'Custom' },
+          { trait_type: "Created", value: new Date().toISOString() },
+          { trait_type: "Creator Address", value: address },
+        ],
+
+        // Enhanced metadata
+        evermark: {
+          version: "2.0",
+          sourceUrl: metadata.sourceUrl,
+          author: metadata.author,
+          contentType: metadata.contentType || 'Custom',
+          customFields: metadata.customFields || [],
+          tags: metadata.tags || [],
+          
+          // Type-specific fields
+          ...(metadata.doi && { doi: metadata.doi }),
+          ...(metadata.isbn && { isbn: metadata.isbn }),
+          ...(metadata.url && { url: metadata.url }),
+          ...(metadata.castUrl && { castUrl: metadata.castUrl }),
+          ...(metadata.publisher && { publisher: metadata.publisher }),
+          ...(metadata.publicationDate && { publicationDate: metadata.publicationDate }),
+          ...(metadata.journal && { journal: metadata.journal }),
+          ...(metadata.volume && { volume: metadata.volume }),
+          ...(metadata.issue && { issue: metadata.issue }),
+          ...(metadata.pages && { pages: metadata.pages }),
+          
+          // Cast data if available
+          ...(castData && { 
+            farcasterData: {
+              castHash: castData.castHash,
+              author: castData.author,
+              username: castData.username,
+              authorFid: castData.authorFid,
+              content: castData.content,
+              timestamp: castData.timestamp,
+              canonicalUrl: castData.canonicalUrl,
+              embeds: castData.embeds,
+              mentions: castData.mentions,
+              parentHash: castData.parentHash,
+              rootParentHash: castData.rootParentHash,
+            }
+          }),
+        }
+      };
+
+      // Add type-specific attributes
+      if (metadata.contentType === 'DOI' && metadata.doi) {
+        comprehensiveMetadata.attributes.push({ trait_type: "DOI", value: metadata.doi });
+      }
+      if (metadata.contentType === 'ISBN' && metadata.isbn) {
+        comprehensiveMetadata.attributes.push({ trait_type: "ISBN", value: metadata.isbn });
+      }
+      if (castData) {
+        comprehensiveMetadata.attributes.push(
+          { trait_type: "Farcaster Author", value: castData.username },
+          { trait_type: "Cast Hash", value: castData.castHash },
+          { trait_type: "Author FID", value: castData.authorFid.toString() }
+        );
+      }
+
+      console.log("📋 Comprehensive metadata built:", comprehensiveMetadata);
+
+      // Step 4: Upload metadata to IPFS
+      setCurrentStep("Uploading metadata to IPFS...");
+      setUploadProgress(70);
+
+      const metadataBlob = new Blob([JSON.stringify(comprehensiveMetadata, null, 2)], {
+        type: 'application/json'
+      });
+      const metadataFile = new File([metadataBlob], 'metadata.json', { type: 'application/json' });
+
+      let metadataURI: string;
+      try {
+        metadataURI = await uploadToPinata(metadataFile);
+        console.log("✅ Metadata uploaded:", metadataURI);
+        setUploadProgress(85);
+      } catch (error) {
+        console.error("❌ Metadata upload failed:", error);
+        throw new Error(`Metadata upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+
+      // Step 5: Get next token ID
+      setCurrentStep("Getting next token ID...");
+      
+      let nextTokenId: bigint;
+      try {
+        nextTokenId = await readContract({
+          contract,
+          method: "nextTokenId",
+          params: [],
+        });
+        console.log("🎯 Next token ID:", nextTokenId.toString());
+      } catch (error) {
+        console.error("❌ Failed to get next token ID:", error);
+        throw new Error("Failed to get next token ID from contract");
+      }
+
+      // Step 6: Create the NFT transaction
+      setCurrentStep("Creating Evermark NFT...");
+      setUploadProgress(90);
+
+      console.log("📡 Preparing mint transaction...");
+      console.log("📋 Transaction params:", {
+        to: address,
+        metadataURI,
+        referrer: DEVELOPER_REFERRER
       });
 
+      // ✅ FIXED: Use environment-aware transaction preparation (following patterns.md)
+      const transaction = prepareTransaction(
+        CONTRACTS.EVERMARK_NFT,
+        EVERMARK_NFT_ABI,
+        "mint",
+        [address, metadataURI, DEVELOPER_REFERRER]
+      );
+
       console.log("📡 Sending transaction via unified wallet provider...");
-      
-      // ✅ SIMPLIFIED: Use unified transaction sending
+
+      // ✅ FIXED: Use unified transaction execution (following patterns.md)
       const result = await sendTransaction(transaction);
-      
+
       if (!result.success) {
         throw new Error(result.error || "Transaction failed");
       }
@@ -530,7 +512,10 @@ export const useEvermarkCreation = () => {
       const txHash = result.transactionHash!;
       console.log("✅ Evermark created successfully! Transaction:", txHash);
 
-      const successMessage = `Evermark "${actualTitle}" created successfully!`;
+      setUploadProgress(100);
+      setCurrentStep("Evermark created successfully!");
+      
+      const successMessage = `Evermark #${nextTokenId.toString()} created successfully! Transaction: ${txHash}`;
       setSuccess(successMessage);
 
       return {
@@ -538,91 +523,62 @@ export const useEvermarkCreation = () => {
         message: successMessage,
         txHash,
         metadataURI,
-        imageUrl: imageUrl || undefined,
-        castData: castData && isCastDataSuccess(castData) ? castData : null
+        imageUrl,
+        castData,
       };
 
     } catch (err: any) {
       console.error("❌ Evermark creation failed:", err);
       
-      let errorMessage = "Failed to create Evermark";
-      
-      // Enhanced error handling
-      if (err.message) {
-        if (err.message.includes("insufficient funds")) {
-          errorMessage = "Insufficient funds for minting fee and gas";
-        } else if (err.message.includes("user rejected")) {
-          errorMessage = "Transaction was rejected by user";
-        } else if (err.message.includes("network")) {
-          errorMessage = "Network error - please try again";
-        } else if (err.message.includes("Validation failed")) {
-          errorMessage = err.message;
-        } else {
-          errorMessage = err.message;
-        }
-      }
-
-      // Include wallet errors if present
-      if (walletError) {
-        errorMessage += ` (Wallet: ${walletError})`;
-      }
-
+      // ✅ FIXED: Consistent error handling (following patterns.md)
+      const errorMessage = err.message || "Failed to create Evermark";
       setError(errorMessage);
+      setCurrentStep("Creation failed");
       
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
       };
-
     } finally {
       setIsCreating(false);
-      isProcessingRef.current = false;
+      setUploadProgress(0);
+      abortControllerRef.current = null;
     }
-  };
+  }, [address, sendTransaction, requireConnection, walletType, prepareTransaction, contract]);
 
-  // Farcaster input validation helper
-  const validateFarcasterInput = (input: string): { 
-    isValid: boolean; 
-    hash?: string; 
-    error?: string 
-  } => {
-    if (!input) {
-      return { isValid: false, error: "Input is required" };
+  const cancelCreation = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      setIsCreating(false);
+      setCurrentStep("Creation cancelled");
+      setError("Creation was cancelled by user");
     }
+  }, []);
 
-    if (!isFarcasterInput(input)) {
-      return { isValid: false, error: "Not a valid Farcaster URL or hash" };
-    }
-
-    const hash = extractCastHash(input);
-    if (!hash) {
-      return { isValid: false, error: "Could not extract cast hash" };
-    }
-
-    return { isValid: true, hash };
-  };
-
-  // Clear messages
-  const clearMessages = () => {
+  const clearMessages = useCallback(() => {
     setError(null);
     setSuccess(null);
-  };
-
-  // Wallet info for debugging
-  const walletInfo = {
-    isConnected,
-    canInteract,
-    isTransactionPending,
-    walletError
-  };
+  }, []);
 
   return {
-    createEvermark,
+    // State
     isCreating,
+    uploadProgress,
+    currentStep,
     error,
     success,
-    validateFarcasterInput,
+    
+    // Actions
+    createEvermark,
+    cancelCreation,
     clearMessages,
-    walletInfo
+    
+    // Utilities
+    validateMetadata,
+    isFarcasterInput,
+    
+    // Auth info
+    isConnected: !!address,
+    userAddress: address,
   };
-};
+}
