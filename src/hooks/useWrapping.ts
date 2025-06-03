@@ -95,66 +95,54 @@ export function useWrapping(userAddress?: string) {
     }, 2000);
   }, [refetchEmarkBalance, refetchWEmarkBalance, refetchUserSummary, refetchUnbondingInfo, refetchVotingPower]);
   
-  // Wrap EMARK tokens - EXACT SAME PATTERN AS VOTING PANEL
-  const wrapTokens = useCallback(async (amount: bigint) => {
-    const connectionResult = await requireConnection();
-    if (!connectionResult.success) {
-      setError("Please connect your wallet");
-      return { success: false, error: "Wallet not connected" };
-    }
-    
-    setIsWrapping(true);
-    setError(null);
-    setSuccess(null);
-    
-    try {
-      // First approve the wrapping contract to spend EMARK tokens
-      const approveTransaction = prepareContractCall({
-        contract: emarkContract,
-        method: "approve",
-        params: [CONTRACTS.CARD_CATALOG, amount],
-      });
-      
-      return new Promise<void>((resolve, reject) => {
-        sendTransaction(approveTransaction as any, {
-          onSuccess: () => {
-            // Then wrap the tokens
-            const wrapTransaction = prepareContractCall({
-              contract: wrappingContract,
-              method: "wrap",
-              params: [amount],
-            });
-            
-            sendTransaction(wrapTransaction as any, {
-              onSuccess: () => {
-                setSuccess(`Successfully wrapped ${amount.toString()} $EMARK → wEMARK!`);
-                setIsWrapping(false);
-                refetchAllData();
-                resolve();
-              },
-              onError: (error) => {
-                setError(`Wrapping failed: ${error.message}`);
-                setIsWrapping(false);
-                reject(error);
-              }
-            });
-          },
-          onError: (error) => {
-            setError(`Approval failed: ${error.message}`);
-            setIsWrapping(false);
-            reject(error);
-          }
-        });
-      });
-      
-    } catch (err: any) {
-      setError(err.message || "Failed to wrap tokens");
-      setIsWrapping(false);
-      return { success: false, error: err.message };
-    }
-  }, [effectiveUserAddress, emarkContract, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
+  // Update the wrapTokens function to handle the void return:
+const wrapTokens = useCallback(async (amount: bigint) => {
+  const connectionResult = await requireConnection();
+  if (!connectionResult.success) {
+    setError("Please connect your wallet");
+    return { success: false, error: "Wallet not connected" };
+  }
   
-  // Request unwrap - EXACT SAME PATTERN AS VOTING PANEL
+  setIsWrapping(true);
+  setError(null);
+  setSuccess(null);
+  
+  try {
+    // First approve the wrapping contract to spend EMARK tokens
+    const approveTransaction = prepareContractCall({
+      contract: emarkContract,
+      method: "approve",
+      params: [CONTRACTS.CARD_CATALOG, amount],
+    });
+    
+    // Handle void return - if no error is thrown, it succeeded
+    await sendTransaction(approveTransaction);
+    console.log('✅ Approval transaction successful');
+    
+    // Then wrap the tokens
+    const wrapTransaction = prepareContractCall({
+      contract: wrappingContract,
+      method: "wrap",
+      params: [amount],
+    });
+    
+    // Handle void return - if no error is thrown, it succeeded
+    await sendTransaction(wrapTransaction);
+    console.log('✅ Wrap transaction successful');
+    
+    setSuccess(`Successfully wrapped ${amount.toString()} $EMARK → wEMARK!`);
+    setIsWrapping(false);
+    refetchAllData();
+    
+    return { success: true };
+    
+  } catch (err: any) {
+    setError(err.message || "Failed to wrap tokens");
+    setIsWrapping(false);
+    return { success: false, error: err.message };
+  }
+}, [emarkContract, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
+
   const requestUnwrap = useCallback(async (amount: bigint) => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
