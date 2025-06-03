@@ -284,7 +284,6 @@ export const useFarcasterUser = () => {
   const context = useContext(FarcasterContext);
   
   const getVerifiedAddresses = () => {
-    // Since verifiedAddresses is now guaranteed to exist, we can access it directly
     return context.user?.verifiedAddresses.eth_addresses || [];
   };
   
@@ -297,17 +296,20 @@ export const useFarcasterUser = () => {
     return getVerifiedAddresses().length > 0;
   };
   
-  console.log('🔍 useFarcasterUser state:', {
-    isInFarcaster: context.isInFarcaster,
-    isReady: context.isReady,
-    isAuthenticated: context.isAuthenticated,
-    hasUser: !!context.user,
-    fid: context.user?.fid,
-    username: context.user?.username,
-    verifiedAddresses: getVerifiedAddresses(),
-    primaryAddress: getPrimaryAddress(),
-    hasVerifiedAddress: hasVerifiedAddress()
-  });
+  // ✅ FIXED: Only log once when context changes, not on every render
+  useEffect(() => {
+    console.log('🔍 useFarcasterUser state:', {
+      isInFarcaster: context.isInFarcaster,
+      isReady: context.isReady,
+      isAuthenticated: context.isAuthenticated,
+      hasUser: !!context.user,
+      fid: context.user?.fid,
+      username: context.user?.username,
+      verifiedAddresses: getVerifiedAddresses(),
+      primaryAddress: getPrimaryAddress(),
+      hasVerifiedAddress: hasVerifiedAddress()
+    });
+  }, [context.isInFarcaster, context.isReady, context.isAuthenticated, context.user?.fid]); // Only log when these change
   
   return {
     user: context.user,
