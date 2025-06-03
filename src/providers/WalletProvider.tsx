@@ -121,38 +121,28 @@ function detectWalletEnvironment(): {
 }
 
 export function WalletProvider({ children }: WalletProviderProps) {
-  // Get Farcaster context
-  const { isInFarcaster, isReady: farcasterReady } = useFarcasterUser();
+  const { 
+    isInFarcaster: farcasterUserDetected, 
+    isReady: farcasterReady,
+    hasVerifiedAddress
+  } = useFarcasterUser();
   
-  // Detect environment
-  const environmentDetection = detectWalletEnvironment();
+  const shouldUseFarcaster = farcasterUserDetected && farcasterReady && hasVerifiedAddress();
   
-  // Determine which wallet system to use
-  const shouldUseFarcaster = environmentDetection.shouldUseFarcaster || isInFarcaster;
-  
-  console.log('🎯 Wallet Provider Routing:', {
-    shouldUseFarcaster,
-    isInFarcaster,
+  console.log('🔍 WALLET ROUTING DEBUG:', {
+    farcasterUserDetected,
     farcasterReady,
-    environmentConfidence: environmentDetection.confidence,
-    detectionMethods: environmentDetection.methods
+    hasVerifiedAddressResult: hasVerifiedAddress(),
+    shouldUseFarcaster,
+    finalDecision: shouldUseFarcaster ? 'FARCASTER PROVIDER' : 'THIRDWEB PROVIDER'
   });
 
-  // Route to appropriate provider
-  if (shouldUseFarcaster && farcasterReady) {
+  if (shouldUseFarcaster) {
     console.log('📱 Using Farcaster Wallet Provider');
-    return (
-      <FarcasterWalletProvider>
-        {children}
-      </FarcasterWalletProvider>
-    );
+    return <FarcasterWalletProvider>{children}</FarcasterWalletProvider>;
   } else {
     console.log('🖥️ Using Thirdweb Wallet Provider');
-    return (
-      <ThirdwebWalletProvider>
-        {children}
-      </ThirdwebWalletProvider>
-    );
+    return <ThirdwebWalletProvider>{children}</ThirdwebWalletProvider>;
   }
 }
 
