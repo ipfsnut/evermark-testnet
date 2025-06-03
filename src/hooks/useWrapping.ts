@@ -1,9 +1,9 @@
 import { useState, useCallback, useMemo } from "react";
-import { useReadContract, useSendTransaction } from "thirdweb/react";
+import { useReadContract } from "thirdweb/react"; // ✅ Keep this for reading
 import { getContract, prepareContractCall } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EMARK_TOKEN_ABI } from "../lib/contracts";
-import { useWalletAuth } from "../providers/WalletProvider";
+import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ Use our provider
 
 // Import the CardCatalog ABI
 import CardCatalogABI from "../lib/abis/CardCatalog.json";
@@ -15,6 +15,7 @@ export function useWrapping(userAddress?: string) {
   const [success, setSuccess] = useState<string | null>(null);
   
   const { address: walletAddress, requireConnection } = useWalletAuth();
+  const { sendTransaction } = useWalletConnection(); // ✅ Use our unified transaction method
   const effectiveUserAddress = userAddress || walletAddress;
   
   const emarkContract = useMemo(() => getContract({
@@ -81,9 +82,6 @@ export function useWrapping(userAddress?: string) {
     },
   });
   
-  // Use the EXACT SAME transaction pattern as VotingPanel
-  const { mutate: sendTransaction } = useSendTransaction();
-  
   // Refetch all data after successful transactions
   const refetchAllData = useCallback(() => {
     setTimeout(() => {
@@ -95,89 +93,79 @@ export function useWrapping(userAddress?: string) {
     }, 2000);
   }, [refetchEmarkBalance, refetchWEmarkBalance, refetchUserSummary, refetchUnbondingInfo, refetchVotingPower]);
   
-  // FIXED: Proper variable initialization and error handling
-const wrapTokens = useCallback(async (amount: bigint) => {
-  const connectionResult = await requireConnection();
-  if (!connectionResult.success) {
-    setError("Please connect your wallet");
-    return { success: false, error: "Wallet not connected" };
-  }
-  
-  setIsWrapping(true);
-  setError(null);
-  setSuccess(null);
-  
-  try {
-    console.log('🔄 Starting wrap process for amount:', amount.toString());
+  // ✅ FIXED: Use our wallet provider's sendTransaction method
+  const wrapTokens = useCallback(async (amount: bigint) => {
+    const connectionResult = await requireConnection();
+    if (!connectionResult.success) {
+      setError("Please connect your wallet");
+      return { success: false, error: "Wallet not connected" };
+    }
     
-    // Step 1: Approve EMARK spending
-    console.log('📝 Step 1: Preparing approval transaction...');
-    const approveTransaction = prepareContractCall({
-      contract: emarkContract,
-      method: "approve",
-      params: [CONTRACTS.CARD_CATALOG, amount],
-    });
+    setIsWrapping(true);
+    setError(null);
+    setSuccess(null);
     
-    // ✅ FIXED: Properly await approval transaction
-    console.log('⏳ Sending approval transaction...');
-    await new Promise<void>((resolve, reject) => {
-      sendTransaction(approveTransaction as any, {
-        onSuccess: (result) => {
-          console.log('✅ Approval transaction confirmed:', result.transactionHash);
-          resolve();
-        },
-        onError: (error) => {
-          console.error('❌ Approval transaction failed:', error);
-          reject(new Error(`Approval failed: ${error.message}`));
-        }
+    try {
+      console.log('🔄 Starting wrap process for amount:', amount.toString());
+      
+      // Step 1: Approve EMARK spending
+      console.log('📝 Step 1: Preparing approval transaction...');
+      const approveTransaction = prepareContractCall({
+        contract: emarkContract,
+        method: "approve",
+        params: [CONTRACTS.CARD_CATALOG, amount],
       });
-    });
-    
-    // Step 2: Wait a moment for approval to be processed
-    console.log('⏳ Waiting for approval to be processed...');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Step 3: Wrap the tokens
-    console.log('📝 Step 2: Preparing wrap transaction...');
-    const wrapTransaction = prepareContractCall({
-      contract: wrappingContract,
-      method: "wrap",
-      params: [amount],
-    });
-    
-    // ✅ FIXED: Properly await wrap transaction with proper variable handling
-    console.log('⏳ Sending wrap transaction...');
-    const wrapTxHash = await new Promise<string>((resolve, reject) => {
-      sendTransaction(wrapTransaction as any, {
-        onSuccess: (result) => {
-          console.log('✅ Wrap transaction confirmed:', result.transactionHash);
-          resolve(result.transactionHash);
-        },
-        onError: (error) => {
-          console.error('❌ Wrap transaction failed:', error);
-          reject(new Error(`Wrap failed: ${error.message}`));
-        }
+      
+      // ✅ FIXED: Use our unified sendTransaction method
+      console.log('⏳ Sending approval transaction...');
+      const approvalResult = await sendTransaction(approveTransaction as any);
+      
+      if (!approvalResult.success) {
+        throw new Error(`Approval failed: ${approvalResult.error}`);
+      }
+      
+      console.log('✅ Approval transaction confirmed:', approvalResult.transactionHash);
+      
+      // Step 2: Wait a moment for approval to be processed
+      console.log('⏳ Waiting for approval to be processed...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Step 3: Wrap the tokens
+      console.log('📝 Step 2: Preparing wrap transaction...');
+      const wrapTransaction = prepareContractCall({
+        contract: wrappingContract,
+        method: "wrap",
+        params: [amount],
       });
-    });
-    
-    // ✅ FIXED: Now wrapTxHash is guaranteed to be assigned
-    setSuccess(`Successfully wrapped ${amount.toString()} $EMARK → wEMARK! TX: ${wrapTxHash}`);
-    console.log('🎉 Wrap process completed successfully');
-    
-    // Refresh data after successful transactions
-    refetchAllData();
-    
-    return { success: true, transactionHash: wrapTxHash };
-    
-  } catch (err: any) {
-    console.error('❌ Wrap process failed:', err);
-    const errorMessage = err.message || "Failed to wrap tokens";
-    setError(errorMessage);
-    return { success: false, error: errorMessage };
-  } finally {
-    setIsWrapping(false);
-  }
-}, [effectiveUserAddress, emarkContract, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
+      
+      // ✅ FIXED: Use our unified sendTransaction method
+      console.log('⏳ Sending wrap transaction...');
+      const wrapResult = await sendTransaction(wrapTransaction as any);
+      
+      if (!wrapResult.success) {
+        throw new Error(`Wrap failed: ${wrapResult.error}`);
+      }
+      
+      console.log('✅ Wrap transaction confirmed:', wrapResult.transactionHash);
+      
+      // ✅ FIXED: Now we have guaranteed transaction hashes
+      setSuccess(`Successfully wrapped ${amount.toString()} $EMARK → wEMARK! TX: ${wrapResult.transactionHash}`);
+      console.log('🎉 Wrap process completed successfully');
+      
+      // Refresh data after successful transactions
+      refetchAllData();
+      
+      return { success: true, transactionHash: wrapResult.transactionHash };
+      
+    } catch (err: any) {
+      console.error('❌ Wrap process failed:', err);
+      const errorMessage = err.message || "Failed to wrap tokens";
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
+    } finally {
+      setIsWrapping(false);
+    }
+  }, [effectiveUserAddress, emarkContract, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
 
   // ✅ FIXED: Similar pattern for requestUnwrap
   const requestUnwrap = useCallback(async (amount: bigint) => {
@@ -200,26 +188,20 @@ const wrapTokens = useCallback(async (amount: bigint) => {
         params: [amount],
       });
       
-      // ✅ FIXED: Properly await transaction confirmation with proper variable handling
-      const txHash = await new Promise<string>((resolve, reject) => {
-        sendTransaction(transaction as any, {
-          onSuccess: (result) => {
-            console.log('✅ Unwrap request transaction confirmed:', result.transactionHash);
-            resolve(result.transactionHash);
-          },
-          onError: (error) => {
-            console.error('❌ Unwrap request failed:', error);
-            reject(new Error(`Unwrap request failed: ${error.message}`));
-          }
-        });
-      });
+      // ✅ FIXED: Use our unified sendTransaction method
+      const result = await sendTransaction(transaction as any);
       
-      // ✅ FIXED: Now txHash is guaranteed to be assigned
-      setSuccess(`Successfully requested unwrap of ${amount.toString()} wEMARK. Unbonding period started. TX: ${txHash}`);
+      if (!result.success) {
+        throw new Error(`Unwrap request failed: ${result.error}`);
+      }
+      
+      console.log('✅ Unwrap request transaction confirmed:', result.transactionHash);
+      
+      setSuccess(`Successfully requested unwrap of ${amount.toString()} wEMARK. Unbonding period started. TX: ${result.transactionHash}`);
       console.log('🎉 Unwrap request completed successfully');
       
       refetchAllData();
-      return { success: true, transactionHash: txHash };
+      return { success: true, transactionHash: result.transactionHash };
       
     } catch (err: any) {
       console.error('❌ Unwrap request failed:', err);
@@ -252,26 +234,20 @@ const wrapTokens = useCallback(async (amount: bigint) => {
         params: [],
       });
       
-      // ✅ FIXED: Properly await transaction confirmation with proper variable handling
-      const txHash = await new Promise<string>((resolve, reject) => {
-        sendTransaction(transaction as any, {
-          onSuccess: (result) => {
-            console.log('✅ Complete unwrap transaction confirmed:', result.transactionHash);
-            resolve(result.transactionHash);
-          },
-          onError: (error) => {
-            console.error('❌ Complete unwrap failed:', error);
-            reject(new Error(`Complete unwrap failed: ${error.message}`));
-          }
-        });
-      });
+      // ✅ FIXED: Use our unified sendTransaction method
+      const result = await sendTransaction(transaction as any);
       
-      // ✅ FIXED: Now txHash is guaranteed to be assigned
-      setSuccess(`Successfully completed unwrap! wEMARK → $EMARK conversion complete. TX: ${txHash}`);
+      if (!result.success) {
+        throw new Error(`Complete unwrap failed: ${result.error}`);
+      }
+      
+      console.log('✅ Complete unwrap transaction confirmed:', result.transactionHash);
+      
+      setSuccess(`Successfully completed unwrap! wEMARK → $EMARK conversion complete. TX: ${result.transactionHash}`);
       console.log('🎉 Complete unwrap completed successfully');
       
       refetchAllData();
-      return { success: true, transactionHash: txHash };
+      return { success: true, transactionHash: result.transactionHash };
       
     } catch (err: any) {
       console.error('❌ Complete unwrap failed:', err);
@@ -304,26 +280,20 @@ const wrapTokens = useCallback(async (amount: bigint) => {
         params: [],
       });
       
-      // ✅ FIXED: Properly await transaction confirmation with proper variable handling
-      const txHash = await new Promise<string>((resolve, reject) => {
-        sendTransaction(transaction as any, {
-          onSuccess: (result) => {
-            console.log('✅ Cancel unbonding transaction confirmed:', result.transactionHash);
-            resolve(result.transactionHash);
-          },
-          onError: (error) => {
-            console.error('❌ Cancel unbonding failed:', error);
-            reject(new Error(`Cancel unbonding failed: ${error.message}`));
-          }
-        });
-      });
+      // ✅ FIXED: Use our unified sendTransaction method
+      const result = await sendTransaction(transaction as any);
       
-      // ✅ FIXED: Now txHash is guaranteed to be assigned
-      setSuccess(`Successfully cancelled unbonding! TX: ${txHash}`);
+      if (!result.success) {
+        throw new Error(`Cancel unbonding failed: ${result.error}`);
+      }
+      
+      console.log('✅ Cancel unbonding transaction confirmed:', result.transactionHash);
+      
+      setSuccess(`Successfully cancelled unbonding! TX: ${result.transactionHash}`);
       console.log('🎉 Cancel unbonding completed successfully');
       
       refetchAllData();
-      return { success: true, transactionHash: txHash };
+      return { success: true, transactionHash: result.transactionHash };
       
     } catch (err: any) {
       console.error('❌ Cancel unbonding failed:', err);
