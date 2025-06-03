@@ -14,7 +14,7 @@ export function useEmarkToken() {
   
   // 🎉 SIMPLIFIED: Use wallet provider instead of manual checks
   const { isConnected, address, requireConnection } = useWalletAuth();
-  const { thirdwebAccount, canInteract } = useTransactionWallet();
+  const { canInteract } = useTransactionWallet();
   
   const contract = getContract({
     client,

@@ -151,13 +151,13 @@ export function useDisplayProfile() {
 
 // Hook specifically for checking if user can interact with contracts
 export function useContractAuth() {
-  const { canInteractWithContracts, primaryAddress, authMethod, isInFarcaster } = useProfile();
+  const { canInteract, address, walletType, isInFarcaster } = useWalletConnection();
   
   return {
-    canInteract: canInteractWithContracts,
-    address: primaryAddress,
-    authMethod,
-    needsWalletConnection: !canInteractWithContracts,
+    canInteract, // ✅ Now uses unified wallet logic
+    address,
+    authMethod: walletType,
+    needsWalletConnection: !canInteract,
     isInFarcaster,
     // Helper message for users who need to connect
     getConnectionMessage: () => {
