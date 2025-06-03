@@ -1,7 +1,8 @@
 // src/hooks/useEvermarkCreation.ts - Fixed with unified WalletProvider patterns
 import { useState, useRef, useCallback } from "react";
+import { useReadContract } from "thirdweb/react"; // ✅ For reading only
 import { getContract, prepareContractCall, readContract } from "thirdweb";
-import { encodeFunctionData } from "viem"; // ✅ Add Viem for Farcaster transactions
+import { encodeFunctionData } from "viem"; // ✅ For Wagmi transactions
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
 import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ Use unified provider
@@ -257,7 +258,7 @@ export function useEvermarkCreation() {
   const [success, setSuccess] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // ✅ FIXED: Use unified wallet provider (following patterns.md)
+  // ✅ Use unified wallet provider (following patterns.md)
   const { address, requireConnection } = useWalletAuth();
   const { sendTransaction, walletType } = useWalletConnection();
 
@@ -268,8 +269,31 @@ export function useEvermarkCreation() {
     abi: EVERMARK_NFT_ABI,
   });
 
-  // ✅ FIXED: Add environment-aware transaction preparation (following patterns.md)
-  const prepareTransaction = useCallback((contractAddress: string, abi: any[], functionName: string, params: any[]) => {
+  // ✅ FIXED: Use useReadContract from thirdweb/react (following patterns.md)
+  const { data: mintingFee, isLoading: isLoadingFee } = useReadContract({
+    contract,
+    method: "MINTING_FEE",
+    params: [],
+  });
+
+  console.log("💰 Current minting fee from contract:", mintingFee?.toString());
+
+  // ✅ FIXED: Environment-aware transaction preparation with fee support
+  const prepareTransaction = useCallback((
+    contractAddress: string, 
+    abi: any[], 
+    functionName: string, 
+    params: any[],
+    value?: bigint | string
+  ) => {
+    console.log("🔧 prepareTransaction debug:", {
+      contractAddress,
+      functionName,
+      params,
+      value: value?.toString(),
+      walletType,
+    });
+
     if (walletType === 'farcaster') {
       // Use Viem for Farcaster (Wagmi)
       const data = encodeFunctionData({
@@ -278,10 +302,14 @@ export function useEvermarkCreation() {
         args: params,
       });
       
-      return {
+      // ✅ FIXED: Create new object instead of modifying read-only property
+      const tx = {
         to: contractAddress as `0x${string}`,
         data,
+        ...(value && { value: BigInt(value) }) // ✅ Add value conditionally
       };
+      
+      return tx;
     } else {
       // Use Thirdweb for desktop
       const contract = getContract({
@@ -291,16 +319,27 @@ export function useEvermarkCreation() {
         abi,
       });
       
-      return prepareContractCall({
+      // ✅ FIXED: Create transaction with value from the start
+      const tx = prepareContractCall({
         contract,
         method: functionName,
         params,
+        ...(value && { value: BigInt(value) }) // ✅ Add value conditionally
       });
+
+      return tx;
     }
   }, [walletType]);
 
   const createEvermark = useCallback(async (metadata: EvermarkMetadata): Promise<CreateEvermarkResult> => {
-    // ✅ FIXED: Use unified connection check (following patterns.md)
+    // ✅ Check if minting fee is loaded
+    if (isLoadingFee || !mintingFee) {
+      const errorMsg = "Loading minting fee from contract...";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    // ✅ Connection check
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
       const errorMsg = "Please connect your wallet to create an Evermark";
@@ -322,13 +361,12 @@ export function useEvermarkCreation() {
     setUploadProgress(0);
     setCurrentStep("Starting creation process...");
 
-    // Create abort controller for this operation
     abortControllerRef.current = new AbortController();
 
     try {
       console.log("🚀 Starting Evermark creation process...");
       console.log("🔧 Using wallet type:", walletType);
-      console.log("📝 Metadata:", metadata);
+      console.log(" Minting fee:", mintingFee.toString(), "wei");
 
       let imageUrl = "";
       let castData: CastDataSuccess | null = null;
@@ -487,22 +525,30 @@ export function useEvermarkCreation() {
 
       console.log("📡 Preparing mint transaction...");
       console.log("📋 Transaction params:", {
-        to: address,
         metadataURI,
-        referrer: DEVELOPER_REFERRER
+        title: metadata.title,
+        creator: metadata.author,
+        referrer: DEVELOPER_REFERRER,
+        mintingFee: mintingFee.toString()
       });
 
-      // ✅ FIXED: Use environment-aware transaction preparation (following patterns.md)
+      // ✅ FIXED: Use correct function name and parameters from ABI
       const transaction = prepareTransaction(
         CONTRACTS.EVERMARK_NFT,
         EVERMARK_NFT_ABI,
-        "mint",
-        [address, metadataURI, DEVELOPER_REFERRER]
+        "mintEvermarkWithReferral", // ✅ Correct function name
+        [
+          metadataURI,              // string metadataURI
+          metadata.title,           // string title  
+          metadata.author,          // string creator
+          DEVELOPER_REFERRER        // address referrer
+        ],
+        mintingFee // ✅ Dynamic minting fee from contract
       );
 
       console.log("📡 Sending transaction via unified wallet provider...");
 
-      // ✅ FIXED: Use unified transaction execution (following patterns.md)
+      // ✅ Transaction execution
       const result = await sendTransaction(transaction);
 
       if (!result.success) {
@@ -515,7 +561,7 @@ export function useEvermarkCreation() {
       setUploadProgress(100);
       setCurrentStep("Evermark created successfully!");
       
-      const successMessage = `Evermark #${nextTokenId.toString()} created successfully! Transaction: ${txHash}`;
+      const successMessage = `Evermark created successfully! Fee: ${mintingFee.toString()} wei. Transaction: ${txHash}`;
       setSuccess(successMessage);
 
       return {
@@ -530,7 +576,6 @@ export function useEvermarkCreation() {
     } catch (err: any) {
       console.error("❌ Evermark creation failed:", err);
       
-      // ✅ FIXED: Consistent error handling (following patterns.md)
       const errorMessage = err.message || "Failed to create Evermark";
       setError(errorMessage);
       setCurrentStep("Creation failed");
@@ -544,7 +589,7 @@ export function useEvermarkCreation() {
       setUploadProgress(0);
       abortControllerRef.current = null;
     }
-  }, [address, sendTransaction, requireConnection, walletType, prepareTransaction, contract]);
+  }, [address, sendTransaction, requireConnection, walletType, prepareTransaction, contract, mintingFee, isLoadingFee]);
 
   const cancelCreation = useCallback(() => {
     if (abortControllerRef.current) {
@@ -567,6 +612,10 @@ export function useEvermarkCreation() {
     currentStep,
     error,
     success,
+    
+    // ✅ NEW: Expose minting fee info
+    mintingFee,
+    isLoadingFee,
     
     // Actions
     createEvermark,
