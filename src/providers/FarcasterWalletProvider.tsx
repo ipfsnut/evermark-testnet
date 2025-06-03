@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, ReactNode } from 'react';
+import { useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAccount, useConnect, useSendTransaction } from "wagmi";
 import { encodeFunctionData, parseUnits, createPublicClient, http } from "viem";
 import { base } from "viem/chains";
@@ -42,30 +42,25 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
   const primaryAddress = wagmiAddress || getPrimaryAddress();
   
   // Enhanced connection detection
-  const isConnected = isWagmiConnected || hasVerifiedAddress();
-  const canInteract = isConnected;
+  const isConnected = isWagmiConnected; // ✅ Only Wagmi connection counts for transactions
+  const canInteract = isWagmiConnected; // ✅ Only when Wagmi is actually connected
   
   // Auto-connect for Farcaster
   useEffect(() => {
-    if (!farcasterReady || isConnected || isConnecting) return;
+    if (!farcasterReady || isWagmiConnected || isConnecting) return;
     
-    if (isFarcasterAuth && hasVerifiedAddress() && !isWagmiConnected) {
-      console.log('🔌 Auto-connecting Farcaster wallet...');
+    // If we're in Farcaster but not connected via Wagmi, force connection
+    if (isFarcasterAuth && hasVerifiedAddress()) {
+      console.log('🔌 Forcing Wagmi connection for transactions...');
       setIsConnecting(true);
       
       const farcasterConnector = connectors.find(c => c.id === 'farcasterFrame');
       if (farcasterConnector) {
-        try {
-          connect({ connector: farcasterConnector });
-          console.log('✅ Farcaster wallet auto-connect initiated');
-          setError(undefined);
-        } catch (err: unknown) {
-          console.warn('⚠️ Auto-connect failed, but user has verified addresses:', err);
-        }
+        connect({ connector: farcasterConnector });
       }
       setIsConnecting(false);
     }
-  }, [farcasterReady, isConnected, isConnecting, isFarcasterAuth, hasVerifiedAddress, isWagmiConnected, connectors, connect]);
+  }, [farcasterReady, isWagmiConnected, isConnecting, isFarcasterAuth, hasVerifiedAddress, connectors, connect]);
   
   // Manual connection
   const connectWallet = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
