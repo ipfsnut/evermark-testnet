@@ -38,13 +38,11 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
   const { connect, connectors, isPending: isConnectPending } = useConnect();
   const { sendTransactionAsync: sendWagmiTx } = useSendTransaction();
   
-  // Enhanced address resolution
-  const primaryAddress = wagmiAddress || getPrimaryAddress();
-  
-  // Enhanced connection detection
-  const isConnected = isWagmiConnected; // ✅ Only Wagmi connection counts for transactions
-  const canInteract = isWagmiConnected; // ✅ Only when Wagmi is actually connected
-  
+  const primaryAddress = wagmiAddress || getPrimaryAddress() || undefined;
+
+  const isConnected = isWagmiConnected || (hasVerifiedAddress() && !!primaryAddress);
+  const canInteract = isWagmiConnected; 
+
   // Auto-connect for Farcaster
   useEffect(() => {
     if (!farcasterReady || isWagmiConnected || isConnecting) return;
@@ -256,10 +254,21 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
     return results;
   }, [sendTransaction]);
   
+  // Add debug logging right before the value object:
+  console.log('🔍 FarcasterWalletProvider Final State:', {
+    isWagmiConnected,
+    wagmiAddress,
+    farcasterAddress: getPrimaryAddress(),
+    finalAddress: primaryAddress,
+    isConnected,
+    canInteract,
+    hasVerifiedAddress: hasVerifiedAddress()
+  });
+
   const value: UnifiedWalletConnection = {
     // Core state
     isConnected,
-    address: primaryAddress || undefined,
+    address: primaryAddress, // This should now be string | undefined
     displayAddress: primaryAddress ? `${primaryAddress.slice(0, 6)}...${primaryAddress.slice(-4)}` : undefined,
     
     // Environment
