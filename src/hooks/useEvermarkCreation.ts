@@ -537,23 +537,6 @@ export function useEvermarkCreation() {
         throw new Error(`Metadata upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
 
-      // Step 5: Get next token ID
-      setCurrentStep("Getting next token ID...");
-      
-      let nextTokenId: bigint;
-      try {
-        nextTokenId = await readContract({
-          contract,
-          method: "nextTokenId",
-          params: [],
-        });
-        console.log("🎯 Next token ID:", nextTokenId.toString());
-      } catch (error) {
-        console.error("❌ Failed to get next token ID:", error);
-        throw new Error("Failed to get next token ID from contract");
-      }
-
-      // Step 6: Create the NFT transaction
       setCurrentStep("Creating Evermark NFT...");
       setUploadProgress(90);
 
