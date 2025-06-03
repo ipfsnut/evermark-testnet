@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
-import { useReadContract } from "thirdweb/react"; // ✅ Keep this for reading
-import { getContract, prepareContractCall } from "thirdweb";
+import { useReadContract } from "thirdweb/react";
+import { getContract, prepareContractCall } from "thirdweb"; // ✅ Add prepareContractCall import
+import { encodeFunctionData } from "viem"; // ✅ Remove unused parseUnits
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EMARK_TOKEN_ABI } from "../lib/contracts";
 import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ Use our provider
@@ -15,7 +16,7 @@ export function useWrapping(userAddress?: string) {
   const [success, setSuccess] = useState<string | null>(null);
   
   const { address: walletAddress, requireConnection } = useWalletAuth();
-  const { sendTransaction } = useWalletConnection(); // ✅ Use our unified transaction method
+  const { sendTransaction, walletType } = useWalletConnection(); // ✅ Use our unified transaction method
   const effectiveUserAddress = userAddress || walletAddress;
   
   const emarkContract = useMemo(() => getContract({
@@ -93,7 +94,38 @@ export function useWrapping(userAddress?: string) {
     }, 2000);
   }, [refetchEmarkBalance, refetchWEmarkBalance, refetchUserSummary, refetchUnbondingInfo, refetchVotingPower]);
   
-  // ✅ FIXED: Use our wallet provider's sendTransaction method
+  // ✅ FIXED: Helper function to prepare transactions based on wallet type
+  const prepareTransaction = useCallback((contractAddress: string, abi: any[], functionName: string, params: any[]) => {
+    if (walletType === 'farcaster') {
+      // ✅ Use Viem for Farcaster (Wagmi)
+      const data = encodeFunctionData({
+        abi,
+        functionName,
+        args: params,
+      });
+      
+      return {
+        to: contractAddress as `0x${string}`,
+        data,
+      };
+    } else {
+      // ✅ Use Thirdweb for desktop
+      const contract = getContract({
+        client,
+        chain: CHAIN,
+        address: contractAddress,
+        abi,
+      });
+      
+      return prepareContractCall({
+        contract,
+        method: functionName,
+        params,
+      });
+    }
+  }, [walletType]);
+  
+  // ✅ FIXED: Use proper transaction preparation
   const wrapTokens = useCallback(async (amount: bigint) => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -107,18 +139,19 @@ export function useWrapping(userAddress?: string) {
     
     try {
       console.log('🔄 Starting wrap process for amount:', amount.toString());
+      console.log('🔧 Using wallet type:', walletType);
       
       // Step 1: Approve EMARK spending
       console.log('📝 Step 1: Preparing approval transaction...');
-      const approveTransaction = prepareContractCall({
-        contract: emarkContract,
-        method: "approve",
-        params: [CONTRACTS.CARD_CATALOG, amount],
-      });
+      const approveTransaction = prepareTransaction(
+        CONTRACTS.EMARK_TOKEN,
+        EMARK_TOKEN_ABI,
+        "approve",
+        [CONTRACTS.CARD_CATALOG, amount]
+      );
       
-      // ✅ FIXED: Use our unified sendTransaction method
       console.log('⏳ Sending approval transaction...');
-      const approvalResult = await sendTransaction(approveTransaction as any);
+      const approvalResult = await sendTransaction(approveTransaction);
       
       if (!approvalResult.success) {
         throw new Error(`Approval failed: ${approvalResult.error}`);
@@ -132,15 +165,15 @@ export function useWrapping(userAddress?: string) {
       
       // Step 3: Wrap the tokens
       console.log('📝 Step 2: Preparing wrap transaction...');
-      const wrapTransaction = prepareContractCall({
-        contract: wrappingContract,
-        method: "wrap",
-        params: [amount],
-      });
+      const wrapTransaction = prepareTransaction(
+        CONTRACTS.CARD_CATALOG,
+        CardCatalogABI,
+        "wrap",
+        [amount]
+      );
       
-      // ✅ FIXED: Use our unified sendTransaction method
       console.log('⏳ Sending wrap transaction...');
-      const wrapResult = await sendTransaction(wrapTransaction as any);
+      const wrapResult = await sendTransaction(wrapTransaction);
       
       if (!wrapResult.success) {
         throw new Error(`Wrap failed: ${wrapResult.error}`);
@@ -148,13 +181,10 @@ export function useWrapping(userAddress?: string) {
       
       console.log('✅ Wrap transaction confirmed:', wrapResult.transactionHash);
       
-      // ✅ FIXED: Now we have guaranteed transaction hashes
       setSuccess(`Successfully wrapped ${amount.toString()} $EMARK → wEMARK! TX: ${wrapResult.transactionHash}`);
       console.log('🎉 Wrap process completed successfully');
       
-      // Refresh data after successful transactions
       refetchAllData();
-      
       return { success: true, transactionHash: wrapResult.transactionHash };
       
     } catch (err: any) {
@@ -165,7 +195,7 @@ export function useWrapping(userAddress?: string) {
     } finally {
       setIsWrapping(false);
     }
-  }, [effectiveUserAddress, emarkContract, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
+  }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
 
   // ✅ FIXED: Similar pattern for requestUnwrap
   const requestUnwrap = useCallback(async (amount: bigint) => {
@@ -181,15 +211,16 @@ export function useWrapping(userAddress?: string) {
     
     try {
       console.log('🔄 Starting unwrap request for amount:', amount.toString());
+      console.log('🔧 Using wallet type:', walletType);
       
-      const transaction = prepareContractCall({
-        contract: wrappingContract,
-        method: "requestUnwrap",
-        params: [amount],
-      });
+      const transaction = prepareTransaction(
+        CONTRACTS.CARD_CATALOG,
+        CardCatalogABI,
+        "requestUnwrap",
+        [amount]
+      );
       
-      // ✅ FIXED: Use our unified sendTransaction method
-      const result = await sendTransaction(transaction as any);
+      const result = await sendTransaction(transaction);
       
       if (!result.success) {
         throw new Error(`Unwrap request failed: ${result.error}`);
@@ -211,7 +242,7 @@ export function useWrapping(userAddress?: string) {
     } finally {
       setIsUnwrapping(false);
     }
-  }, [effectiveUserAddress, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
+  }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
   
   // ✅ FIXED: Similar pattern for completeUnwrap
   const completeUnwrap = useCallback(async () => {
@@ -227,15 +258,16 @@ export function useWrapping(userAddress?: string) {
     
     try {
       console.log('🔄 Starting complete unwrap...');
+      console.log('🔧 Using wallet type:', walletType);
       
-      const transaction = prepareContractCall({
-        contract: wrappingContract,
-        method: "completeUnwrap",
-        params: [],
-      });
+      const transaction = prepareTransaction(
+        CONTRACTS.CARD_CATALOG,
+        CardCatalogABI,
+        "completeUnwrap",
+        []
+      );
       
-      // ✅ FIXED: Use our unified sendTransaction method
-      const result = await sendTransaction(transaction as any);
+      const result = await sendTransaction(transaction);
       
       if (!result.success) {
         throw new Error(`Complete unwrap failed: ${result.error}`);
@@ -257,7 +289,7 @@ export function useWrapping(userAddress?: string) {
     } finally {
       setIsUnwrapping(false);
     }
-  }, [effectiveUserAddress, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
+  }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
   
   // ✅ FIXED: Similar pattern for cancelUnbonding
   const cancelUnbonding = useCallback(async () => {
@@ -273,15 +305,16 @@ export function useWrapping(userAddress?: string) {
     
     try {
       console.log('🔄 Starting cancel unbonding...');
+      console.log('🔧 Using wallet type:', walletType);
       
-      const transaction = prepareContractCall({
-        contract: wrappingContract,
-        method: "cancelUnbonding",
-        params: [],
-      });
+      const transaction = prepareTransaction(
+        CONTRACTS.CARD_CATALOG,
+        CardCatalogABI,
+        "cancelUnbonding",
+        []
+      );
       
-      // ✅ FIXED: Use our unified sendTransaction method
-      const result = await sendTransaction(transaction as any);
+      const result = await sendTransaction(transaction);
       
       if (!result.success) {
         throw new Error(`Cancel unbonding failed: ${result.error}`);
@@ -303,7 +336,7 @@ export function useWrapping(userAddress?: string) {
     } finally {
       setIsUnwrapping(false);
     }
-  }, [effectiveUserAddress, wrappingContract, sendTransaction, requireConnection, refetchAllData]);
+  }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
   
   const clearMessages = useCallback(() => {
     setError(null);
