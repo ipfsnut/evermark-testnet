@@ -53,19 +53,32 @@ export function EnhancedCreateEvermark() {
   
   // Auto-populate author if we have Farcaster info
   React.useEffect(() => {
-    if (profile.farcasterUser && !enhancedMetadata.customFields.find(f => f.key === 'author')) {
+
+    if (profile.farcasterUser) {
       const authorName = profile.farcasterUser.displayName || profile.farcasterUser.username || '';
       if (authorName) {
-        setEnhancedMetadata(prev => ({
-          ...prev,
-          customFields: [
-            ...prev.customFields,
-            { key: 'author', value: authorName }
-          ]
-        }));
+
+
+
+
+
+
+
+        setEnhancedMetadata(prev => {
+          // Always update/add author field
+          const otherFields = prev.customFields.filter(f => f.key !== 'author');
+          return {
+            ...prev,
+            customFields: [
+              ...otherFields,
+              { key: 'author', value: authorName }
+            ]
+          };
+        });
       }
     }
-  }, [profile.farcasterUser, enhancedMetadata.customFields]);
+
+  }, [profile.farcasterUser]); // Remove the dependency on customFields
   
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -228,7 +241,6 @@ export function EnhancedCreateEvermark() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Prevent multiple submissions
     if (isSubmitting || isCreating) return;
     setIsSubmitting(true);
     
@@ -244,14 +256,37 @@ export function EnhancedCreateEvermark() {
         sourceUrl: getSourceUrl(),
         author: getAuthor(),
         imageFile: selectedImage,
+        // ✅ ADD: Include all the enhanced metadata
+        customFields: enhancedMetadata.customFields,
+        tags: enhancedMetadata.tags,
+        contentType: enhancedMetadata.contentType,
+        // Include type-specific fields
+        ...(enhancedMetadata.contentType === 'DOI' && {
+          doi: enhancedMetadata.doi,
+          journal: enhancedMetadata.journal,
+          volume: enhancedMetadata.volume,
+          issue: enhancedMetadata.issue,
+          pages: enhancedMetadata.pages,
+          publicationDate: enhancedMetadata.publicationDate
+        }),
+        ...(enhancedMetadata.contentType === 'ISBN' && {
+          isbn: enhancedMetadata.isbn,
+          publisher: enhancedMetadata.publisher,
+          publicationDate: enhancedMetadata.publicationDate
+        }),
+        ...(enhancedMetadata.contentType === 'Cast' && {
+          castUrl: enhancedMetadata.castUrl
+        }),
+        ...(enhancedMetadata.contentType === 'URL' && {
+          url: enhancedMetadata.url
+        })
       };
       
-      console.log('Creating Evermark with data:', {
+      console.log('Creating Evermark with enhanced data:', {
         basicData: evermarkData,
         enhancedMetadata
       });
       
-      // The hook will handle all cast processing automatically
       const result = await createEvermark(evermarkData);
       
       if (result.success) {

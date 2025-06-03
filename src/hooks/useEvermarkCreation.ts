@@ -1,11 +1,37 @@
-// src/hooks/useEvermarkCreation.ts - DRAMATICALLY simplified with WalletProvider
+// src/hooks/useEvermarkCreation.ts - Simplified with unified WalletProvider
 import { useState, useRef } from "react";
-import { getContract, prepareContractCall, sendTransaction, readContract } from "thirdweb";
+import { getContract, prepareContractCall, readContract } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
-import { useWalletAuth, useTransactionWallet } from "../providers/WalletProvider";
+import { useWalletConnection } from "../providers/WalletProvider";
 
-// Keep all the interface definitions and helper functions...
+// Enhanced metadata interface with all fields
+export interface EvermarkMetadata {
+  title: string;
+  description: string;
+  sourceUrl: string;
+  author: string;
+  imageFile?: File | null;
+  
+  // ✅ Enhanced metadata fields
+  customFields?: Array<{ key: string; value: string }>;
+  tags?: string[];
+  contentType?: 'Cast' | 'DOI' | 'ISBN' | 'URL' | 'Custom';
+  
+  // Type-specific fields
+  doi?: string;
+  isbn?: string;
+  url?: string;
+  castUrl?: string;
+  publisher?: string;
+  publicationDate?: string;
+  journal?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+}
+
+// Cast data interfaces
 interface CastDataSuccess {
   title: string;
   author: string;
@@ -36,17 +62,52 @@ const isCastDataSuccess = (castData: CastData): castData is CastDataSuccess => {
   return !('error' in castData);
 };
 
-export interface EvermarkMetadata {
-  title: string;
-  description: string;
-  sourceUrl: string;
-  author: string;
-  imageFile?: File | null;
+// Transaction result interface
+interface CreateEvermarkResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  txHash?: string;
+  metadataURI?: string;
+  imageUrl?: string;
+  castData?: CastDataSuccess | null;
 }
 
 const DEVELOPER_REFERRER = "0x2B27EA7DaA8Bf1dE98407447b269Dfe280753fe3";
 
-// Keep all the helper functions unchanged...
+// Validation function
+const validateMetadata = (metadata: EvermarkMetadata): { isValid: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  if (!metadata.title?.trim()) errors.push("Title is required");
+  if (!metadata.description?.trim()) errors.push("Description is required");
+  
+  // Content-type specific validation
+  if (metadata.contentType === 'DOI' && metadata.doi) {
+    if (!/^10\.\d{4,}\//.test(metadata.doi)) {
+      errors.push("Invalid DOI format (should start with 10.xxxx/)");
+    }
+  }
+  
+  if (metadata.contentType === 'ISBN' && metadata.isbn) {
+    const cleanIsbn = metadata.isbn.replace(/-/g, '');
+    if (!/^(?:\d{9}[\dX]|\d{13})$/.test(cleanIsbn)) {
+      errors.push("Invalid ISBN format (should be 10 or 13 digits)");
+    }
+  }
+  
+  if (metadata.contentType === 'URL' && metadata.url) {
+    try {
+      new URL(metadata.url);
+    } catch {
+      errors.push("Invalid URL format");
+    }
+  }
+  
+  return { isValid: errors.length === 0, errors };
+};
+
+// Image upload to Pinata
 const uploadToPinata = async (file: File): Promise<string> => {
   const formData = new FormData();
   formData.append('file', file);
@@ -79,6 +140,7 @@ const uploadToPinata = async (file: File): Promise<string> => {
   }
 };
 
+// Farcaster cast processing
 const extractCastHash = (input: string): string | null => {
   console.log("🔍 Extracting cast hash from input:", input);
   
@@ -183,6 +245,7 @@ const fetchCastDataFromPinata = async (input: string): Promise<CastData> => {
   }
 };
 
+// Enhanced metadata upload to Pinata
 const uploadMetadataToPinata = async (
   metadata: EvermarkMetadata, 
   imageUrl?: string, 
@@ -199,11 +262,31 @@ const uploadMetadataToPinata = async (
     description: metadata.description,
     image: imageUrl || '',
     external_url: castData?.canonicalUrl || metadata.sourceUrl || '',
+    
+    // ✅ Enhanced attributes including custom fields
     attributes: [
       { trait_type: 'Author', value: metadata.author || 'Unknown Author' },
+      { trait_type: 'Content Type', value: metadata.contentType || 'Custom' },
       { trait_type: 'Source URL', value: castData?.canonicalUrl || metadata.sourceUrl || 'Direct Upload' },
       { trait_type: 'Created', value: new Date().toISOString() },
-      { trait_type: 'Content Type', value: castData && isCastDataSuccess(castData) ? 'Farcaster Cast' : 'Custom Content' },
+      
+      // ✅ Custom fields as attributes
+      ...(metadata.customFields?.map(field => ({
+        trait_type: field.key,
+        value: field.value
+      })) || []),
+      
+      // ✅ Type-specific attributes
+      ...(metadata.doi ? [{ trait_type: 'DOI', value: metadata.doi }] : []),
+      ...(metadata.isbn ? [{ trait_type: 'ISBN', value: metadata.isbn }] : []),
+      ...(metadata.journal ? [{ trait_type: 'Journal', value: metadata.journal }] : []),
+      ...(metadata.publisher ? [{ trait_type: 'Publisher', value: metadata.publisher }] : []),
+      ...(metadata.publicationDate ? [{ trait_type: 'Publication Date', value: metadata.publicationDate }] : []),
+      ...(metadata.volume ? [{ trait_type: 'Volume', value: metadata.volume }] : []),
+      ...(metadata.issue ? [{ trait_type: 'Issue', value: metadata.issue }] : []),
+      ...(metadata.pages ? [{ trait_type: 'Pages', value: metadata.pages }] : []),
+      
+      // ✅ Farcaster-specific attributes
       ...(castData && isCastDataSuccess(castData) ? [
         { trait_type: 'Cast Content', value: castData.content },
         { trait_type: 'Cast Hash', value: castData.castHash },
@@ -213,6 +296,41 @@ const uploadMetadataToPinata = async (
         { trait_type: 'Platform', value: 'Farcaster' }
       ] : [])
     ],
+    
+    // ✅ Tags
+    ...(metadata.tags && metadata.tags.length > 0 && {
+      tags: metadata.tags
+    }),
+    
+    // ✅ Enhanced metadata section for rich data
+    enhanced_metadata: {
+      content_type: metadata.contentType,
+      custom_fields: metadata.customFields || [],
+      tags: metadata.tags || [],
+      type_specific_data: {
+        ...(metadata.contentType === 'DOI' && {
+          doi: metadata.doi,
+          journal: metadata.journal,
+          volume: metadata.volume,
+          issue: metadata.issue,
+          pages: metadata.pages,
+          publication_date: metadata.publicationDate
+        }),
+        ...(metadata.contentType === 'ISBN' && {
+          isbn: metadata.isbn,
+          publisher: metadata.publisher,
+          publication_date: metadata.publicationDate
+        }),
+        ...(metadata.contentType === 'Cast' && {
+          cast_url: metadata.castUrl
+        }),
+        ...(metadata.contentType === 'URL' && {
+          url: metadata.url
+        })
+      }
+    },
+    
+    // ✅ Farcaster data if available
     ...(castData && isCastDataSuccess(castData) && {
       farcaster_data: {
         content: castData.content,
@@ -228,7 +346,7 @@ const uploadMetadataToPinata = async (
     })
   };
 
-  console.log("📝 Uploading metadata object:", JSON.stringify(metadataObject, null, 2));
+  console.log("📝 Uploading enhanced metadata object:", JSON.stringify(metadataObject, null, 2));
 
   try {
     const response = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
@@ -244,6 +362,7 @@ const uploadMetadataToPinata = async (
           keyvalues: {
             type: 'evermark-metadata',
             title: metadata.title,
+            content_type: metadata.contentType || 'custom',
             platform: castData && isCastDataSuccess(castData) ? 'farcaster' : 'general'
           }
         }
@@ -256,10 +375,10 @@ const uploadMetadataToPinata = async (
 
     const result = await response.json();
     const metadataURI = `ipfs://${result.IpfsHash}`;
-    console.log("✅ Metadata uploaded with IPFS URI:", metadataURI);
+    console.log("✅ Enhanced metadata uploaded with IPFS URI:", metadataURI);
     return metadataURI;
   } catch (error) {
-    console.error('Metadata upload error:', error);
+    console.error('Enhanced metadata upload error:', error);
     throw error;
   }
 };
@@ -271,32 +390,21 @@ export const useEvermarkCreation = () => {
   
   const isProcessingRef = useRef(false);
   
-  // 🎉 MASSIVELY SIMPLIFIED: Use the wallet provider instead of 100+ lines of complex detection logic
-  const { isConnected, canInteract, requireConnection, error: walletError } = useWalletAuth();
+  // ✅ SIMPLIFIED: Use unified wallet provider
   const { 
-    useThirdweb, 
-    useWagmi, 
-    thirdwebAccount, 
-    sendWagmiTransaction,
-    isTransactionPending 
-  } = useTransactionWallet();
+    isConnected, 
+    canInteract, 
+    requireConnection, 
+    sendTransaction,
+    isTransactionPending,
+    error: walletError 
+  } = useWalletConnection();
 
-  const createEvermark = async (metadata: EvermarkMetadata) => {
-    // 🎉 SIMPLIFIED: Just one line to handle wallet connection!
-    if (!canInteract) {
-      console.log("🔌 Wallet not connected, attempting to connect...");
-      const connectionResult = await requireConnection();
-      if (!connectionResult.success) {
-        setError(connectionResult.error || "Failed to connect wallet");
-        return { success: false, error: connectionResult.error || "Connection failed" };
-      }
-      // Wait a moment for connection to stabilize
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    }
-
+  const createEvermark = async (metadata: EvermarkMetadata): Promise<CreateEvermarkResult> => {
+    // Prevent concurrent executions
     if (isProcessingRef.current) {
-      console.warn("Transaction already in progress");
-      return { success: false, error: "Transaction already in progress. Please wait." };
+      console.log("⚠️ Creation already in progress, skipping");
+      return { success: false, error: "Creation already in progress" };
     }
 
     isProcessingRef.current = true;
@@ -304,30 +412,27 @@ export const useEvermarkCreation = () => {
     setError(null);
     setSuccess(null);
 
-    console.log("🚀 Starting Evermark creation process...");
-    console.log("🔍 Using wallet system:", useThirdweb ? "Thirdweb" : "Wagmi");
-
-    // Validate required fields
-    if (!metadata.title?.trim()) {
-      const error = "Title is required";
-      setError(error);
-      isProcessingRef.current = false;
-      setIsCreating(false);
-      return { success: false, error };
-    }
-
-    if (!metadata.description?.trim()) {
-      const error = "Description is required";
-      setError(error);
-      isProcessingRef.current = false;
-      setIsCreating(false);
-      return { success: false, error };
-    }
-
-    const providedAuthor = metadata.author?.trim();
-
     try {
-      // Get contract
+      console.log("🚀 Starting Evermark creation with enhanced metadata:", metadata);
+
+      // ✅ SIMPLIFIED: Use unified wallet connection
+      if (!canInteract) {
+        console.log("🔌 Wallet not connected, attempting connection...");
+        const connectionResult = await requireConnection();
+        if (!connectionResult.success) {
+          throw new Error(connectionResult.error || "Failed to connect wallet");
+        }
+        // Give connection a moment to stabilize
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Validate metadata
+      const validation = validateMetadata(metadata);
+      if (!validation.isValid) {
+        throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
+      }
+
+      // Get contract instance
       const contract = getContract({
         client,
         chain: CHAIN,
@@ -335,240 +440,189 @@ export const useEvermarkCreation = () => {
         abi: EVERMARK_NFT_ABI,
       });
 
-      // Check contract state and get the actual minting fee
-      console.log("🔍 Checking contract state and minting fee...");
-      
-      let mintingFee: bigint;
-      
-      try {
-        const isPaused = await readContract({
-          contract,
-          method: "paused",
-          params: []
-        });
-        
-        if (isPaused) {
-          throw new Error("Contract is currently paused");
-        }
+      // Get minting fee
+      console.log("💰 Getting minting fee...");
+      const mintingFee = await readContract({
+        contract,
+        method: "mintingFee",
+        params: [],
+      });
+      console.log("✅ Minting fee:", mintingFee.toString());
 
-        mintingFee = await readContract({
-          contract,
-          method: "MINTING_FEE",
-          params: []
-        });
-        
-        console.log("💰 Contract minting fee:", mintingFee.toString(), "wei");
-        
-      } catch (stateError: any) {
-        console.error("❌ Contract state check failed:", stateError);
-        mintingFee = BigInt("1000000000000000"); // 0.001 ETH as fallback
-        console.warn("⚠️ Using fallback minting fee:", mintingFee.toString());
-      }
+      let imageUrl = '';
+      let castData: CastData | null = null;
 
-      let imageUrl = "";
-      let metadataURI = "";
-
-      // Upload image to Pinata if it exists
+      // Handle image upload
       if (metadata.imageFile) {
-        console.log("📸 Uploading image to Pinata...");
+        console.log("🖼️ Uploading image to IPFS...");
         try {
           imageUrl = await uploadToPinata(metadata.imageFile);
-          console.log("✅ Image uploaded successfully:", imageUrl);
-        } catch (uploadError: any) {
-          console.error("❌ Failed to upload image:", uploadError);
-          throw new Error(`Image upload failed: ${uploadError.message}`);
+          console.log("✅ Image uploaded:", imageUrl);
+        } catch (imageError) {
+          console.error("❌ Image upload failed:", imageError);
+          // Continue without image rather than failing completely
+          setError("Image upload failed, continuing without image");
         }
       }
 
-      let actualTitle = metadata.title;
-      let actualAuthor = providedAuthor || "Unknown Author";
-      let castData: CastData | undefined = undefined;
-      
-      // Check if it's Farcaster-related input and fetch data
-      if (metadata.sourceUrl && isFarcasterInput(metadata.sourceUrl)) {
-        console.log("🎯 Detected Farcaster input, fetching cast data...");
+      // Handle Farcaster cast processing
+      const sourceUrl = metadata.sourceUrl || metadata.castUrl || '';
+      if (sourceUrl && isFarcasterInput(sourceUrl)) {
+        console.log("📱 Processing Farcaster cast...");
         try {
-          castData = await fetchCastDataFromPinata(metadata.sourceUrl);
+          castData = await fetchCastDataFromPinata(sourceUrl);
+          console.log("✅ Cast data processed:", castData);
           
+          // Update metadata with cast data if successful
           if (isCastDataSuccess(castData)) {
-            actualTitle = castData.title;
-            if (!providedAuthor) {
-              actualAuthor = castData.author;
-            }
+            // Enhance metadata with cast information
+            metadata.title = metadata.title || castData.title;
+            metadata.author = metadata.author || castData.author;
+            metadata.description = metadata.description || castData.content;
+            
+            // Add cast-specific custom fields
+            const castFields = [
+              { key: 'cast_hash', value: castData.castHash },
+              { key: 'cast_author', value: castData.username },
+              { key: 'cast_timestamp', value: castData.timestamp },
+              { key: 'platform', value: 'Farcaster' }
+            ];
+            
+            metadata.customFields = [
+              ...(metadata.customFields || []),
+              ...castFields.filter(newField => 
+                !metadata.customFields?.some(existing => existing.key === newField.key)
+              )
+            ];
           }
-        } catch (fetchError: any) {
-          console.error("❌ Error fetching cast data:", fetchError);
+        } catch (castError) {
+          console.error("❌ Cast processing failed:", castError);
+          // Continue with original metadata
+          setError("Cast processing failed, using provided metadata");
         }
       }
 
-      // Upload metadata to Pinata
-      console.log("📝 Uploading metadata to Pinata...");
-      try {
-        metadataURI = await uploadMetadataToPinata({
-          ...metadata,
-          title: actualTitle,
-          author: actualAuthor
-        }, imageUrl, castData);
-        console.log("✅ Metadata uploaded successfully:", metadataURI);
-      } catch (metadataError: any) {
-        console.error("❌ Failed to upload metadata:", metadataError);
-        throw new Error(`Metadata upload failed: ${metadataError.message}`);
+      // Upload enhanced metadata to IPFS
+      console.log("📝 Uploading enhanced metadata to IPFS...");
+      const metadataURI = await uploadMetadataToPinata(metadata, imageUrl, castData || undefined); // ✅ Convert null to undefined
+      console.log("✅ Enhanced metadata uploaded:", metadataURI);
+      // Prepare transaction
+      const actualTitle = metadata.title || "Untitled Evermark";
+      const actualAuthor = metadata.author || "Unknown Author";
+
+      console.log("⛓️ Preparing blockchain transaction...");
+      const transaction = prepareContractCall({
+        contract,
+        method: "mintEvermarkWithReferral",
+        params: [metadataURI, actualTitle, actualAuthor, DEVELOPER_REFERRER],
+        value: mintingFee,
+      });
+
+      console.log("📡 Sending transaction via unified wallet provider...");
+      
+      // ✅ SIMPLIFIED: Use unified transaction sending
+      const result = await sendTransaction(transaction);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Transaction failed");
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const txHash = result.transactionHash!;
+      console.log("✅ Evermark created successfully! Transaction:", txHash);
 
-      console.log("📤 Sending transaction to blockchain...");
-      
-      let result: { transactionHash: string };
-      
-      // 🎉 SIMPLIFIED: Use the provider's clean transaction logic
-      if (useThirdweb) {
-        console.log("💳 Using Thirdweb for transaction");
-        
-        const transaction = prepareContractCall({
-          contract,
-          method: "mintEvermarkWithReferral",
-          params: [metadataURI, actualTitle, actualAuthor, DEVELOPER_REFERRER],
-          value: mintingFee,
-        });
-
-        const thirdwebResult = await sendTransaction({
-          transaction,
-          account: thirdwebAccount,
-        });
-        
-        result = { transactionHash: thirdwebResult.transactionHash };
-        
-      } else if (useWagmi) {
-        console.log("📱 Using Wagmi for Farcaster transaction");
-        
-        const transaction = prepareContractCall({
-          contract,
-          method: "mintEvermarkWithReferral",
-          params: [metadataURI, actualTitle, actualAuthor, DEVELOPER_REFERRER],
-          value: mintingFee,
-        });
-
-        try {
-          let transactionData: `0x${string}`;
-          
-          if (!transaction.data) {
-            throw new Error("Transaction data is missing");
-          }
-          
-          if (typeof transaction.data === 'function') {
-            const resolvedData = await transaction.data();
-            if (!resolvedData) {
-              throw new Error("Failed to resolve transaction data");
-            }
-            transactionData = resolvedData as `0x${string}`;
-          } else {
-            transactionData = transaction.data as `0x${string}`;
-          }
-
-          const wagmiTxHash = await sendWagmiTransaction({
-            to: transaction.to as `0x${string}`,
-            data: transactionData,
-            value: mintingFee,
-            gas: transaction.gas ? BigInt(transaction.gas.toString()) : undefined,
-          });
-          
-          result = { transactionHash: wagmiTxHash };
-          console.log("✅ Wagmi transaction successful:", wagmiTxHash);
-          
-        } catch (wagmiTxError: any) {
-          console.error("Wagmi transaction failed:", wagmiTxError);
-          throw new Error(`Farcaster transaction failed: ${wagmiTxError.message}`);
-        }
-      } else {
-        throw new Error("No transaction method available. Please connect a wallet.");
-      }
-
-      console.log("✅ Transaction successful:", result.transactionHash);
-      
-      const successMessage = castData && isCastDataSuccess(castData)
-        ? `Farcaster cast by @${castData.username} preserved successfully!`
-        : `Evermark "${actualTitle}" by ${actualAuthor} created successfully!`;
-      
+      const successMessage = `Evermark "${actualTitle}" created successfully!`;
       setSuccess(successMessage);
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         message: successMessage,
-        txHash: result.transactionHash,
+        txHash,
         metadataURI,
-        imageUrl,
+        imageUrl: imageUrl || undefined,
         castData: castData && isCastDataSuccess(castData) ? castData : null
       };
 
-    } catch (error: any) {
-      console.error("❌ Transaction failed:", error);
+    } catch (err: any) {
+      console.error("❌ Evermark creation failed:", err);
       
-      let errorMessage = "Unknown error";
-      if (error.message) {
-        if (error.message.includes("Insufficient minting fee")) {
-          errorMessage = "Insufficient minting fee. Please check the required amount.";
-        } else if (error.message.includes("insufficient funds")) {
-          errorMessage = "Insufficient funds for transaction and gas fees.";
-        } else if (error.message.includes("user rejected")) {
-          errorMessage = "Transaction was rejected by user.";
-        } else if (error.message.includes("paused")) {
-          errorMessage = "Contract is currently paused.";
-        } else if (error.message.includes("Pinata")) {
-          errorMessage = `Upload failed: ${error.message}`;
+      let errorMessage = "Failed to create Evermark";
+      
+      // Enhanced error handling
+      if (err.message) {
+        if (err.message.includes("insufficient funds")) {
+          errorMessage = "Insufficient funds for minting fee and gas";
+        } else if (err.message.includes("user rejected")) {
+          errorMessage = "Transaction was rejected by user";
+        } else if (err.message.includes("network")) {
+          errorMessage = "Network error - please try again";
+        } else if (err.message.includes("Validation failed")) {
+          errorMessage = err.message;
         } else {
-          errorMessage = error.message;
+          errorMessage = err.message;
         }
       }
+
+      // Include wallet errors if present
+      if (walletError) {
+        errorMessage += ` (Wallet: ${walletError})`;
+      }
+
+      setError(errorMessage);
       
-      setError(`Failed to create Evermark: ${errorMessage}`);
-      return { success: false, error: errorMessage };
-      
+      return {
+        success: false,
+        error: errorMessage
+      };
+
     } finally {
-      isProcessingRef.current = false;
       setIsCreating(false);
-      console.log("🧹 Cleanup completed");
+      isProcessingRef.current = false;
     }
   };
 
+  // Farcaster input validation helper
+  const validateFarcasterInput = (input: string): { 
+    isValid: boolean; 
+    hash?: string; 
+    error?: string 
+  } => {
+    if (!input) {
+      return { isValid: false, error: "Input is required" };
+    }
+
+    if (!isFarcasterInput(input)) {
+      return { isValid: false, error: "Not a valid Farcaster URL or hash" };
+    }
+
+    const hash = extractCastHash(input);
+    if (!hash) {
+      return { isValid: false, error: "Could not extract cast hash" };
+    }
+
+    return { isValid: true, hash };
+  };
+
+  // Clear messages
   const clearMessages = () => {
     setError(null);
     setSuccess(null);
   };
 
-  const validateFarcasterInput = (input: string): { isValid: boolean; type: string; hash?: string } => {
-    if (!input) return { isValid: false, type: 'empty' };
-    
-    const hash = extractCastHash(input);
-    
-    if (hash) {
-      if (input.includes('farcaster.xyz')) {
-        return { isValid: true, type: 'farcaster.xyz URL', hash };
-      } else if (input.includes('warpcast.com')) {
-        return { isValid: true, type: 'warpcast URL', hash };
-      } else if (input.startsWith('0x')) {
-        return { isValid: true, type: 'cast hash', hash };
-      }
-    }
-    
-    return { isValid: false, type: 'invalid' };
+  // Wallet info for debugging
+  const walletInfo = {
+    isConnected,
+    canInteract,
+    isTransactionPending,
+    walletError
   };
 
-  return { 
-    createEvermark, 
-    isCreating: isCreating || isTransactionPending, // Include provider's pending state
-    error: error || walletError || null, // Include provider's errors
-    success, 
-    clearMessages,
+  return {
+    createEvermark,
+    isCreating,
+    error,
+    success,
     validateFarcasterInput,
-    isProcessing: isProcessingRef.current,
-    
-    // 🎉 SIMPLIFIED: Expose clean wallet info from provider
-    walletInfo: {
-      isConnected,
-      canInteract,
-      useThirdweb,
-      useWagmi
-    }
+    clearMessages,
+    walletInfo
   };
 };
