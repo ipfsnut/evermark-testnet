@@ -639,6 +639,21 @@ export function useEvermarkCreation() {
     setSuccess(null);
   }, []);
 
+  const validateFarcasterInput = useCallback((input: string) => {
+    const isValid = isFarcasterInput(input);
+    if (!isValid) return { isValid: false };
+    
+    // Extract hash from URL
+    const hashMatch = input.match(/0x[a-fA-F0-9]+/);
+    const hash = hashMatch ? hashMatch[0] : null;
+    
+    return {
+      isValid: true,
+      hash,
+      url: input
+    };
+  }, []);
+
   return {
     // State
     isCreating,
@@ -664,5 +679,6 @@ export function useEvermarkCreation() {
     // Auth info
     isConnected: !!address,
     userAddress: address,
+    validateFarcasterInput,
   };
 }
