@@ -1,5 +1,5 @@
-// src/lib/farcaster.tsx - Fixed type error with verified addresses
-import React, { createContext, useContext, useEffect, useState, PropsWithChildren, useRef } from 'react';
+// src/lib/farcaster.tsx - Complete rewrite with all fixes and improvements
+import React, { createContext, useContext, useEffect, useState, useCallback, PropsWithChildren, useRef } from 'react';
 import sdk from "@farcaster/frame-sdk";
 
 export { sdk };
@@ -39,7 +39,7 @@ const FarcasterContext = createContext<FarcasterContextType>({
   error: undefined,
 });
 
-// Enhanced environment detection (same as before)
+// Enhanced environment detection
 function detectFarcasterEnvironment() {
   if (typeof window === 'undefined') {
     return { isInFarcaster: false, confidence: 'high', methods: ['no-window'] };
@@ -279,37 +279,53 @@ export const FarcasterProvider: React.FC<PropsWithChildren> = ({ children }) => 
   );
 };
 
-// 🎯 FIXED: Better user hook with proper typing and null safety
+// 🎯 FIXED: Better user hook with proper typing, null safety, and NO INFINITE LOOPS
 export const useFarcasterUser = () => {
   const context = useContext(FarcasterContext);
   
-  const getVerifiedAddresses = () => {
+  // ✅ MEMOIZED: These functions are now stable and won't cause re-renders
+  const getVerifiedAddresses = useCallback(() => {
     return context.user?.verifiedAddresses.eth_addresses || [];
-  };
+  }, [context.user?.verifiedAddresses.eth_addresses]);
   
-  const getPrimaryAddress = () => {
+  const getPrimaryAddress = useCallback(() => {
     const addresses = getVerifiedAddresses();
     return addresses.length > 0 ? addresses[0] : null;
-  };
+  }, [getVerifiedAddresses]);
   
-  const hasVerifiedAddress = () => {
+  const hasVerifiedAddress = useCallback(() => {
     return getVerifiedAddresses().length > 0;
-  };
+  }, [getVerifiedAddresses]);
   
-  // ✅ FIXED: Only log once when context changes, not on every render
+  // ✅ FIXED: Only log when context actually changes (not on every render)
   useEffect(() => {
-    console.log('🔍 useFarcasterUser state:', {
-      isInFarcaster: context.isInFarcaster,
-      isReady: context.isReady,
-      isAuthenticated: context.isAuthenticated,
-      hasUser: !!context.user,
-      fid: context.user?.fid,
-      username: context.user?.username,
-      verifiedAddresses: getVerifiedAddresses(),
-      primaryAddress: getPrimaryAddress(),
-      hasVerifiedAddress: hasVerifiedAddress()
-    });
-  }, [context.isInFarcaster, context.isReady, context.isAuthenticated, context.user?.fid]); // Only log when these change
+    if (context.isInFarcaster && context.isReady) {
+      console.log('🔍 Farcaster user state updated:', {
+        isAuthenticated: context.isAuthenticated,
+        hasUser: !!context.user,
+        fid: context.user?.fid,
+        username: context.user?.username,
+        hasVerifiedAddresses: hasVerifiedAddress()
+      });
+    }
+  }, [context.isAuthenticated, context.user?.fid, context.user?.username, hasVerifiedAddress]);
+  
+  // ✅ MEMOIZED: Display helpers are now stable
+  const getDisplayName = useCallback(() => {
+    return context.user?.displayName || context.user?.username || '';
+  }, [context.user?.displayName, context.user?.username]);
+  
+  const getAvatarUrl = useCallback(() => {
+    return context.user?.pfpUrl || '';
+  }, [context.user?.pfpUrl]);
+  
+  const getUserHandle = useCallback(() => {
+    return context.user?.username ? `@${context.user.username}` : '';
+  }, [context.user?.username]);
+  
+  const getProfileUrl = useCallback(() => {
+    return context.user?.username ? `https://warpcast.com/${context.user.username}` : '';
+  }, [context.user?.username]);
   
   return {
     user: context.user,
@@ -318,28 +334,37 @@ export const useFarcasterUser = () => {
     isReady: context.isReady,
     error: context.error,
     
-    // Address helpers
+    // Address helpers (now memoized)
     getVerifiedAddresses,
     getPrimaryAddress,
     hasVerifiedAddress,
     
-    // Display helpers
-    getDisplayName: () => context.user?.displayName || context.user?.username || '',
-    getAvatarUrl: () => context.user?.pfpUrl || '',
-    getUserHandle: () => context.user?.username ? `@${context.user.username}` : '',
-    getProfileUrl: () => context.user?.username ? `https://warpcast.com/${context.user.username}` : '',
+    // Display helpers (now memoized)
+    getDisplayName,
+    getAvatarUrl,
+    getUserHandle,
+    getProfileUrl,
   };
 };
 
+// ✅ ENHANCED: Farcaster actions with better error handling
 export const useFarcasterActions = () => {
   return {
     openWarpcastProfile: (username: string) => {
-      const url = `https://warpcast.com/${username}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      try {
+        const url = `https://warpcast.com/${username}`;
+        window.open(url, '_blank', 'noopener,noreferrer');
+      } catch (error) {
+        console.error('Failed to open Warpcast profile:', error);
+      }
     },
     shareFrame: (frameUrl: string) => {
-      const shareUrl = `https://warpcast.com/~/compose?text=Check%20out%20this%20frame%3A%20${encodeURIComponent(frameUrl)}`;
-      window.open(shareUrl, '_blank', 'noopener,noreferrer');
+      try {
+        const shareUrl = `https://warpcast.com/~/compose?text=Check%20out%20this%20frame%3A%20${encodeURIComponent(frameUrl)}`;
+        window.open(shareUrl, '_blank', 'noopener,noreferrer');
+      } catch (error) {
+        console.error('Failed to share frame:', error);
+      }
     },
   };
 };
