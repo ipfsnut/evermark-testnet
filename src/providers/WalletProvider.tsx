@@ -1,203 +1,163 @@
-// src/providers/WalletProvider.tsx - All TypeScript errors fixed
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useActiveAccount } from "thirdweb/react";
-import { useAccount, useConnect, useSendTransaction } from "wagmi";
-import { useFarcasterUser } from "../lib/farcaster";
+import { createContext, useContext, ReactNode } from 'react';
+import { useFarcasterUser } from '../lib/farcaster';
+import { FarcasterWalletProvider } from './FarcasterWalletProvider';
+import { ThirdwebWalletProvider } from './ThirdwebWalletProvider';
 
-// Properly typed interface
-export interface WalletConnection {
-  // Core state - simplified and properly typed
+// Unified wallet interface that both providers must implement
+export interface UnifiedWalletConnection {
+  // Core state
   isConnected: boolean;
   address?: string;
   displayAddress?: string;
   
   // Environment context
+  walletType: 'farcaster' | 'thirdweb' | 'none';
   isInFarcaster: boolean;
-  usesFarcasterWallet: boolean;
   
   // Connection methods
   connectWallet: () => Promise<{ success: boolean; error?: string }>;
   requireConnection: () => Promise<{ success: boolean; error?: string }>;
+  disconnect: () => Promise<void>;
   
   // Transaction capabilities
   canInteract: boolean;
-  sendTransaction: any; // Will be either Thirdweb or Wagmi based on context
+  sendTransaction: (tx: any) => Promise<{ success: boolean; transactionHash?: string; error?: string }>;
+  
+  // ERC-20 utilities
+  approveERC20: (tokenAddress: string, spenderAddress: string, amount: string) => Promise<{ success: boolean; transactionHash?: string; error?: string }>;
+  checkAllowance: (tokenAddress: string, ownerAddress: string, spenderAddress: string) => Promise<bigint>;
+  
+  // Batch transactions
+  batchTransactions: (transactions: any[]) => Promise<Array<{ success: boolean; transactionHash?: string; error?: string }>>;
   
   // Status
   isConnecting: boolean;
+  isTransactionPending: boolean;
   error?: string;
+  lastTransactionHash?: string;
 }
 
-const WalletContext = createContext<WalletConnection | null>(null);
+// Context for the unified wallet
+const WalletContext = createContext<UnifiedWalletConnection | null>(null);
 
 interface WalletProviderProps {
   children: ReactNode;
 }
 
-export function WalletProvider({ children }: WalletProviderProps) {
-  const [error, setError] = useState<string>();
-  const [isConnecting, setIsConnecting] = useState(false);
+// Enhanced environment detection
+function detectWalletEnvironment(): {
+  shouldUseFarcaster: boolean;
+  confidence: 'high' | 'medium' | 'low';
+  methods: string[];
+} {
+  if (typeof window === 'undefined') {
+    return { shouldUseFarcaster: false, confidence: 'high', methods: ['no-window'] };
+  }
+
+  const methods: string[] = [];
+  let shouldUseFarcaster = false;
+  let confidence: 'high' | 'medium' | 'low' = 'low';
+
+  const userAgent = navigator.userAgent.toLowerCase();
+  const url = window.location.href.toLowerCase();
   
-  // Get Farcaster context with proper typing - removed unused farcasterUser
-  const { 
-    isInFarcaster, 
-    isAuthenticated: isFarcasterAuth, 
-    isReady: farcasterReady,
-    hasVerifiedAddress,
-    getPrimaryAddress
-  } = useFarcasterUser();
+  // Method 1: Direct Farcaster indicators
+  if (userAgent.includes('farcaster') || userAgent.includes('warpcast')) {
+    shouldUseFarcaster = true;
+    confidence = 'high';
+    methods.push('user-agent-direct');
+  }
+
+  // Method 2: URL patterns  
+  if (url.includes('farcaster.com') || url.includes('warpcast.com') || url.includes('frame')) {
+    shouldUseFarcaster = true;
+    confidence = 'high';
+    methods.push('url-pattern');
+  }
+
+  // Method 3: PostMessage detection
+  if ((window as any).__farcaster_detected) {
+    shouldUseFarcaster = true;
+    confidence = 'high';
+    methods.push('postmessage-detected');
+  }
+
+  // Method 4: Frame context detection
+  try {
+    const hasParent = window.parent !== window;
+    const isIframe = window.self !== window.top;
+    
+    if (hasParent || isIframe) {
+      methods.push('iframe-context');
+      if (methods.length > 1) {
+        confidence = 'medium';
+      }
+    }
+  } catch (e) {
+    methods.push('cross-origin-blocked');
+  }
+
+  // Method 5: Mobile WebView detection  
+  const isMobile = userAgent.includes('mobile') || userAgent.includes('android') || userAgent.includes('iphone');
+  const isWebView = userAgent.includes('wv') || userAgent.includes('webview');
   
-  // Thirdweb (for desktop/web)
-  const thirdwebAccount = useActiveAccount();
-  
-  // Wagmi (for Farcaster frames)
-  const { 
-    isConnected: isWagmiConnected, 
-    address: wagmiAddress 
-  } = useAccount();
-  const { connect, connectors, isPending: isConnectPending } = useConnect();
-  const { sendTransactionAsync: sendWagmiTx } = useSendTransaction();
-  
-  // Clean environment-based logic with proper typing
-  const usesFarcasterWallet = isInFarcaster && farcasterReady;
-  
-  // Helper function to convert null to undefined
-  const nullToUndefined = (value: string | null | undefined): string | undefined => {
-    return value === null ? undefined : value;
-  };
-  
-  // FIXED: Complete null filtering for all address sources
-  const primaryAddress = usesFarcasterWallet 
-    ? (nullToUndefined(wagmiAddress) || nullToUndefined(getPrimaryAddress())) 
-    : nullToUndefined(thirdwebAccount?.address);
-  
-  // Better connection detection
-  const isConnected = usesFarcasterWallet 
-    ? (isWagmiConnected || hasVerifiedAddress()) 
-    : !!thirdwebAccount?.address;
-  
-  const canInteract = isConnected;
-  
-  console.log('🔍 Wallet State (All Errors Fixed):', {
-    isInFarcaster,
-    farcasterReady,
-    usesFarcasterWallet,
-    isWagmiConnected,
-    wagmiAddress,
-    farcasterPrimaryAddress: getPrimaryAddress(),
-    hasVerifiedAddress: hasVerifiedAddress(),
-    thirdwebAddress: thirdwebAccount?.address,
-    primaryAddress,
-    isConnected,
-    canInteract
+  if (isMobile && isWebView && !userAgent.includes('safari') && !userAgent.includes('chrome/')) {
+    methods.push('mobile-webview');
+    if (!shouldUseFarcaster && methods.length > 1) {
+      shouldUseFarcaster = true;
+      confidence = 'medium';
+    }
+  }
+
+  console.log('🔍 Wallet Environment Detection:', {
+    shouldUseFarcaster,
+    confidence,
+    methods,
+    userAgent: userAgent.substring(0, 100),
+    url: url.substring(0, 100)
   });
-  
-  // Auto-connect for Farcaster
-  useEffect(() => {
-    if (!usesFarcasterWallet || isConnected || isConnecting) return;
-    
-    // If user has verified addresses in Farcaster but Wagmi isn't connected, try to connect
-    if (isFarcasterAuth && hasVerifiedAddress() && !isWagmiConnected) {
-      console.log('🔌 Auto-connecting Farcaster wallet...');
-      setIsConnecting(true);
-      
-      const farcasterConnector = connectors.find(c => c.id === 'farcasterFrame');
-      if (farcasterConnector) {
-        try {
-          // FIXED: connect() is synchronous in wagmi v2, doesn't return a Promise
-          connect({ connector: farcasterConnector });
-          console.log('✅ Farcaster wallet auto-connect initiated');
-          setError(undefined);
-        } catch (err: unknown) {
-          console.warn('⚠️ Auto-connect failed, but user has verified addresses:', err);
-          // Don't set error - user still has verified addresses from Farcaster context
-        }
-        setIsConnecting(false);
-      } else {
-        setIsConnecting(false);
-      }
-    }
-  }, [usesFarcasterWallet, isConnected, isConnecting, isFarcasterAuth, hasVerifiedAddress, isWagmiConnected, connectors, connect]);
-  
-  // Manual connection
-  const connectWallet = useCallback(async () => {
-    if (isConnecting || isConnectPending) {
-      return { success: false, error: "Connection already in progress" };
-    }
-    
-    setIsConnecting(true);
-    setError(undefined);
-    
-    try {
-      if (usesFarcasterWallet) {
-        // In Farcaster: try to connect the frame wallet
-        const farcasterConnector = connectors.find(c => c.id === 'farcasterFrame');
-        if (farcasterConnector) {
-          // FIXED: connect() is synchronous in wagmi v2, doesn't return a Promise
-          connect({ connector: farcasterConnector });
-          console.log('✅ Farcaster wallet connection initiated');
-          return { success: true };
-        } else {
-          // If no connector but user has verified addresses, that's still success
-          if (hasVerifiedAddress()) {
-            console.log('✅ Using Farcaster verified addresses');
-            return { success: true };
-          }
-          throw new Error('No Farcaster wallet available');
-        }
-      } else {
-        // Desktop: user needs to use Thirdweb connect button
-        throw new Error('Please use the Connect Wallet button for desktop');
-      }
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Failed to connect wallet';
-      setError(errorMsg);
-      return { success: false, error: errorMsg };
-    } finally {
-      setIsConnecting(false);
-    }
-  }, [usesFarcasterWallet, connectors, connect, hasVerifiedAddress, isConnecting, isConnectPending]);
-  
-  // Require connection (auto-connect if needed)
-  const requireConnection = useCallback(async () => {
-    if (isConnected) {
-      return { success: true };
-    }
-    return await connectWallet();
-  }, [isConnected, connectWallet]);
-  
-  const value: WalletConnection = {
-    // Core state - primaryAddress is now guaranteed to be string | undefined
-    isConnected,
-    address: primaryAddress,
-    displayAddress: primaryAddress ? `${primaryAddress.slice(0, 6)}...${primaryAddress.slice(-4)}` : undefined,
-    
-    // Environment
-    isInFarcaster,
-    usesFarcasterWallet,
-    
-    // Methods
-    connectWallet,
-    requireConnection,
-    
-    // Capabilities
-    canInteract,
-    sendTransaction: usesFarcasterWallet ? sendWagmiTx : null, // Thirdweb transactions handled per-hook
-    
-    // Status
-    isConnecting: isConnecting || isConnectPending,
-    error,
-  };
-  
-  return (
-    <WalletContext.Provider value={value}>
-      {children}
-    </WalletContext.Provider>
-  );
+
+  return { shouldUseFarcaster, confidence, methods };
 }
 
-// Main hook
-export function useWalletConnection(): WalletConnection {
+export function WalletProvider({ children }: WalletProviderProps) {
+  // Get Farcaster context
+  const { isInFarcaster, isReady: farcasterReady } = useFarcasterUser();
+  
+  // Detect environment
+  const environmentDetection = detectWalletEnvironment();
+  
+  // Determine which wallet system to use
+  const shouldUseFarcaster = environmentDetection.shouldUseFarcaster || isInFarcaster;
+  
+  console.log('🎯 Wallet Provider Routing:', {
+    shouldUseFarcaster,
+    isInFarcaster,
+    farcasterReady,
+    environmentConfidence: environmentDetection.confidence,
+    detectionMethods: environmentDetection.methods
+  });
+
+  // Route to appropriate provider
+  if (shouldUseFarcaster && farcasterReady) {
+    console.log('📱 Using Farcaster Wallet Provider');
+    return (
+      <FarcasterWalletProvider>
+        {children}
+      </FarcasterWalletProvider>
+    );
+  } else {
+    console.log('🖥️ Using Thirdweb Wallet Provider');
+    return (
+      <ThirdwebWalletProvider>
+        {children}
+      </ThirdwebWalletProvider>
+    );
+  }
+}
+
+// Main hook for accessing wallet functionality
+export function useWalletConnection(): UnifiedWalletConnection {
   const context = useContext(WalletContext);
   if (!context) {
     throw new Error('useWalletConnection must be used within a WalletProvider');
@@ -205,7 +165,7 @@ export function useWalletConnection(): WalletConnection {
   return context;
 }
 
-// Auth hook with proper typing
+// Backward compatible hooks
 export function useWalletAuth() {
   const { 
     isConnected, 
@@ -215,7 +175,7 @@ export function useWalletAuth() {
     connectWallet,
     error,
     isInFarcaster,
-    usesFarcasterWallet 
+    walletType 
   } = useWalletConnection();
   
   return {
@@ -226,26 +186,35 @@ export function useWalletAuth() {
     connectWallet,
     error,
     isInFarcaster,
-    usesFarcasterWallet,
-    // Helper for transaction hooks
+    usesFarcasterWallet: walletType === 'farcaster',
     needsConnection: !isConnected
   };
 }
 
-// Transaction hook with proper typing
 export function useTransactionWallet() {
   const { 
-    usesFarcasterWallet,
+    walletType,
     sendTransaction,
     canInteract,
-    isConnected 
+    isConnected,
+    isTransactionPending,
+    approveERC20,
+    batchTransactions
   } = useWalletConnection();
   
   return {
-    useThirdweb: !usesFarcasterWallet && isConnected,
-    useWagmi: usesFarcasterWallet && isConnected,
-    sendWagmiTransaction: usesFarcasterWallet ? sendTransaction : null,
+    useThirdweb: walletType === 'thirdweb' && isConnected,
+    useWagmi: walletType === 'farcaster' && isConnected,
+    sendWagmiTransaction: walletType === 'farcaster' ? sendTransaction : null,
     canInteract,
-    isTransactionPending: false, // Individual hooks manage their own pending state
+    isTransactionPending,
+    
+    // Enhanced capabilities
+    sendTransaction,
+    approveERC20,
+    batchTransactions
   };
 }
+
+// Export the context for sub-providers to use
+export { WalletContext };
