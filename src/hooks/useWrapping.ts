@@ -1,10 +1,10 @@
 import { useState, useCallback, useMemo } from "react";
 import { useReadContract } from "thirdweb/react";
-import { getContract, prepareContractCall } from "thirdweb"; // ✅ Add prepareContractCall import
-import { encodeFunctionData } from "viem"; // ✅ Remove unused parseUnits
+import { getContract, prepareContractCall } from "thirdweb";
+import { encodeFunctionData } from "viem";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EMARK_TOKEN_ABI } from "../lib/contracts";
-import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ Use our provider
+import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider";
 
 // Import the CardCatalog ABI
 import CardCatalogABI from "../lib/abis/CardCatalog.json";
@@ -16,7 +16,7 @@ export function useWrapping(userAddress?: string) {
   const [success, setSuccess] = useState<string | null>(null);
   
   const { address: walletAddress, requireConnection } = useWalletAuth();
-  const { sendTransaction, walletType } = useWalletConnection(); // ✅ Use our unified transaction method
+  const { sendTransaction, walletType } = useWalletConnection();
   const effectiveUserAddress = userAddress || walletAddress;
   
   const emarkContract = useMemo(() => getContract({
@@ -94,10 +94,10 @@ export function useWrapping(userAddress?: string) {
     }, 2000);
   }, [refetchEmarkBalance, refetchWEmarkBalance, refetchUserSummary, refetchUnbondingInfo, refetchVotingPower]);
   
-  // ✅ FIXED: Helper function to prepare transactions based on wallet type
+  // Helper function to prepare transactions based on wallet type
   const prepareTransaction = useCallback((contractAddress: string, abi: any[], functionName: string, params: any[]) => {
     if (walletType === 'farcaster') {
-      // ✅ Use Viem for Farcaster (Wagmi)
+      // Use Viem for Farcaster (Wagmi)
       const data = encodeFunctionData({
         abi,
         functionName,
@@ -109,7 +109,7 @@ export function useWrapping(userAddress?: string) {
         data,
       };
     } else {
-      // ✅ Use Thirdweb for desktop
+      // Use Thirdweb for desktop
       const contract = getContract({
         client,
         chain: CHAIN,
@@ -125,7 +125,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [walletType]);
   
-  // ✅ FIXED: Use proper transaction preparation
+  // Use proper transaction preparation
   const wrapTokens = useCallback(async (amount: bigint) => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -197,7 +197,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
 
-  // ✅ FIXED: Similar pattern for requestUnwrap
+  // Similar pattern for requestUnwrap
   const requestUnwrap = useCallback(async (amount: bigint) => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -244,7 +244,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
   
-  // ✅ FIXED: Similar pattern for completeUnwrap
+  // Similar pattern for completeUnwrap
   const completeUnwrap = useCallback(async () => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -291,7 +291,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
   
-  // ✅ FIXED: Similar pattern for cancelUnbonding
+  // Similar pattern for cancelUnbonding
   const cancelUnbonding = useCallback(async () => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
