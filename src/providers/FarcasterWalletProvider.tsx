@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAccount, useConnect, useSendTransaction } from "wagmi";
 import { encodeFunctionData, parseUnits, createPublicClient, http } from "viem";
 import { base } from "viem/chains";
@@ -20,6 +20,7 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
   const [isConnecting, setIsConnecting] = useState(false);
   const [isTransactionPending, setIsTransactionPending] = useState(false);
   const [lastTransactionHash, setLastTransactionHash] = useState<string>();
+  const [connectionAttempts, setConnectionAttempts] = useState(0);
   
   // Farcaster context
   const { 
@@ -27,109 +28,225 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
     isAuthenticated: isFarcasterAuth, 
     isReady: farcasterReady,
     hasVerifiedAddress,
-    getPrimaryAddress
+    getPrimaryAddress,
+    getVerifiedAddresses,
+    user
   } = useFarcasterUser();
   
   // Wagmi hooks for Farcaster wallet
   const { 
     isConnected: isWagmiConnected, 
-    address: wagmiAddress 
+    address: wagmiAddress,
+    status: wagmiStatus
   } = useAccount();
-  const { connect, connectors, isPending: isConnectPending } = useConnect();
+  const { connect, connectors, isPending: isConnectPending, error: connectError } = useConnect();
   const { sendTransactionAsync: sendWagmiTx } = useSendTransaction();
   
-  const primaryAddress = wagmiAddress || getPrimaryAddress() || undefined;
-
-  const isConnected = isWagmiConnected || (hasVerifiedAddress() && !!primaryAddress);
-  const canInteract = isWagmiConnected; 
-
-  // Auto-connect for Farcaster
+  // Enhanced address resolution with priority order
+  const primaryAddress = wagmiAddress || getPrimaryAddress();
+  const verifiedAddresses = getVerifiedAddresses();
+  
+  // Enhanced connection detection
+  const hasAnyAddress = hasVerifiedAddress() || !!wagmiAddress;
+  const isConnected = hasAnyAddress; // ✅ User is "connected" if they have any address
+  const canInteract = isWagmiConnected; // ✅ But can only transact if Wagmi is connected
+  
+  console.log('🔍 FARCASTER WALLET PROVIDER STATE:', {
+    isInFarcaster,
+    farcasterReady,
+    isFarcasterAuth,
+    hasVerifiedAddress: hasVerifiedAddress(),
+    verifiedAddresses,
+    wagmiAddress,
+    wagmiStatus,
+    isWagmiConnected,
+    hasAnyAddress,
+    isConnected,
+    canInteract,
+    connectionAttempts,
+    user: user ? { fid: user.fid, username: user.username } : null
+  });
+  
+  // Enhanced auto-connect logic with retry mechanism
   useEffect(() => {
-    if (!farcasterReady || isWagmiConnected || isConnecting) return;
+    if (!farcasterReady || isWagmiConnected || isConnecting || connectionAttempts >= 3) return;
     
-    // If we're in Farcaster but not connected via Wagmi, force connection
+    // If user is authenticated and has verified addresses, try to connect Wagmi
     if (isFarcasterAuth && hasVerifiedAddress()) {
-      console.log('🔌 Forcing Wagmi connection for transactions...');
+      console.log('🔌 Auto-connecting Farcaster wallet (attempt', connectionAttempts + 1, ')...');
       setIsConnecting(true);
+      setConnectionAttempts(prev => prev + 1);
       
       const farcasterConnector = connectors.find(c => c.id === 'farcasterFrame');
       if (farcasterConnector) {
-        connect({ connector: farcasterConnector });
+        try {
+          console.log('✅ Found Farcaster connector, initiating connection...');
+          connect({ connector: farcasterConnector });
+          setError(undefined);
+        } catch (err: unknown) {
+          console.warn('⚠️ Auto-connect failed (attempt', connectionAttempts + 1, '):', err);
+          // Don't set error immediately - user still has verified addresses
+          if (connectionAttempts >= 2) {
+            setError("Auto-connection failed, but you can still use your verified addresses");
+          }
+        }
+      } else {
+        console.log('⚠️ No Farcaster connector found, using verified addresses only');
+        setError("Using verified addresses (full wallet features require connection)");
       }
-      setIsConnecting(false);
+      
+      setTimeout(() => setIsConnecting(false), 2000);
+    } else if (isFarcasterAuth && !hasVerifiedAddress()) {
+      console.log('⚠️ User authenticated but no verified addresses found');
+      setError("Please link a wallet to your Farcaster account to use Evermark");
     }
-  }, [farcasterReady, isWagmiConnected, isConnecting, isFarcasterAuth, hasVerifiedAddress, connectors, connect]);
+  }, [
+    farcasterReady, 
+    isWagmiConnected, 
+    isConnecting, 
+    isFarcasterAuth, 
+    hasVerifiedAddress, 
+    connectors, 
+    connect, 
+    connectionAttempts
+  ]);
   
-  // Manual connection
+  // Handle connection errors
+  useEffect(() => {
+    if (connectError) {
+      console.error('❌ Wagmi connection error:', connectError);
+      setError(`Connection failed: ${connectError.message}`);
+    }
+  }, [connectError]);
+  
+  // Manual connection with enhanced error handling
   const connectWallet = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (isConnecting || isConnectPending) {
       return { success: false, error: "Connection already in progress" };
     }
     
+    console.log('🔌 Manual wallet connection requested...');
     setIsConnecting(true);
     setError(undefined);
     
     try {
+      // Check if user is authenticated in Farcaster
+      if (!isFarcasterAuth) {
+        throw new Error('Please authenticate with Farcaster first');
+      }
+      
+      // Check for verified addresses
+      if (!hasVerifiedAddress()) {
+        throw new Error('Please link a wallet to your Farcaster account first');
+      }
+      
       const farcasterConnector = connectors.find(c => c.id === 'farcasterFrame');
       if (farcasterConnector) {
+        console.log('✅ Initiating manual Farcaster wallet connection...');
         connect({ connector: farcasterConnector });
-        console.log('✅ Farcaster wallet connection initiated');
+        
+        // Wait a bit for connection to process
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        console.log('✅ Manual Farcaster wallet connection initiated');
         return { success: true };
       } else {
+        // Fallback: user has verified addresses but no connector
         if (hasVerifiedAddress()) {
-          console.log('✅ Using Farcaster verified addresses');
+          console.log('✅ Using Farcaster verified addresses (limited functionality)');
+          setError("Using verified addresses (some features may be limited)");
           return { success: true };
         }
-        throw new Error('No Farcaster wallet available');
+        throw new Error('No Farcaster wallet connector available');
       }
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to connect wallet';
+      console.error('❌ Manual connection failed:', errorMsg);
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsConnecting(false);
     }
-  }, [connectors, connect, hasVerifiedAddress, isConnecting, isConnectPending]);
+  }, [
+    isConnecting, 
+    isConnectPending, 
+    isFarcasterAuth, 
+    hasVerifiedAddress, 
+    connectors, 
+    connect
+  ]);
   
-  // Require connection with retry logic
+  // Require connection with enhanced retry logic
   const requireConnection = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    if (isConnected) {
+    console.log('🔍 Connection requirement check:', {
+      isConnected,
+      canInteract,
+      hasVerifiedAddress: hasVerifiedAddress(),
+      isWagmiConnected
+    });
+    
+    // If we can interact (Wagmi connected), we're good
+    if (canInteract) {
       return { success: true };
     }
     
-    let attempts = 0;
-    const maxAttempts = 3;
-    
-    while (attempts < maxAttempts) {
+    // If user has verified addresses but no Wagmi connection, try to connect
+    if (hasVerifiedAddress() && !isWagmiConnected) {
+      console.log('🔌 User has verified addresses, attempting Wagmi connection...');
       const result = await connectWallet();
-      if (result.success) {
-        return result;
-      }
-      attempts++;
       
-      if (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+      // Even if Wagmi connection fails, user can still use verified addresses for some features
+      if (!result.success && hasVerifiedAddress()) {
+        console.log('⚠️ Wagmi connection failed but user has verified addresses');
+        return { 
+          success: true, // ✅ Allow limited functionality
+          error: "Limited functionality - some features may not work" 
+        };
       }
+      
+      return result;
     }
     
-    return { success: false, error: "Failed to connect after multiple attempts" };
-  }, [isConnected, connectWallet]);
+    // No verified addresses at all
+    return { 
+      success: false, 
+      error: "Please link a wallet to your Farcaster account" 
+    };
+  }, [isConnected, canInteract, hasVerifiedAddress, isWagmiConnected, connectWallet]);
   
   // Disconnect
   const disconnect = useCallback(async () => {
+    console.log('🔌 Disconnecting Farcaster wallet...');
     setError(undefined);
     setLastTransactionHash(undefined);
     setIsTransactionPending(false);
+    setConnectionAttempts(0);
+    // Note: Can't actually disconnect from Farcaster, just reset our state
   }, []);
   
-  // Send transaction
+  // Enhanced transaction sending with better error handling
   const sendTransaction = useCallback(async (tx: any): Promise<{ success: boolean; transactionHash?: string; error?: string }> => {
-    if (!isConnected) {
+    console.log('📡 Farcaster transaction requested:', { canInteract, isWagmiConnected, hasVerifiedAddress: hasVerifiedAddress() });
+    
+    // Must have Wagmi connection for transactions
+    if (!canInteract) {
+      console.log('🔌 No Wagmi connection, attempting to establish...');
       const connectResult = await requireConnection();
       if (!connectResult.success) {
         return {
           success: false,
-          error: connectResult.error || "Not connected"
+          error: connectResult.error || "Cannot send transactions without wallet connection"
+        };
+      }
+      
+      // Give connection a moment to stabilize
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Check again
+      if (!isWagmiConnected) {
+        return {
+          success: false,
+          error: "Wallet connection required for transactions"
         };
       }
     }
@@ -142,6 +259,7 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
         throw new Error("Wagmi transaction method not available");
       }
       
+      console.log('📡 Sending transaction via Wagmi...');
       const txHash = await sendWagmiTx(tx);
       setLastTransactionHash(txHash);
       console.log('✅ Farcaster transaction successful:', txHash);
@@ -162,7 +280,7 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
     } finally {
       setIsTransactionPending(false);
     }
-  }, [isConnected, requireConnection, sendWagmiTx]);
+  }, [canInteract, isWagmiConnected, requireConnection, sendWagmiTx]);
   
   // ERC-20 approval using Viem
   const approveERC20 = useCallback(async (
@@ -254,21 +372,11 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
     return results;
   }, [sendTransaction]);
   
-  // Add debug logging right before the value object:
-  console.log('🔍 FarcasterWalletProvider Final State:', {
-    isWagmiConnected,
-    wagmiAddress,
-    farcasterAddress: getPrimaryAddress(),
-    finalAddress: primaryAddress,
-    isConnected,
-    canInteract,
-    hasVerifiedAddress: hasVerifiedAddress()
-  });
-
+  // Enhanced wallet connection value
   const value: UnifiedWalletConnection = {
-    // Core state
-    isConnected,
-    address: primaryAddress, // This should now be string | undefined
+    // Core state - ✅ Enhanced logic
+    isConnected, // True if user has any address (verified or Wagmi)
+    address: primaryAddress || undefined,
     displayAddress: primaryAddress ? `${primaryAddress.slice(0, 6)}...${primaryAddress.slice(-4)}` : undefined,
     
     // Environment
@@ -280,8 +388,8 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
     requireConnection,
     disconnect,
     
-    // Capabilities
-    canInteract,
+    // Capabilities - ✅ Clear distinction
+    canInteract, // Only true when Wagmi is connected (can send transactions)
     sendTransaction,
     
     // ERC-20 utilities
@@ -297,6 +405,41 @@ export function FarcasterWalletProvider({ children }: FarcasterWalletProviderPro
     error,
     lastTransactionHash,
   };
+  
+  // Enhanced debug logging for development
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('🔍 FARCASTER WALLET PROVIDER UPDATE:', {
+        timestamp: new Date().toISOString(),
+        state: {
+          isConnected,
+          canInteract,
+          primaryAddress,
+          verifiedAddresses: verifiedAddresses.length,
+          wagmiStatus,
+          connectionAttempts,
+          error: error || 'none'
+        },
+        capabilities: {
+          hasVerifiedAddress: hasVerifiedAddress(),
+          isWagmiConnected,
+          canSendTransactions: canInteract,
+          hasTransactionMethod: !!sendWagmiTx
+        }
+      });
+    }
+  }, [
+    isConnected, 
+    canInteract, 
+    primaryAddress, 
+    verifiedAddresses.length, 
+    wagmiStatus, 
+    connectionAttempts, 
+    error,
+    hasVerifiedAddress,
+    isWagmiConnected,
+    sendWagmiTx
+  ]);
   
   return (
     <WalletContext.Provider value={value}>
