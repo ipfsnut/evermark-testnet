@@ -2,296 +2,17 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalRewardPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address[]",
-				"name": "users",
-				"type": "address[]"
-			}
-		],
-		"name": "calculateRewardsLive",
-		"outputs": [
-			{
-				"components": [
-					{
-						"internalType": "address",
-						"name": "user",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "baseReward",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "variableReward",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalReward",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct RewardCalculatorHelper.UserRewardData[]",
-				"name": "rewards",
-				"type": "tuple[]"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
-				"name": "_cardCatalog",
+				"name": "account",
 				"type": "address"
 			}
 		],
-		"stateMutability": "nonpayable",
-		"type": "constructor"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "previousOwner",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "OwnershipTransferred",
-		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "userCount",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "totalDistributed",
-				"type": "uint256"
-			}
-		],
-		"name": "RewardsCalculated",
-		"type": "event"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_cardCatalog",
-				"type": "address"
-			}
-		],
-		"name": "setCardCatalog",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "totalRewardPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalStaked",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address[]",
-				"name": "users",
-				"type": "address[]"
-			}
-		],
-		"name": "_simulateRewardCalculation",
+		"name": "balanceOf",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "totalDistributed",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "userCount",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"components": [
-					{
-						"internalType": "uint256",
-						"name": "totalRewardPool",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalStaked",
-						"type": "uint256"
-					},
-					{
-						"internalType": "address[]",
-						"name": "users",
-						"type": "address[]"
-					},
-					{
-						"internalType": "uint256[]",
-						"name": "userStakes",
-						"type": "uint256[]"
-					},
-					{
-						"internalType": "uint256[]",
-						"name": "userDelegated",
-						"type": "uint256[]"
-					}
-				],
-				"internalType": "struct RewardCalculatorHelper.RewardCalculationInput",
-				"name": "input",
-				"type": "tuple"
-			}
-		],
-		"name": "calculateBatchRewards",
-		"outputs": [
-			{
-				"components": [
-					{
-						"internalType": "address",
-						"name": "user",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "baseReward",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "variableReward",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalReward",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct RewardCalculatorHelper.UserRewardData[]",
-				"name": "rewards",
-				"type": "tuple[]"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "totalRewardPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalStaked",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "userStake",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "userDelegated",
-				"type": "uint256"
-			}
-		],
-		"name": "calculateUserReward",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "baseReward",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "variableReward",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalReward",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "cardCatalog",
-		"outputs": [
-			{
-				"internalType": "contract ICardCatalog",
 				"name": "",
-				"type": "address"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -299,114 +20,30 @@
 	},
 	{
 		"inputs": [
-			{
-				"components": [
-					{
-						"internalType": "address",
-						"name": "user",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "baseReward",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "variableReward",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalReward",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct RewardCalculatorHelper.UserRewardData[]",
-				"name": "rewards",
-				"type": "tuple[]"
-			}
-		],
-		"name": "generateMerkleLeaves",
-		"outputs": [
-			{
-				"internalType": "bytes32[]",
-				"name": "leaves",
-				"type": "bytes32[]"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getRewardConstants",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "tokenStakerBps",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "creatorBps",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "baseVariableSplit",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "basisPoints",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "user",
 				"type": "address"
+			}
+		],
+		"name": "getDelegatedVotingPower",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "totalRewardPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address[]",
-				"name": "users",
-				"type": "address[]"
-			}
-		],
-		"name": "simulateRewardDistribution",
+		"inputs": [],
+		"name": "totalSupply",
 		"outputs": [
 			{
-				"internalType": "bool",
-				"name": "success",
-				"type": "bool"
-			},
-			{
 				"internalType": "uint256",
-				"name": "totalDistributed",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "userCount",
+				"name": "",
 				"type": "uint256"
 			}
 		],

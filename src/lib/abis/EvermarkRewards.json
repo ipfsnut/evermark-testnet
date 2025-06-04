@@ -1,5 +1,18 @@
 [
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "fundWeeklyRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
@@ -39,6 +52,52 @@
 	{
 		"inputs": [
 			{
+				"internalType": "uint256[]",
+				"name": "weekNumbers",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "amounts",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "bytes32[][]",
+				"name": "merkleProofs",
+				"type": "bytes32[][]"
+			}
+		],
+		"name": "batchClaimRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "address",
+				"name": "recipient",
+				"type": "address"
+			}
+		],
+		"name": "emergencyWithdraw",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "address",
 				"name": "implementation",
 				"type": "address"
@@ -56,6 +115,60 @@
 		"inputs": [],
 		"name": "FailedCall",
 		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "week",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "stakingSnapshot",
+				"type": "uint256"
+			}
+		],
+		"name": "finalizeWeek",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "grantRole",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_rewardToken",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_stakingProvider",
+				"type": "address"
+			}
+		],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
 	},
 	{
 		"inputs": [],
@@ -88,50 +201,6 @@
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "address",
-				"name": "cardCatalog",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "voting",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "leaderboard",
-				"type": "address"
-			},
-			{
-				"indexed": false,
-				"internalType": "address",
-				"name": "nftStaking",
-				"type": "address"
-			}
-		],
-		"name": "ContractsUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "timestamp",
-				"type": "uint256"
-			}
-		],
-		"name": "EmergencyPauseSet",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
 				"internalType": "uint64",
 				"name": "version",
 				"type": "uint64"
@@ -139,6 +208,32 @@
 		],
 		"name": "Initialized",
 		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "week",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bytes32",
+				"name": "merkleRoot",
+				"type": "bytes32"
+			}
+		],
+		"name": "MerkleRootSet",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -154,6 +249,55 @@
 		"type": "event"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "callerConfirmation",
+				"type": "address"
+			}
+		],
+		"name": "renounceRole",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "newStartTime",
+				"type": "uint256"
+			}
+		],
+		"name": "resetProtocolStart",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "revokeRole",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -163,7 +307,7 @@
 				"type": "address"
 			},
 			{
-				"indexed": false,
+				"indexed": true,
 				"internalType": "uint256",
 				"name": "week",
 				"type": "uint256"
@@ -171,29 +315,30 @@
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "baseRewards",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "variableRewards",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "nftRewards",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "creatorRewards",
+				"name": "amount",
 				"type": "uint256"
 			}
 		],
 		"name": "RewardsClaimed",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "week",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "RewardsFunded",
 		"type": "event"
 	},
 	{
@@ -272,6 +417,115 @@
 		"type": "event"
 	},
 	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "pauseUntil",
+				"type": "uint256"
+			}
+		],
+		"name": "setEmergencyPause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_rewardDistributor",
+				"type": "address"
+			}
+		],
+		"name": "setRewardDistributor",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_helper",
+				"type": "address"
+			}
+		],
+		"name": "setRewardsCalculatorHelper",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_rewardToken",
+				"type": "address"
+			}
+		],
+		"name": "setRewardToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_stakingProvider",
+				"type": "address"
+			}
+		],
+		"name": "setStakingProvider",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "week",
+				"type": "uint256"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "merkleRoot",
+				"type": "bytes32"
+			}
+		],
+		"name": "setWeeklyMerkleRoot",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "week",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "totalStaked",
+				"type": "uint256"
+			}
+		],
+		"name": "StakingSnapshotCached",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -298,35 +552,22 @@
 		"type": "event"
 	},
 	{
-		"anonymous": false,
 		"inputs": [
 			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
 			},
 			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "totalPool",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "tokenStakerPool",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "creatorPool",
-				"type": "uint256"
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
 			}
 		],
-		"name": "WeeklyRewardsCalculated",
-		"type": "event"
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
 	},
 	{
 		"anonymous": false,
@@ -340,11 +581,17 @@
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "totalDistributed",
+				"name": "rewardPool",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "creatorPool",
 				"type": "uint256"
 			}
 		],
-		"name": "WeeklyRewardsDistributed",
+		"name": "WeekFinalized",
 		"type": "event"
 	},
 	{
@@ -361,99 +608,37 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "DEFAULT_ADMIN_ROLE",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "MAX_BATCH_SIZE",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "REWARDS_DISTRIBUTOR_ROLE",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "UPGRADER_ROLE",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "UPGRADE_INTERFACE_VERSION",
-		"outputs": [
-			{
-				"internalType": "string",
-				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "WEEK_DURATION",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "week",
+				"name": "totalPool",
+				"type": "uint256"
+			}
+		],
+		"name": "calculateRewardSplit",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "tokenStakerPool",
 				"type": "uint256"
 			},
 			{
-				"internalType": "address[]",
-				"name": "users",
-				"type": "address[]"
+				"internalType": "uint256",
+				"name": "creatorPool",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "basePool",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "variablePool",
+				"type": "uint256"
 			}
 		],
-		"name": "batchCalculateRewards",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
@@ -491,55 +676,51 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "cardCatalog",
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "weekNumbers",
+				"type": "uint256[]"
+			}
+		],
+		"name": "checkClaimedStatus",
 		"outputs": [
 			{
-				"internalType": "contract ICardCatalog",
-				"name": "",
-				"type": "address"
+				"internalType": "bool[]",
+				"name": "claimed",
+				"type": "bool[]"
 			}
 		],
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "claimAllRewards",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "totalClaimed",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "week",
+				"name": "",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"name": "claimWeeklyRewards",
+		"name": "claimedBitmap",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "totalClaimed",
+				"name": "",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "clearEmergencyPause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -556,39 +737,34 @@
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "DEFAULT_ADMIN_ROLE",
+		"outputs": [
 			{
-				"internalType": "address[]",
-				"name": "creators",
-				"type": "address[]"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "amounts",
-				"type": "uint256[]"
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
 			}
 		],
-		"name": "distributeCreatorRewards",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "distributeProtocolFees",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
 		"inputs": [],
-		"name": "emergencyPauseTimestamp",
+		"name": "DISTRIBUTOR_ROLE",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emergencyPauseUntil",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -597,83 +773,6 @@
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "recipient",
-				"type": "address"
-			}
-		],
-		"name": "emergencyWithdraw",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "evermarkLeaderboard",
-		"outputs": [
-			{
-				"internalType": "contract IEvermarkLeaderboard",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "evermarkVoting",
-		"outputs": [
-			{
-				"internalType": "contract IEvermarkVoting",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			}
-		],
-		"name": "finalizeWeek",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "forceStartNewWeek",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "fundWeeklyRewards",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -687,61 +786,18 @@
 			},
 			{
 				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "endTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
 				"name": "timeRemaining",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "rewardPool",
 				"type": "uint256"
 			},
 			{
 				"internalType": "bool",
 				"name": "finalized",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "getGlobalStats",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "totalDistributed",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalTokenStaker",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalCreator",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalNftStaker",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "currentWeekNumber",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -774,83 +830,27 @@
 				"type": "address"
 			}
 		],
-		"name": "getUserRewardSummary",
-		"outputs": [
-			{
-				"components": [
-					{
-						"internalType": "uint256",
-						"name": "pendingBaseRewards",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "pendingVariableRewards",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "pendingNftRewards",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "pendingCreatorRewards",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalPending",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "totalClaimed",
-						"type": "uint256"
-					}
-				],
-				"internalType": "struct EvermarkRewards.UserRewardSummary",
-				"name": "summary",
-				"type": "tuple"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			}
-		],
-		"name": "getUserWeekRewards",
+		"name": "getUserClaimSummary",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "baseRewards",
+				"name": "totalClaimed",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "variableRewards",
+				"name": "lastClaimWeek",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "nftRewards",
+				"name": "lastClaimTime",
 				"type": "uint256"
 			},
 			{
-				"internalType": "bool",
-				"name": "claimed",
-				"type": "bool"
+				"internalType": "uint256",
+				"name": "userIdx",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -860,40 +860,25 @@
 		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "weekNumber",
+				"name": "week",
 				"type": "uint256"
 			}
 		],
-		"name": "getWeekInfo",
+		"name": "getWeekData",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "endTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenStakerPool",
+				"name": "rewardPool",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
 				"name": "creatorPool",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "finalizedAt",
 				"type": "uint256"
 			},
 			{
@@ -903,29 +888,16 @@
 			},
 			{
 				"internalType": "bool",
-				"name": "distributed",
+				"name": "merkleGenerated",
 				"type": "bool"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "merkleRoot",
+				"type": "bytes32"
 			}
 		],
 		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "role",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "grantRole",
-		"outputs": [],
-		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -955,42 +927,15 @@
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_cardCatalog",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_evermarkVoting",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_evermarkLeaderboard",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftStaking",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_rewardToken",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "nftStaking",
+		"name": "indexToUser",
 		"outputs": [
 			{
-				"internalType": "contract INFTStaking",
+				"internalType": "address",
 				"name": "",
 				"type": "address"
 			}
@@ -1000,9 +945,15 @@
 	},
 	{
 		"inputs": [],
-		"name": "pause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"name": "nextUserIndex",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -1019,14 +970,8 @@
 		"type": "function"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "pendingCreatorRewards",
+		"inputs": [],
+		"name": "protocolStartTime",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -1051,39 +996,29 @@
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "rewardDistributor",
+		"outputs": [
 			{
-				"internalType": "bytes32",
-				"name": "role",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "address",
-				"name": "callerConfirmation",
+				"internalType": "contract IRewardDistributor",
+				"name": "",
 				"type": "address"
 			}
 		],
-		"name": "renounceRole",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "rewardsCalculatorHelper",
+		"outputs": [
 			{
-				"internalType": "bytes32",
-				"name": "role",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "address",
-				"name": "account",
+				"internalType": "contract IRewardsCalculatorHelper",
+				"name": "",
 				"type": "address"
 			}
 		],
-		"name": "revokeRole",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -1100,29 +1035,45 @@
 		"type": "function"
 	},
 	{
-		"inputs": [
+		"inputs": [],
+		"name": "stakingProvider",
+		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "pauseUntilTimestamp",
-				"type": "uint256"
+				"internalType": "contract IStakingDataProvider",
+				"name": "",
+				"type": "address"
 			}
 		],
-		"name": "setEmergencyPause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_rewardToken",
-				"type": "address"
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
 			}
 		],
-		"name": "setRewardToken",
-		"outputs": [],
-		"stateMutability": "nonpayable",
+		"name": "stakingSnapshots",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "totalStaked",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "snapshotTime",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "blockNumber",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -1146,12 +1097,12 @@
 	},
 	{
 		"inputs": [],
-		"name": "totalCreatorRewards",
+		"name": "UPGRADE_INTERFACE_VERSION",
 		"outputs": [
 			{
-				"internalType": "uint256",
+				"internalType": "string",
 				"name": "",
-				"type": "uint256"
+				"type": "string"
 			}
 		],
 		"stateMutability": "view",
@@ -1159,38 +1110,12 @@
 	},
 	{
 		"inputs": [],
-		"name": "totalNftStakerRewards",
+		"name": "UPGRADER_ROLE",
 		"outputs": [
 			{
-				"internalType": "uint256",
+				"internalType": "bytes32",
 				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "totalRewardsDistributed",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "totalTokenStakerRewards",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
+				"type": "bytes32"
 			}
 		],
 		"stateMutability": "view",
@@ -1204,7 +1129,36 @@
 				"type": "address"
 			}
 		],
-		"name": "totalUserClaimed",
+		"name": "userClaims",
+		"outputs": [
+			{
+				"internalType": "uint128",
+				"name": "totalClaimed",
+				"type": "uint128"
+			},
+			{
+				"internalType": "uint64",
+				"name": "lastClaimWeek",
+				"type": "uint64"
+			},
+			{
+				"internalType": "uint64",
+				"name": "lastClaimTime",
+				"type": "uint64"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "userIndex",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -1217,68 +1171,15 @@
 	},
 	{
 		"inputs": [],
-		"name": "unpause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_cardCatalog",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_evermarkVoting",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_evermarkLeaderboard",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_nftStaking",
-				"type": "address"
-			}
-		],
-		"name": "updateContracts",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "upgradeToAndCall",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "weekStartTime",
+		"name": "version",
 		"outputs": [
 			{
-				"internalType": "uint256",
+				"internalType": "string",
 				"name": "",
-				"type": "uint256"
+				"type": "string"
 			}
 		],
-		"stateMutability": "view",
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{
@@ -1289,47 +1190,22 @@
 				"type": "uint256"
 			}
 		],
-		"name": "weeklyRewards",
+		"name": "weekData",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
+				"internalType": "uint128",
+				"name": "rewardPool",
+				"type": "uint128"
 			},
 			{
-				"internalType": "uint256",
-				"name": "startTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "endTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "totalRewardPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "tokenStakerPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
+				"internalType": "uint128",
 				"name": "creatorPool",
-				"type": "uint256"
+				"type": "uint128"
 			},
 			{
-				"internalType": "uint256",
-				"name": "baseStakerPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "variableStakerPool",
-				"type": "uint256"
+				"internalType": "uint32",
+				"name": "finalizedAt",
+				"type": "uint32"
 			},
 			{
 				"internalType": "bool",
@@ -1338,8 +1214,27 @@
 			},
 			{
 				"internalType": "bool",
-				"name": "distributed",
+				"name": "merkleGenerated",
 				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "weeklyMerkleRoots",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
 			}
 		],
 		"stateMutability": "view",
