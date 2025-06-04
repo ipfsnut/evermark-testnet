@@ -1,10 +1,7 @@
 import { useState, useEffect } from "react";
-import { useReadContract, useSendTransaction } from "thirdweb/react";
-import { getContract, prepareContractCall } from "thirdweb";
-import { toEther, toWei } from "thirdweb/utils";
-import { client } from "../../lib/thirdweb";
-import { CONTRACTS, CHAIN, VOTING_ABI } from "../../lib/contracts";
 import { VoteIcon, TrendingUpIcon, AlertCircleIcon, CheckCircleIcon } from 'lucide-react';
+import { toEther } from "thirdweb/utils";
+import { useVoting } from "../../hooks/useVoting";
 import { useWalletAuth } from "../../providers/WalletProvider";
 
 interface VotingPanelProps {
@@ -13,194 +10,49 @@ interface VotingPanelProps {
 }
 
 export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
-  const { address, isConnected } = useWalletAuth(); // Fixed: use consistent naming
+  const { address, isConnected } = useWalletAuth();
   const [voteAmount, setVoteAmount] = useState("");
-  const [isVoting, setIsVoting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   
-  const votingContract = getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.VOTING,
-    abi: VOTING_ABI,
-  });
-  
-  // Get current votes for this Evermark
-  const { data: currentVotes, isLoading: isLoadingVotes, refetch: refetchVotes } = useReadContract({
-    contract: votingContract,
-    method: "getEvermarkVotes",
-    params: [BigInt(evermarkId || "0")] as const,
-    queryOptions: {
-      enabled: !!evermarkId && evermarkId !== "0",
-    },
-  });
-
-  // Get user votes for this Evermark
-  const userVotesQuery = address ? useReadContract({
-    contract: votingContract,
-    method: "getUserVotesForEvermark",
-    params: [address, BigInt(evermarkId || "0")] as const,
-    queryOptions: {
-      enabled: !!evermarkId && evermarkId !== "0",
-    },
-  }) : { data: undefined, isLoading: false };
-
-  const userVotes = userVotesQuery.data;
-  const isLoadingUserVotes = 'isLoading' in userVotesQuery ? userVotesQuery.isLoading : false;
-
-  // Get remaining voting power from EvermarkVoting contract
-  const votingPowerQuery = useReadContract({
-    contract: votingContract,
-    method: "getRemainingVotingPower",
-    params: [address || ""] as const,
-    queryOptions: {
-      enabled: !!address,
-    },
-  });
-
-  const availableVotingPower = votingPowerQuery.data;
-  const isLoadingVotingPower = 'isLoading' in votingPowerQuery ? votingPowerQuery.isLoading : false;
-  
-  const { mutate: sendTransaction } = useSendTransaction();
+  // 🎉 All the complex blockchain logic is now in the hook!
+  const {
+    totalVotes,
+    userVotes,
+    availableVotingPower,
+    isLoadingTotalVotes,
+    isLoadingUserVotes,
+    isLoadingVotingPower,
+    isVoting,
+    error,
+    success,
+    delegateVotes,
+    undelegateVotes,
+    clearMessages,
+  } = useVoting(evermarkId, address);
   
   // Clear messages after 5 seconds
   useEffect(() => {
     if (success || error) {
-      const timer = setTimeout(() => {
-        setSuccess(null);
-        setError(null);
-      }, 5000);
+      const timer = setTimeout(() => clearMessages(), 5000);
       return () => clearTimeout(timer);
     }
-  }, [success, error]);
+  }, [success, error, clearMessages]);
   
+  // Simple handlers that use the hook's methods
   const handleVote = async () => {
-    if (!address) {
-      setError("Please connect your wallet");
-      return;
-    }
-    
-    if (!voteAmount || parseFloat(voteAmount) <= 0) {
-      setError("Please enter a valid vote amount");
-      return;
-    }
-    
-    if (!availableVotingPower) {
-      setError("Loading voting power...");
-      return;
-    }
-    
-    const voteAmountWei = toWei(voteAmount);
-    
-    // Check if user has enough voting power
-    if (voteAmountWei > availableVotingPower) {
-      setError(`Insufficient voting power. Available: ${toEther(availableVotingPower)} WEMARK`);
-      return;
-    }
-    
-    setIsVoting(true);
-    setError(null);
-    setSuccess(null);
-    
-    try {
-      const transaction = prepareContractCall({
-        contract: votingContract,
-        method: "delegateVotes",
-        params: [BigInt(evermarkId), voteAmountWei] as const,
-      });
-      
-      return new Promise<void>((resolve, reject) => {
-        sendTransaction(transaction as any, {
-          onSuccess: () => {
-            setSuccess(`Successfully delegated ${voteAmount} WEMARK to this Evermark!`);
-            setVoteAmount("");
-            
-            // Refetch data
-            setTimeout(() => {
-              refetchVotes();
-              if ('refetch' in userVotesQuery) userVotesQuery.refetch?.();
-              if ('refetch' in votingPowerQuery) votingPowerQuery.refetch?.();
-            }, 2000);
-            
-            resolve();
-          },
-          onError: (error) => {
-            setError(error.message || "Failed to delegate votes");
-            reject(error);
-          },
-          onSettled: () => {
-            setIsVoting(false);
-          }
-        });
-      });
-      
-    } catch (err: any) {
-      setError(err.message || "Failed to prepare transaction");
-      setIsVoting(false);
+    const result = await delegateVotes(voteAmount);
+    if (result.success) {
+      setVoteAmount(""); // Clear input on success
     }
   };
   
   const handleUnvote = async () => {
-    if (!address || !userVotes || userVotes === BigInt(0)) {
-      setError("No votes to withdraw");
-      return;
-    }
-    
-    if (!voteAmount || parseFloat(voteAmount) <= 0) {
-      setError("Please enter a valid amount to withdraw");
-      return;
-    }
-    
-    const withdrawAmountWei = toWei(voteAmount);
-    
-    if (withdrawAmountWei > userVotes) {
-      setError(`Cannot withdraw more than delegated. Your delegation: ${toEther(userVotes)} WEMARK`);
-      return;
-    }
-    
-    setIsVoting(true);
-    setError(null);
-    setSuccess(null);
-    
-    try {
-      const transaction = prepareContractCall({
-        contract: votingContract,
-        method: "undelegateVotes",
-        params: [BigInt(evermarkId), withdrawAmountWei] as const,
-      });
-      
-      return new Promise<void>((resolve, reject) => {
-        sendTransaction(transaction as any, {
-          onSuccess: () => {
-            setSuccess(`Successfully withdrew ${voteAmount} WEMARK from this Evermark!`);
-            setVoteAmount("");
-            
-            // Refetch data after successful transaction
-            setTimeout(() => {
-              refetchVotes();
-              if ('refetch' in userVotesQuery) userVotesQuery.refetch?.();
-              if ('refetch' in votingPowerQuery) votingPowerQuery.refetch?.();
-            }, 2000);
-            
-            resolve();
-          },
-          onError: (error) => {
-            setError(error.message || "Failed to undelegate votes");
-            reject(error);
-          },
-          onSettled: () => {
-            setIsVoting(false);
-          }
-        });
-      });
-    } catch (err: any) {
-      setError(err.message || "Failed to undelegate votes");
-      setIsVoting(false);
+    const result = await undelegateVotes(voteAmount);
+    if (result.success) {
+      setVoteAmount(""); // Clear input on success
     }
   };
   
-  if (!address) {
+  if (!isConnected) {
     return (
       <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
         <div className="text-center py-8">
@@ -227,7 +79,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
             <div>
               <p className="text-sm text-gray-600">Total Votes</p>
               <p className="text-xl font-bold text-gray-900">
-                {isLoadingVotes ? "..." : `${toEther(currentVotes || BigInt(0))}`}
+                {isLoadingTotalVotes ? "..." : `${toEther(totalVotes)}`}
               </p>
             </div>
           </div>
@@ -239,7 +91,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
             <div>
               <p className="text-sm text-gray-600">Your Votes</p>
               <p className="text-xl font-bold text-gray-900">
-                {isLoadingUserVotes ? "..." : `${toEther(userVotes || BigInt(0))}`}
+                {isLoadingUserVotes ? "..." : `${toEther(userVotes)}`}
               </p>
             </div>
           </div>
@@ -253,7 +105,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
             <div>
               <p className="text-sm text-gray-600">Available</p>
               <p className="text-xl font-bold text-gray-900">
-                {isLoadingVotingPower ? "..." : toEther(availableVotingPower || BigInt(0))}
+                {isLoadingVotingPower ? "..." : `${toEther(availableVotingPower)}`}
               </p>
             </div>
           </div>
@@ -280,7 +132,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
         <div className="space-y-4">
           <div>
             <label htmlFor="vote-amount" className="block text-sm font-medium text-gray-700 mb-2">
-              Vote Amount (WEMARK)
+              Vote Amount (wEMARK)
             </label>
             <input
               id="vote-amount"
