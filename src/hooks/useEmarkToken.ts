@@ -1,20 +1,23 @@
-// src/hooks/useEmarkToken.ts - Dramatically simplified with WalletProvider
-import { useReadContract, useSendTransaction } from "thirdweb/react";
+// Fixed useEmarkToken.ts - Use unified wallet provider instead of thirdweb directly
+// Replace your entire src/hooks/useEmarkToken.ts with this:
+
+import { useReadContract } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
+import { encodeFunctionData } from "viem";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EMARK_TOKEN_ABI } from "../lib/contracts";
 import { useState, useCallback } from "react";
 import { toWei } from "thirdweb/utils";
-import { useWalletAuth, useTransactionWallet } from "../providers/WalletProvider";
+import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ USE UNIFIED PROVIDER
 
 export function useEmarkToken() {
   const [isTransacting, setIsTransacting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // 🎉 SIMPLIFIED: Use wallet provider instead of manual checks
+  // ✅ CRITICAL FIX: Use unified wallet providers
   const { isConnected, address, requireConnection } = useWalletAuth();
-  const { canInteract } = useTransactionWallet();
+  const { sendTransaction, walletType } = useWalletConnection();
   
   const contract = getContract({
     client,
@@ -23,7 +26,7 @@ export function useEmarkToken() {
     abi: EMARK_TOKEN_ABI,
   });
 
-  // 🎉 SIMPLIFIED: Contract queries (much cleaner with guaranteed address)
+  // Contract queries (these work the same way)
   const { data: balance, isLoading: balanceLoading, refetch: refetchBalance } = useReadContract({
     contract,
     method: "balanceOf",
@@ -68,12 +71,12 @@ export function useEmarkToken() {
     params: [],
   });
 
-  const { mutate: sendTransaction } = useSendTransaction();
-
-  // 🎉 SIMPLIFIED: Approve CardCatalog for staking with auto-connection
+  // ✅ CRITICAL FIX: Approve CardCatalog using unified wallet provider
   const approveStaking = useCallback(async (amount: string) => {
-    // Auto-connect if needed (handles both thirdweb and Farcaster)
-    if (!canInteract) {
+    console.log('💰 Starting approve staking process...');
+    
+    // ✅ Use unified connection check
+    if (!isConnected) {
       const connectionResult = await requireConnection();
       if (!connectionResult.success) {
         const errorMsg = connectionResult.error || "Please connect your wallet";
@@ -89,27 +92,56 @@ export function useEmarkToken() {
     setSuccess(null);
 
     try {
+      console.log('💰 Approving', amount, 'EMARK for staking using', walletType);
+      
       const amountWei = toWei(amount);
       
-      const transaction = prepareContractCall({
-        contract,
-        method: "approve",
-        params: [CONTRACTS.CARD_CATALOG, amountWei],
-      });
+      // ✅ CRITICAL FIX: Prepare transaction based on wallet type
+      let transaction;
+      
+      if (walletType === 'farcaster') {
+        // Use viem encoding for Farcaster frames
+        const data = encodeFunctionData({
+          abi: EMARK_TOKEN_ABI,
+          functionName: 'approve',
+          args: [CONTRACTS.CARD_CATALOG, amountWei]
+        });
+        
+        transaction = {
+          to: CONTRACTS.EMARK_TOKEN as `0x${string}`,
+          data,
+        };
+      } else {
+        // Use thirdweb for desktop
+        transaction = prepareContractCall({
+          contract,
+          method: "approve",
+          params: [CONTRACTS.CARD_CATALOG, amountWei],
+        });
+      }
 
-      // 🎉 SIMPLIFIED: Use thirdweb transaction (provider handles wallet detection)
-      await sendTransaction(transaction as any);
+      console.log('📡 Sending approval transaction via unified provider...');
+      
+      // ✅ Use unified wallet provider's sendTransaction
+      const result = await sendTransaction(transaction);
+      
+      if (result.success) {
+        console.log("✅ Approval successful:", result.transactionHash);
+        
+        // Refetch allowance after approval
+        setTimeout(() => {
+          refetchStakingAllowance();
+        }, 2000);
 
-      // Refetch allowance after approval
-      setTimeout(() => {
-        refetchStakingAllowance();
-      }, 2000);
-
-      const successMsg = `Successfully approved ${amount} EMARK for staking`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+        const successMsg = `Successfully approved ${amount} EMARK for staking`;
+        setSuccess(successMsg);
+        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+      } else {
+        throw new Error(result.error || 'Transaction failed');
+      }
+      
     } catch (err: any) {
-      console.error("Error approving tokens:", err);
+      console.error("❌ Approval failed:", err);
       let errorMsg = "Failed to approve tokens";
       
       // Better error handling
@@ -128,12 +160,14 @@ export function useEmarkToken() {
     } finally {
       setIsTransacting(false);
     }
-  }, [canInteract, requireConnection, contract, sendTransaction, refetchStakingAllowance]);
+  }, [isConnected, requireConnection, walletType, contract, sendTransaction, refetchStakingAllowance]);
 
-  // 🎉 SIMPLIFIED: Transfer tokens with auto-connection
+  // ✅ CRITICAL FIX: Transfer tokens using unified wallet provider
   const transfer = useCallback(async (to: string, amount: string) => {
-    // Auto-connect if needed
-    if (!canInteract) {
+    console.log('💰 Starting transfer process...');
+    
+    // ✅ Use unified connection check
+    if (!isConnected) {
       const connectionResult = await requireConnection();
       if (!connectionResult.success) {
         const errorMsg = connectionResult.error || "Please connect your wallet";
@@ -148,27 +182,56 @@ export function useEmarkToken() {
     setSuccess(null);
 
     try {
+      console.log('💰 Transferring', amount, 'EMARK to', to, 'using', walletType);
+      
       const amountWei = toWei(amount);
       
-      const transaction = prepareContractCall({
-        contract,
-        method: "transfer",
-        params: [to, amountWei],
-      });
+      // ✅ CRITICAL FIX: Prepare transaction based on wallet type
+      let transaction;
+      
+      if (walletType === 'farcaster') {
+        // Use viem encoding for Farcaster frames
+        const data = encodeFunctionData({
+          abi: EMARK_TOKEN_ABI,
+          functionName: 'transfer',
+          args: [to, amountWei]
+        });
+        
+        transaction = {
+          to: CONTRACTS.EMARK_TOKEN as `0x${string}`,
+          data,
+        };
+      } else {
+        // Use thirdweb for desktop
+        transaction = prepareContractCall({
+          contract,
+          method: "transfer",
+          params: [to, amountWei],
+        });
+      }
 
-      // 🎉 SIMPLIFIED: Use thirdweb transaction
-      await sendTransaction(transaction as any);
+      console.log('📡 Sending transfer transaction via unified provider...');
+      
+      // ✅ Use unified wallet provider's sendTransaction
+      const result = await sendTransaction(transaction);
+      
+      if (result.success) {
+        console.log("✅ Transfer successful:", result.transactionHash);
+        
+        // Refetch balance after transfer
+        setTimeout(() => {
+          refetchBalance();
+        }, 2000);
 
-      // Refetch balance after transfer
-      setTimeout(() => {
-        refetchBalance();
-      }, 2000);
-
-      const successMsg = `Successfully transferred ${amount} EMARK`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+        const successMsg = `Successfully transferred ${amount} EMARK`;
+        setSuccess(successMsg);
+        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+      } else {
+        throw new Error(result.error || 'Transaction failed');
+      }
+      
     } catch (err: any) {
-      console.error("Error transferring tokens:", err);
+      console.error("❌ Transfer failed:", err);
       let errorMsg = "Failed to transfer tokens";
       
       // Better error handling
@@ -189,7 +252,7 @@ export function useEmarkToken() {
     } finally {
       setIsTransacting(false);
     }
-  }, [canInteract, requireConnection, contract, sendTransaction, refetchBalance]);
+  }, [isConnected, requireConnection, walletType, contract, sendTransaction, refetchBalance]);
 
   return {
     // Token info
@@ -202,7 +265,7 @@ export function useEmarkToken() {
     balance: balance || 0n,
     stakingAllowance: stakingAllowance || 0n,
     balanceLoading,
-    isConnected, // 🎉 SIMPLIFIED: From provider
+    isConnected, // ✅ From unified provider
     
     // Actions
     approveStaking,
@@ -221,9 +284,15 @@ export function useEmarkToken() {
     refetchBalance,
     refetchStakingAllowance,
     
-    // 🎉 NEW: Enhanced capabilities from provider
-    canInteract,
+    // ✅ Enhanced capabilities from unified provider
     userAddress: address,
     requireConnection, // Expose for manual connection if needed
+    
+    // ✅ Auth info for debugging
+    authInfo: {
+      isConnected,
+      address,
+      walletType
+    }
   };
 }
