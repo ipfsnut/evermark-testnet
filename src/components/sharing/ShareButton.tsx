@@ -131,20 +131,36 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
            window.isSecureContext;
   };
 
+  // Add these constants at the top of the file
+  const FARCASTER_MINI_APP_ID = import.meta.env.VITE_FARCASTER_MINI_APP_ID; // e.g., "deoWzfI9kLjH"
+  const FARCASTER_MINI_APP_SLUG = import.meta.env.VITE_FARCASTER_MINI_APP_SLUG; // e.g., "evermark"
+
   // Generate trackable share URL
   const getShareUrl = (platform?: string) => {
-    // Use special /share/ URLs for social platforms that need meta tags
     const socialPlatforms = ['twitter', 'facebook', 'linkedin', 'farcaster', 'bluesky', 'lens'];
     
     if (platform && socialPlatforms.includes(platform)) {
-      const baseUrl = `${window.location.origin}/share/evermark/${evermarkId}`;
-      const params = new URLSearchParams();
-      
-      if (platform) params.set('utm_source', platform);
-      params.set('utm_medium', 'social');
-      params.set('utm_campaign', 'evermark_share');
-      
-      return `${baseUrl}?${params.toString()}`;
+      // Use canonical Farcaster Mini App URL for social sharing
+      if (platform === 'farcaster' && FARCASTER_MINI_APP_ID && FARCASTER_MINI_APP_SLUG) {
+        const baseUrl = `https://farcaster.xyz/miniapps/${FARCASTER_MINI_APP_ID}/${FARCASTER_MINI_APP_SLUG}/evermark/${evermarkId}`;
+        const params = new URLSearchParams();
+        
+        params.set('utm_source', platform);
+        params.set('utm_medium', 'social');
+        params.set('utm_campaign', 'evermark_share');
+        
+        return `${baseUrl}?${params.toString()}`;
+      } else {
+        // For other social platforms, use our direct URL with proper meta tags
+        const baseUrl = `${window.location.origin}/evermark/${evermarkId}`;
+        const params = new URLSearchParams();
+        
+        if (platform) params.set('utm_source', platform);
+        params.set('utm_medium', 'social');
+        params.set('utm_campaign', 'evermark_share');
+        
+        return `${baseUrl}?${params.toString()}`;
+      }
     } else {
       // Use direct URLs for copy/direct access
       const baseUrl = `${window.location.origin}/evermark/${evermarkId}`;
@@ -190,23 +206,45 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   };
   
   const getFarcasterUrl = () => {
-    // Use Farcaster's compose URL with frame embed
-    const frameUrl = getFarcasterFrameUrl();
-    const text = `Check out "${title}" on Evermark`;
-    
-    // Create a Farcaster cast with embedded frame
-    return `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(frameUrl)}`;
+    if (FARCASTER_MINI_APP_ID && FARCASTER_MINI_APP_SLUG) {
+      const miniAppUrl = `https://farcaster.xyz/miniapps/${FARCASTER_MINI_APP_ID}/${FARCASTER_MINI_APP_SLUG}/evermark/${evermarkId}`;
+      const params = new URLSearchParams({
+        utm_source: 'farcaster',
+        utm_medium: 'miniapp',
+        utm_campaign: 'evermark_share'
+      });
+      
+      const shareUrl = `${miniAppUrl}?${params.toString()}`;
+      const text = `Check out "${title}" on Evermark`;
+      
+      return `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(shareUrl)}`;
+    } else {
+      const url = getShareUrl('farcaster');
+      const text = `Check out "${title}" on Evermark`;
+      return `https://farcaster.xyz/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`;
+    }
   };
   
   const getFarcasterDirectUrl = () => {
-    // Direct link to Evermark in Farcaster Mini App context
-    const miniAppUrl = `${window.location.origin}/evermark/${evermarkId}`;
-    const params = new URLSearchParams({
-      utm_source: 'farcaster_miniapp',
-      utm_medium: 'direct',
-      utm_campaign: 'evermark_share'
-    });
-    return `${miniAppUrl}?${params.toString()}`;
+    if (FARCASTER_MINI_APP_ID && FARCASTER_MINI_APP_SLUG) {
+      // Use canonical Mini App URL for direct access
+      const miniAppUrl = `https://farcaster.xyz/miniapps/${FARCASTER_MINI_APP_ID}/${FARCASTER_MINI_APP_SLUG}/evermark/${evermarkId}`;
+      const params = new URLSearchParams({
+        utm_source: 'farcaster_direct',
+        utm_medium: 'miniapp',
+        utm_campaign: 'evermark_share'
+      });
+      return `${miniAppUrl}?${params.toString()}`;
+    } else {
+      // Fallback to our domain
+      const miniAppUrl = `${window.location.origin}/evermark/${evermarkId}`;
+      const params = new URLSearchParams({
+        utm_source: 'farcaster_miniapp',
+        utm_medium: 'direct',
+        utm_campaign: 'evermark_share'
+      });
+      return `${miniAppUrl}?${params.toString()}`;
+    }
   };
   
   const getFacebookUrl = () => {

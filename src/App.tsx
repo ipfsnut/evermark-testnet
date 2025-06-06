@@ -1,6 +1,6 @@
 // Updated App.tsx for Mainnet - Enhanced Farcaster Mini App Integration
 import { useEffect, useState } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppThirdwebProvider } from './lib/thirdweb';
 import { FarcasterProvider, useFarcasterUser } from './lib/farcaster';
 import Layout from './components/layout/Layout';
@@ -223,6 +223,10 @@ function AppContent() {
           {/* Temporary placeholder routes */}
           <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
           <Route path="/bookshelf" element={<ComingSoonPage feature="Bookshelf" />} />
+          {/* Mini App sub-path routing */}
+          <Route path="/evermark/:id" element={<EvermarkDetail />} />
+          {/* Handle any sub-paths that might come from Mini App URLs */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     </ErrorBoundary>
