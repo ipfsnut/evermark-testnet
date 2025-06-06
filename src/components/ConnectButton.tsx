@@ -1,4 +1,3 @@
-
 import { ConnectButton } from "thirdweb/react";
 import { createWallet, inAppWallet } from "thirdweb/wallets";
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
@@ -28,7 +27,7 @@ const wallets = [
 ];
 
 export function WalletConnect() {
-  const { isInFarcaster, isAuthenticated: isFarcasterAuth, user } = useFarcasterUser();
+  const { isInFarcaster, isAuthenticated: isFarcasterAuth } = useFarcasterUser();
   
   // Try to use WalletProvider if available
   const walletProviderState = useWalletConnection ? useWalletConnection() : null;
@@ -48,58 +47,41 @@ export function WalletConnect() {
   const displayAddress = walletProviderState?.displayAddress ?? 
     (address ? `${address.slice(0, 6)}...${address.slice(-4)}` : '');
 
-  // In Farcaster mini-app with authenticated user
-  if (isInFarcaster && isFarcasterAuth && user) {
+  // 🎯 SIMPLIFIED: In Farcaster, show minimal wallet connection status only
+  if (isInFarcaster && isFarcasterAuth) {
     return (
       <div className="flex items-center space-x-2">
-        {/* Show Farcaster user info */}
-        {user.pfpUrl && (
-          <img 
-            src={user.pfpUrl} 
-            alt={user.displayName || user.username} 
-            className="w-8 h-8 rounded-full border-2 border-purple-200"
+        {/* Simple connection indicator */}
+        <div className="flex items-center space-x-2">
+          <div 
+            className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-amber-500'}`} 
+            title={isConnected ? `Wallet Connected: ${displayAddress}` : 'Wallet not connected'}
           />
-        )}
-        <div className="hidden sm:block">
-          <span className="text-sm font-medium text-gray-700">
-            {user.displayName || `@${user.username}`}
+          
+          {/* Desktop: Show connection status */}
+          <span className="hidden sm:block text-xs text-gray-600">
+            {isConnected ? 'Connected' : 'No Wallet'}
           </span>
-        </div>
-        
-        {/* Wallet connection status for Farcaster */}
-        {isConnected ? (
-          <div className="flex items-center space-x-2">
-            <div 
-              className="w-2 h-2 rounded-full bg-green-500" 
-              title={`Wallet Connected: ${displayAddress}`}
-            />
-            <span className="text-xs text-gray-600 font-mono">
-              {displayAddress}
-            </span>
+          
+          {/* Action button based on connection state */}
+          {!isConnected && connectors.length > 0 && (
+            <button
+              onClick={() => connect({ connector: connectors[0] })}
+              className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700 transition-colors"
+            >
+              Link Wallet
+            </button>
+          )}
+          
+          {isConnected && (
             <button
               onClick={() => disconnect()}
-              className="text-xs text-gray-500 hover:text-gray-700"
+              className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
             >
-              Disconnect
+              ×
             </button>
-          </div>
-        ) : (
-          <div className="flex items-center space-x-2">
-            <div 
-              className="w-2 h-2 rounded-full bg-yellow-500" 
-              title="Wallet not connected"
-            />
-            {connectors.map((connector) => (
-              <button
-                key={connector.id}
-                onClick={() => connect({ connector })}
-                className="text-xs bg-purple-600 text-white px-2 py-1 rounded hover:bg-purple-700"
-              >
-                Connect Wallet
-              </button>
-            ))}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     );
   }
@@ -120,6 +102,7 @@ export function WalletConnect() {
             borderRadius: '0.5rem',
             padding: '0.5rem 1rem',
             fontFamily: 'serif',
+            fontSize: '0.875rem', // Slightly smaller for mobile
           }
         }}
         detailsButton={{
@@ -129,6 +112,7 @@ export function WalletConnect() {
             borderRadius: '0.5rem',
             padding: '0.5rem 1rem',
             fontFamily: 'serif',
+            fontSize: '0.875rem',
           }
         }}
       />
@@ -136,7 +120,7 @@ export function WalletConnect() {
         <div className="ml-2 flex items-center space-x-1">
           <div className="w-2 h-2 bg-green-500 rounded-full" title="Wallet Connected" />
           {displayAddress && (
-            <span className="text-xs text-gray-600 font-mono">{displayAddress}</span>
+            <span className="hidden sm:inline text-xs text-gray-600 font-mono">{displayAddress}</span>
           )}
         </div>
       )}
