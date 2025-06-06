@@ -9,8 +9,10 @@ import {
   MessageCircleIcon,
   ZapIcon,
   AtSignIcon,
-  HashIcon
+  HashIcon,
+  ExternalLinkIcon
 } from 'lucide-react';
+import { useFarcasterUser } from '../../lib/farcaster';
 
 interface ShareButtonProps {
   evermarkId: string;
@@ -30,12 +32,12 @@ function useShareTracking(evermarkId: string) {
   const [shareStats, setShareStats] = useState<ShareStats[]>([]);
   const [isTracking, setIsTracking] = useState(false);
   
-  const trackShare = async (platform: string) => {
+  const trackShare = async (platform: string, additionalData?: any) => {
     setIsTracking(true);
     
     try {
       // Track locally first (immediate feedback)
-      console.log(`📤 Shared Evermark ${evermarkId} via ${platform}`);
+      console.log(`📤 Shared Evermark ${evermarkId} via ${platform}`, additionalData);
       
       // Update local stats optimistically
       setShareStats(prev => {
@@ -52,7 +54,7 @@ function useShareTracking(evermarkId: string) {
       });
       
       // Send to API with retry logic
-      await sendToAPI(platform);
+      await sendToAPI(platform, additionalData);
       
     } catch (error) {
       console.error('Failed to track share:', error);
@@ -61,7 +63,7 @@ function useShareTracking(evermarkId: string) {
     }
   };
   
-  const sendToAPI = async (platform: string, retries = 3): Promise<void> => {
+  const sendToAPI = async (platform: string, additionalData?: any, retries = 3): Promise<void> => {
     const shareData = {
       evermarkId,
       platform,
@@ -71,6 +73,7 @@ function useShareTracking(evermarkId: string) {
       utm_source: new URLSearchParams(window.location.search).get('utm_source'),
       utm_medium: new URLSearchParams(window.location.search).get('utm_medium'),
       utm_campaign: new URLSearchParams(window.location.search).get('utm_campaign'),
+      ...additionalData
     };
     
     for (let attempt = 1; attempt <= retries; attempt++) {
@@ -118,7 +121,16 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const { trackShare, isTracking } = useShareTracking(evermarkId);
+  const { isInFarcaster, isAuthenticated, user } = useFarcasterUser();
   
+  // Helper function for proper native share detection
+  const isNativeShareSupported = () => {
+    return navigator.share && 
+           typeof navigator.share === 'function' && 
+           // Check if we're in a secure context (required for Web Share API)
+           window.isSecureContext;
+  };
+
   // Generate trackable share URL
   const getShareUrl = (platform?: string) => {
     // Use special /share/ URLs for social platforms that need meta tags
@@ -177,7 +189,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   };
   
   const getFarcasterUrl = () => {
-    // Use Farcaster's new dynamic URL capabilities
+    // Use Farcaster's compose URL with frame embed
     const frameUrl = getFarcasterFrameUrl();
     const text = `Check out "${title}" on Evermark`;
     
@@ -186,8 +198,8 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   };
   
   const getFarcasterDirectUrl = () => {
-    // Alternative: Direct Farcaster Mini App URL
-    const miniAppUrl = `https://evermark-mini.vercel.app/evermark/${evermarkId}`;
+    // Direct link to Evermark in Farcaster Mini App context
+    const miniAppUrl = `${window.location.origin}/evermark/${evermarkId}`;
     const params = new URLSearchParams({
       utm_source: 'farcaster_miniapp',
       utm_medium: 'direct',
@@ -218,7 +230,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
       const url = getShareUrl('copy');
       await navigator.clipboard.writeText(url);
       setCopied(true);
-      await trackShare('copy');
+      await trackShare('copy', { url });
       
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -231,7 +243,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
       const frameUrl = getFarcasterFrameUrl();
       await navigator.clipboard.writeText(frameUrl);
       setCopied(true);
-      await trackShare('farcaster_frame_copy');
+      await trackShare('farcaster_frame_copy', { frameUrl });
       
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -240,13 +252,36 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   };
   
   const handlePlatformShare = async (platform: string, url: string) => {
-    await trackShare(platform);
+    await trackShare(platform, { 
+      url, 
+      isInFarcaster,
+      userFid: user?.fid 
+    });
+    
+    // For Farcaster Mini App, try to use native sharing if available
+    if (isInFarcaster && platform === 'farcaster') {
+      try {
+        // Try to use Farcaster's native sharing
+        if ((window as any).farcaster?.share) {
+          await (window as any).farcaster.share({
+            text: `Check out "${title}" on Evermark`,
+            embeds: [getFarcasterFrameUrl()]
+          });
+          setIsOpen(false);
+          return;
+        }
+      } catch (nativeError) {
+        console.log('Native Farcaster sharing not available, falling back to web');
+      }
+    }
+    
+    // Fallback to opening URL
     window.open(url, '_blank', 'width=600,height=400');
     setIsOpen(false);
   };
   
   const handleMastodonShare = async () => {
-    await trackShare('mastodon');
+    await trackShare('mastodon', { isInFarcaster });
     const url = getShareUrl('mastodon');
     const text = `Check out "${title}" ${author ? `by ${author} ` : ''}on Evermark`;
     
@@ -256,6 +291,43 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     
     window.open(mastodonUrl, '_blank', 'width=600,height=400');
     setIsOpen(false);
+  };
+  
+  // Native share API for mobile devices
+  const handleNativeShare = async () => {
+    if (!isNativeShareSupported()) {
+      console.log('Native sharing not supported');
+      return;
+    }
+
+    try {
+      const shareData = {
+        title: `Evermark: ${title}`,
+        text: description || `Check out "${title}" on Evermark`,
+        url: getShareUrl('native')
+      };
+
+      // Check if the data can be shared before attempting (if canShare is available)
+      if (navigator.canShare && !navigator.canShare(shareData)) {
+        console.log('Share data not supported');
+        return;
+      }
+
+      await navigator.share(shareData);
+      
+      await trackShare('native_share', { 
+        isInFarcaster,
+        userAgent: navigator.userAgent,
+        shareDataSupported: navigator.canShare ? navigator.canShare(shareData) : 'unknown'
+      });
+    } catch (err) {
+      // User cancelled or sharing failed
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Native sharing cancelled by user');
+      } else {
+        console.log('Native sharing failed:', err);
+      }
+    }
   };
   
   return (
@@ -290,6 +362,18 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
               <h3 className="text-sm font-medium text-gray-900 mb-3">Share this Evermark</h3>
               
               <div className="space-y-2">
+                {/* Native Share (Mobile) */}
+                {isNativeShareSupported() && (
+                  <button
+                    onClick={handleNativeShare}
+                    disabled={isTracking}
+                    className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <ExternalLinkIcon className="h-4 w-4 mr-3 text-blue-600" />
+                    <span className="text-sm">Share via device</span>
+                  </button>
+                )}
+                
                 {/* Copy Link */}
                 <button
                   onClick={copyToClipboard}
@@ -306,48 +390,71 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
                   </span>
                 </button>
                 
+                {/* Farcaster Section - Enhanced for Mini App */}
+                {isInFarcaster && (
+                  <div className="border-t pt-2 mt-2">
+                    <p className="text-xs text-purple-600 mb-2">📱 Farcaster (You're here!)</p>
+                    
+                    {/* Native Farcaster Share */}
+                    <button
+                      onClick={() => handlePlatformShare('farcaster_native', getFarcasterUrl())}
+                      disabled={isTracking}
+                      className="w-full flex items-center px-3 py-2 text-purple-700 hover:bg-purple-50 rounded-lg transition-colors disabled:opacity-50 border border-purple-200"
+                    >
+                      <MessageCircleIcon className="h-4 w-4 mr-3 text-purple-600" />
+                      <div className="flex-1 text-left">
+                        <div className="text-sm font-medium">Cast this Evermark</div>
+                        <div className="text-xs text-purple-600">Share with your followers</div>
+                      </div>
+                    </button>
+                    
+                    {/* Copy Frame URL for custom posts */}
+                    <button
+                      onClick={copyFarcasterFrame}
+                      disabled={isTracking}
+                      className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <LinkIcon className="h-4 w-4 mr-3 text-purple-400" />
+                      <div className="flex-1 text-left">
+                        <div className="text-sm">Copy Frame URL</div>
+                        <div className="text-xs text-gray-500">For custom cast composition</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+                
                 {/* Dweb/Web3 Social Platforms */}
                 <div className="border-t pt-2 mt-2">
                   <p className="text-xs text-gray-500 mb-2">🌐 Decentralized Social</p>
                   
-                  {/* Farcaster with Frame */}
-                  <button
-                    onClick={() => handlePlatformShare('farcaster', getFarcasterUrl())}
-                    disabled={isTracking}
-                    className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <MessageCircleIcon className="h-4 w-4 mr-3 text-purple-600" />
-                    <div className="flex-1 text-left">
-                      <div className="text-sm">Share on Farcaster</div>
-                      <div className="text-xs text-gray-500">With interactive frame</div>
-                    </div>
-                  </button>
-                  
-                  {/* Farcaster Frame URL Copy */}
-                  <button
-                    onClick={copyFarcasterFrame}
-                    disabled={isTracking}
-                    className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <LinkIcon className="h-4 w-4 mr-3 text-purple-400" />
-                    <div className="flex-1 text-left">
-                      <div className="text-sm">Copy Frame URL</div>
-                      <div className="text-xs text-gray-500">For custom Farcaster posts</div>
-                    </div>
-                  </button>
-                  
-                  {/* Farcaster Mini App */}
-                  <button
-                    onClick={() => handlePlatformShare('farcaster_miniapp', getFarcasterDirectUrl())}
-                    disabled={isTracking}
-                    className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    <ZapIcon className="h-4 w-4 mr-3 text-purple-500" />
-                    <div className="flex-1 text-left">
-                      <div className="text-sm">Open in Farcaster Mini App</div>
-                      <div className="text-xs text-gray-500">Direct mini app experience</div>
-                    </div>
-                  </button>
+                  {/* Farcaster (for external users) */}
+                  {!isInFarcaster && (
+                    <>
+                      <button
+                        onClick={() => handlePlatformShare('farcaster', getFarcasterUrl())}
+                        disabled={isTracking}
+                        className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <MessageCircleIcon className="h-4 w-4 mr-3 text-purple-600" />
+                        <div className="flex-1 text-left">
+                          <div className="text-sm">Share on Farcaster</div>
+                          <div className="text-xs text-gray-500">With interactive frame</div>
+                        </div>
+                      </button>
+                      
+                      <button
+                        onClick={() => handlePlatformShare('farcaster_miniapp', getFarcasterDirectUrl())}
+                        disabled={isTracking}
+                        className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <ZapIcon className="h-4 w-4 mr-3 text-purple-500" />
+                        <div className="flex-1 text-left">
+                          <div className="text-sm">Open in Farcaster</div>
+                          <div className="text-xs text-gray-500">Direct mini app link</div>
+                        </div>
+                      </button>
+                    </>
+                  )}
                   
                   {/* Bluesky */}
                   <button
@@ -426,10 +533,21 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
                 </div>
               </div>
               
+              {/* Footer with context info */}
               <div className="mt-4 pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-500">
-                  Share links help track the reach of this Evermark across all platforms
-                </p>
+                <div className="flex items-center justify-between text-xs text-gray-500">
+                  <span>Share links track reach across platforms</span>
+                  {isInFarcaster && (
+                    <span className="text-purple-600 font-medium">📱 Farcaster Mode</span>
+                  )}
+                </div>
+                
+                {/* User context info */}
+                {isInFarcaster && isAuthenticated && user && (
+                  <div className="mt-2 text-xs text-purple-600">
+                    Sharing as @{user.username || `FID:${user.fid}`}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -458,6 +576,19 @@ export const ShareRedirect: React.FC = () => {
       
       console.log(`📈 Share link accessed for Evermark ${id} from ${source}`);
       
+      // Track the inbound share
+      fetch('/.netlify/functions/shares', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evermarkId: id,
+          platform: 'inbound_share',
+          timestamp: new Date().toISOString(),
+          utm_source: source,
+          referrer: document.referrer
+        })
+      }).catch(err => console.warn('Failed to track inbound share:', err));
+      
       // Redirect to the actual Evermark page after brief delay
       setIsRedirecting(true);
       setTimeout(() => {
@@ -472,6 +603,7 @@ export const ShareRedirect: React.FC = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Taking you to the Evermark...</p>
+          <p className="text-xs text-gray-500 mt-2">Tracking share analytics</p>
         </div>
       </div>
     );
@@ -486,6 +618,12 @@ export const ShareRedirect: React.FC = () => {
         <p className="text-gray-600">
           This share link appears to be broken.
         </p>
+        <button 
+          onClick={() => window.location.href = '/'}
+          className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          Go to Evermark Home
+        </button>
       </div>
     </div>
   );
