@@ -75,9 +75,6 @@ export function RewardsPanel() {
             </p>
           </div>
         </div>
-        
-        {/* ✅ CHANGED: Simple test dashboard */}
-        <SimpleTestDashboard />
       </>
     );
   }
