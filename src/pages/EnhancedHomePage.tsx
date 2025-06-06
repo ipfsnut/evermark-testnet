@@ -123,7 +123,7 @@ const EnhancedHomePage: React.FC = () => {
             <img 
               src="/EvermarkLogo.png" 
               alt="Evermark Protocol" 
-              className="h-60 w-auto"
+              className="h-500 w-auto"
             />
           </div>
           <h1 className="text-4xl font-serif font-bold text-gray-900 mb-4">
