@@ -281,8 +281,11 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
             onClick={() => setIsOpen(false)} 
           />
           
-          {/* Share menu */}
-          <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+          {/* Share menu - responsive positioning */}
+          <div className="absolute mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-20
+                    w-80 sm:w-80 sm:right-0
+                    max-sm:w-screen max-sm:left-1/2 max-sm:transform max-sm:-translate-x-1/2
+                    max-sm:mx-4 max-sm:w-[calc(100vw-2rem)]">
             <div className="p-4">
               <h3 className="text-sm font-medium text-gray-900 mb-3">Share this Evermark</h3>
               
