@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PageContainer from '../components/layout/PageContainer';
 import { MarkdownViewer } from '../components/docs/MarkdownViewer';
 import { CONTRACTS } from '../lib/contracts';
@@ -11,8 +11,67 @@ import {
   GitFork,
   Bug,
   Users,
-  FileText
+  FileText,
+  ChevronRightIcon,
+  ChevronDownIcon,
+  CoinsIcon,
+  VoteIcon,
+  GiftIcon,
+  LayersIcon
 } from 'lucide-react';
+
+// Collapsible Documentation Section Component
+const CollapsibleDocSection: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  markdownPath: string;
+  defaultExpanded?: boolean;
+  description?: string;
+}> = ({ title, icon, markdownPath, defaultExpanded = false, description }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+  
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between p-6 hover:bg-gray-50 transition-colors text-left"
+      >
+        <div className="flex items-center">
+          <div className="p-2 bg-purple-100 rounded-lg mr-4">
+            {icon}
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+            {description && (
+              <p className="text-sm text-gray-600 mt-1">{description}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center">
+          <span className="text-sm text-gray-500 mr-2">
+            {isExpanded ? 'Collapse' : 'Expand'}
+          </span>
+          {isExpanded ? (
+            <ChevronDownIcon className="h-5 w-5 text-gray-500" />
+          ) : (
+            <ChevronRightIcon className="h-5 w-5 text-gray-500" />
+          )}
+        </div>
+      </button>
+      
+      {isExpanded && (
+        <div className="border-t border-gray-100">
+          <div className="p-6">
+            <MarkdownViewer 
+              markdownPath={markdownPath}
+              title=""
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const AboutPage: React.FC = () => {
   return (
@@ -195,35 +254,50 @@ const AboutPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Protocol Documentation */}
-        <MarkdownViewer 
-          markdownPath="/docs/protocol-overview.md"
-          title="Protocol Overview"
-        />
+        {/* Protocol Documentation Header */}
+        <div className="text-center">
+          <h2 className="text-2xl font-serif font-bold text-gray-900 mb-2">Protocol Documentation</h2>
+          <p className="text-gray-600">Click any section below to learn more about how Evermark works</p>
+        </div>
 
-        {/* Token Economics */}
-        <MarkdownViewer 
-          markdownPath="/docs/token-economics.md"
-          title="Token Economics"
-        />
+        {/* Collapsible Documentation Sections */}
+        <div className="space-y-4">
+          <CollapsibleDocSection
+            title="Protocol Overview"
+            icon={<BookOpenIcon className="h-5 w-5 text-purple-600" />}
+            markdownPath="/docs/protocol-overview.md"
+            description="Learn the basics of how Evermark Protocol works"
+            defaultExpanded={true}
+          />
 
-        {/* Governance & Voting */}
-        <MarkdownViewer 
-          markdownPath="/docs/governance-voting.md"
-          title="Governance & Voting"
-        />
+          <CollapsibleDocSection
+            title="Token Economics"
+            icon={<CoinsIcon className="h-5 w-5 text-green-600" />}
+            markdownPath="/docs/token-economics.md"
+            description="Understand EMARK and wEMARK tokens, staking, and reward multipliers"
+          />
 
-        {/* Reward System */}
-        <MarkdownViewer 
-          markdownPath="/docs/reward-system.md"
-          title="Reward System"
-        />
+          <CollapsibleDocSection
+            title="Governance & Voting"
+            icon={<VoteIcon className="h-5 w-5 text-blue-600" />}
+            markdownPath="/docs/governance-voting.md"
+            description="How weekly voting cycles and community curation work"
+          />
 
-        {/* Technical Overview */}
-        <MarkdownViewer 
-          markdownPath="/docs/technical-overview.md"
-          title="Technical Overview"
-        />
+          <CollapsibleDocSection
+            title="Reward System"
+            icon={<GiftIcon className="h-5 w-5 text-amber-600" />}
+            markdownPath="/docs/reward-system.md"
+            description="Dual-token rewards, participation bonuses, and earning strategies"
+          />
+
+          <CollapsibleDocSection
+            title="Technical Overview"
+            icon={<LayersIcon className="h-5 w-5 text-indigo-600" />}
+            markdownPath="/docs/technical-overview.md"
+            description="Smart contracts, IPFS integration, and technical architecture"
+          />
+        </div>
 
         {/* Smart Contracts Information */}
         <div className="bg-gray-50 rounded-lg p-6">
