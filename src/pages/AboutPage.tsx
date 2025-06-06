@@ -217,19 +217,6 @@ const AboutPage: React.FC = () => {
               </a>
 
               <a
-                href="https://github.com/ipfsnut/evermark-testnet/discussions"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg hover:bg-gray-700/50 transition-colors"
-              >
-                <div className="flex items-center">
-                  <Users className="h-5 w-5 mr-3 text-purple-400" />
-                  <span className="font-medium">Join Discussions</span>
-                </div>
-                <ExternalLinkIcon className="h-4 w-4 text-gray-400" />
-              </a>
-
-              <a
                 href="https://github.com/ipfsnut/evermark-testnet/blob/main/README.md"
                 target="_blank"
                 rel="noopener noreferrer"
