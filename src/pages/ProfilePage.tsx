@@ -1,9 +1,10 @@
-// src/pages/ProfilePage.tsx - Updated to use WrappingDashboard
+// src/pages/ProfilePage.tsx - Updated to include RewardsPanel
 import React, { useState } from 'react';
 import { useProfile, useContractAuth } from '../hooks/useProfile';
 import { useUserEvermarks } from '../hooks/useEvermarks';
 import { Link } from 'react-router-dom';
 import { WrappingDashboard } from '../components/wrapping/WrappingDashboard';
+import { RewardsPanel } from '../components/rewards/RewardsPanel'; // ✅ ADD: Import RewardsPanel
 import { AuthGuard, AuthStatusBadge } from '../components/auth/AuthGuard';
 import { 
   UserIcon, 
@@ -14,14 +15,16 @@ import {
   CheckCircleIcon,
   TrendingUpIcon,
   TabletIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  GiftIcon // ✅ ADD: Gift icon for rewards tab
 } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
   const profile = useProfile();
   const contractAuth = useContractAuth();
   const { evermarks, isLoading: isLoadingEvermarks } = useUserEvermarks(profile.primaryAddress);
-  const [activeTab, setActiveTab] = useState<'overview' | 'wrapping'>('overview');
+  // ✅ UPDATED: Add rewards tab option
+  const [activeTab, setActiveTab] = useState<'overview' | 'wrapping' | 'rewards'>('overview');
 
   return (
     <AuthGuard>
@@ -60,10 +63,25 @@ const ProfilePage: React.FC = () => {
               >
                 <div className="flex items-center justify-center space-x-2">
                   <CoinsIcon className="h-4 w-4" />
-                  <span>Wrapping & Rewards</span>
+                  <span>Wrapping & Staking</span>
                 </div>
               </button>
             )}
+
+            {/* ✅ ADD: Rewards Tab */}
+            <button
+              onClick={() => setActiveTab('rewards')}
+              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                activeTab === 'rewards'
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <GiftIcon className="h-4 w-4" />
+                <span>Rewards</span>
+              </div>
+            </button>
           </div>
         </div>
 
@@ -289,22 +307,21 @@ const ProfilePage: React.FC = () => {
                   </div>
                 </Link>
 
-                {contractAuth.canInteract && (
-                  <button
-                    onClick={() => setActiveTab('wrapping')}
-                    className="p-4 border border-gray-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-colors group text-left"
-                  >
-                    <div className="flex items-center">
-                      <div className="p-2 bg-amber-100 rounded-lg mr-3 group-hover:bg-amber-200">
-                        <CoinsIcon className="h-5 w-5 text-amber-600" />
-                      </div>
-                      <div>
-                        <h4 className="font-medium text-gray-900">Wrapping Hub</h4>
-                        <p className="text-sm text-gray-600">Manage tokens & rewards</p>
-                      </div>
+                {/* ✅ UPDATED: Change to rewards instead of wrapping */}
+                <button
+                  onClick={() => setActiveTab('rewards')}
+                  className="p-4 border border-gray-200 rounded-lg hover:border-amber-300 hover:bg-amber-50 transition-colors group text-left"
+                >
+                  <div className="flex items-center">
+                    <div className="p-2 bg-amber-100 rounded-lg mr-3 group-hover:bg-amber-200">
+                      <GiftIcon className="h-5 w-5 text-amber-600" />
                     </div>
-                  </button>
-                )}
+                    <div>
+                      <h4 className="font-medium text-gray-900">Rewards Hub</h4>
+                      <p className="text-sm text-gray-600">Claim dual-token rewards</p>
+                    </div>
+                  </div>
+                </button>
               </div>
             </div>
           </div>
@@ -317,6 +334,13 @@ const ProfilePage: React.FC = () => {
               userAddress={profile.primaryAddress}
               className="w-full"
             />
+          </div>
+        )}
+
+        {/* ✅ ADD: Rewards Tab */}
+        {activeTab === 'rewards' && (
+          <div className="space-y-6">
+            <RewardsPanel />
           </div>
         )}
 

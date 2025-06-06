@@ -75,6 +75,9 @@ export function RewardsPanel() {
             </p>
           </div>
         </div>
+        
+        {/* ✅ FIXED: Render DevRewardsDashboard instead of SimpleTestDashboard */}
+        <DevRewardsDashboard />
       </>
     );
   }
@@ -215,6 +218,9 @@ export function RewardsPanel() {
           </p>
         </div>
       </div>
+      
+      {/* ✅ FIXED: Render DevRewardsDashboard here too */}
+      <DevRewardsDashboard />
     </>
   );
 }

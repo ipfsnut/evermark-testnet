@@ -67,6 +67,16 @@ export const DevRewardsDashboard: React.FC = () => {
     },
   });
 
+  // ✅ ADD: Get current allowance
+  const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
+    contract: emarkContract,
+    method: "allowance",
+    params: [address || "0x0000000000000000000000000000000000000000", CONTRACTS.REWARDS],
+    queryOptions: {
+      enabled: !!address,
+    },
+  });
+
   // Get FeeCollector status
   const { data: feeCollectorEvermarkRewards } = useReadContract({
     contract: feeCollectorContract,
@@ -86,6 +96,7 @@ export const DevRewardsDashboard: React.FC = () => {
     setTimeout(() => setMessage(null), 5000);
   };
 
+  // ✅ FIXED: Better transaction handling with allowance check
   const fundEmarkRewards = async () => {
     if (!emarkAmount || parseFloat(emarkAmount) <= 0) {
       setMessage({ type: 'error', text: 'Please enter a valid EMARK amount' });
@@ -97,64 +108,112 @@ export const DevRewardsDashboard: React.FC = () => {
     setMessage(null);
 
     try {
-      // Step 1: Approve
-      const approveTransaction = prepareContractCall({
-        contract: emarkContract,
-        method: "approve",
-        params: [CONTRACTS.REWARDS, toWei(emarkAmount)],
+      const amountWei = toWei(emarkAmount);
+      const currentAllowanceBigInt = currentAllowance || BigInt(0);
+
+      console.log('🔍 Funding Debug:', {
+        amount: emarkAmount,
+        amountWei: amountWei.toString(),
+        currentAllowance: currentAllowanceBigInt.toString(),
+        needsApproval: currentAllowanceBigInt < amountWei
       });
 
-      await new Promise<void>((resolve, reject) => {
-        sendTransaction(approveTransaction, {
-          onSuccess: () => {
-            console.log("✅ EMARK approval successful");
-            resolve();
-          },
-          onError: (error) => {
-            console.error("❌ EMARK approval failed:", error);
-            reject(error);
-          }
+      // ✅ Step 1: Check if approval is needed
+      if (currentAllowanceBigInt < amountWei) {
+        console.log('🔄 Requesting EMARK approval...');
+        setMessage({ type: 'success', text: 'Step 1/2: Requesting EMARK approval...' });
+
+        const approveTransaction = prepareContractCall({
+          contract: emarkContract,
+          method: "approve",
+          params: [CONTRACTS.REWARDS, amountWei],
         });
-      });
 
-      // Wait a moment for approval
-      await new Promise(resolve => setTimeout(resolve, 2000));
+        // ✅ Better Promise handling
+        const approvalResult = await new Promise<boolean>((resolve) => {
+          sendTransaction(approveTransaction, {
+            onSuccess: (result) => {
+              console.log("✅ EMARK approval successful:", result);
+              resolve(true);
+            },
+            onError: (error) => {
+              console.error("❌ EMARK approval failed:", error);
+              setMessage({ 
+                type: 'error', 
+                text: `Approval failed: ${error.message || 'Transaction rejected'}` 
+              });
+              resolve(false);
+            }
+          });
+        });
 
-      // Step 2: Fund
+        if (!approvalResult) {
+          setIsProcessing(false);
+          clearMessage();
+          return;
+        }
+
+        // Wait for approval to be confirmed and refetch allowance
+        console.log('⏳ Waiting for approval confirmation...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        await refetchAllowance();
+      } else {
+        console.log('✅ Sufficient allowance already exists');
+      }
+
+      // ✅ Step 2: Fund the rewards
+      console.log('🔄 Funding EMARK rewards...');
+      setMessage({ type: 'success', text: 'Step 2/2: Funding rewards pool...' });
+
       const fundTransaction = prepareContractCall({
         contract: rewardsContract,
         method: "fundEmarkRewards",
-        params: [toWei(emarkAmount)],
+        params: [amountWei],
       });
 
-      await new Promise<void>((resolve, reject) => {
+      const fundingResult = await new Promise<boolean>((resolve) => {
         sendTransaction(fundTransaction, {
-          onSuccess: () => {
-            console.log("✅ EMARK funding successful");
+          onSuccess: (result) => {
+            console.log("✅ EMARK funding successful:", result);
             setMessage({ 
               type: 'success', 
-              text: `Successfully funded ${emarkAmount} EMARK to rewards pool!` 
+              text: `✅ Successfully funded ${emarkAmount} EMARK to rewards pool!` 
             });
             setEmarkAmount("");
-            setTimeout(() => refetchPeriodStatus(), 3000);
-            resolve();
+            // Refetch data after successful funding
+            setTimeout(() => {
+              refetchPeriodStatus();
+              refetchAllowance();
+            }, 2000);
+            resolve(true);
           },
           onError: (error) => {
             console.error("❌ EMARK funding failed:", error);
-            reject(error);
+            setMessage({ 
+              type: 'error', 
+              text: `Funding failed: ${error.message || 'Transaction failed'}` 
+            });
+            resolve(false);
           }
         });
       });
 
+      if (fundingResult) {
+        console.log('🎉 EMARK rewards funding completed successfully!');
+      }
+
     } catch (error: any) {
-      console.error("Error funding EMARK rewards:", error);
+      console.error("❌ Error funding EMARK rewards:", error);
       setMessage({ 
         type: 'error', 
         text: `Failed to fund EMARK rewards: ${error.message || 'Unknown error'}` 
       });
     } finally {
       setIsProcessing(false);
-      clearMessage();
+      // ✅ Don't auto-clear success messages
+      if (message?.type === 'error') {
+        clearMessage();
+      }
     }
   };
 
@@ -248,6 +307,11 @@ export const DevRewardsDashboard: React.FC = () => {
   const hasEthPool = parseFloat(currentEthPool) > 0;
   const hasEmarkPool = parseFloat(currentEmarkPool) > 0;
 
+  // ✅ Show allowance info
+  const currentAllowanceFormatted = currentAllowance ? toEther(currentAllowance) : "0";
+  const needsApproval = emarkAmount && currentAllowance ? 
+    currentAllowance < toWei(emarkAmount) : true;
+
   return (
     <div className="mt-8 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg shadow-sm p-6 border-2 border-red-200">
       <div className="flex items-center mb-4">
@@ -324,6 +388,9 @@ export const DevRewardsDashboard: React.FC = () => {
               <label className="block text-xs text-gray-600 mb-1">
                 Your Balance: {devEmarkBalance ? toEther(devEmarkBalance) : "0"} EMARK
               </label>
+              <label className="block text-xs text-gray-500 mb-1">
+                Current Allowance: {currentAllowanceFormatted} EMARK
+              </label>
               <input
                 type="number"
                 placeholder="Amount in EMARK"
@@ -332,6 +399,16 @@ export const DevRewardsDashboard: React.FC = () => {
                 className="w-full px-3 py-2 border border-gray-300 rounded text-sm"
                 disabled={isProcessing}
               />
+              {/* ✅ Show approval status */}
+              {emarkAmount && (
+                <p className="text-xs mt-1">
+                  {needsApproval ? (
+                    <span className="text-amber-600">⚠️ Requires approval + funding</span>
+                  ) : (
+                    <span className="text-green-600">✅ Ready to fund (sufficient allowance)</span>
+                  )}
+                </p>
+              )}
             </div>
             <button
               onClick={fundEmarkRewards}
@@ -346,7 +423,7 @@ export const DevRewardsDashboard: React.FC = () => {
               ) : (
                 <>
                   <CoinsIcon className="h-3 w-3 mr-1 inline-block" />
-                  Fund EMARK Pool
+                  {needsApproval && emarkAmount ? 'Approve & Fund EMARK' : 'Fund EMARK Pool'}
                 </>
               )}
             </button>
@@ -396,7 +473,10 @@ export const DevRewardsDashboard: React.FC = () => {
           </button>
           
           <button
-            onClick={() => refetchPeriodStatus()}
+            onClick={() => {
+              refetchPeriodStatus();
+              refetchAllowance();
+            }}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm"
           >
             <RefreshCwIcon className="h-3 w-3 mr-1 inline-block" />
@@ -419,14 +499,16 @@ export const DevRewardsDashboard: React.FC = () => {
             <div>Next ETH Rate: {nextEthRate} wei/second</div>
             <div>Next EMARK Rate: {nextEmarkRate} wei/second</div>
             <div>Period Status Available: {periodStatus ? "Yes" : "No"}</div>
+            <div>Current Allowance: {currentAllowanceFormatted} EMARK</div>
+            <div>Needs Approval: {needsApproval ? "Yes" : "No"}</div>
           </div>
         </details>
       </div>
 
       <div className="mt-4 p-3 bg-amber-50 rounded border border-amber-200">
         <p className="text-xs text-amber-800">
-          💡 <strong>Debug Notes:</strong> Based on your transaction logs, 100 ETH was processed through FeeCollector. 
-          If pools are still empty, check the fee destination configuration or try manual rebalance.
+          💡 <strong>Debug Notes:</strong> The funding process now checks existing allowance first. 
+          If you already have sufficient allowance, it will skip approval and go straight to funding.
         </p>
       </div>
     </div>
