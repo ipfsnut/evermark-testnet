@@ -160,7 +160,8 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   
   // Generate Farcaster Frame URL for dynamic content
   const getFarcasterFrameUrl = () => {
-    const frameUrl = `${window.location.origin}/api/frames/evermark/${evermarkId}`;
+    // Use existing share route instead of non-existent frame endpoint
+    const frameUrl = `${window.location.origin}/share/evermark/${evermarkId}`;
     const params = new URLSearchParams({
       utm_source: 'farcaster',
       utm_medium: 'frame',
