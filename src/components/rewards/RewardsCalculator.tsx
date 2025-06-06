@@ -10,7 +10,10 @@ import {
   LockIcon,
   VoteIcon,
   RefreshCwIcon,
-  AlertCircleIcon
+  AlertCircleIcon,
+  TrendingUpIcon,
+  DollarSignIcon,
+  Coins
 } from 'lucide-react';
 import { useUserRewardsSummary, useCurrentPeriodInfo } from '../../hooks/useRewards';
 import { formatEmark, formatEmarkWithSymbol, formatWEmarkWithSymbol } from '../../utils/formatters';
@@ -19,8 +22,9 @@ import { toEther } from "thirdweb/utils";
 
 interface RewardComponent {
   name: string;
-  amount: bigint;
-  multiplier: number;
+  ethAmount: bigint;
+  wethAmount: bigint;
+  emarkAmount: bigint;
   description: string;
   icon: React.ReactNode;
   isLoading?: boolean;
@@ -30,17 +34,17 @@ export const RewardsCalculator: React.FC = () => {
   const { address, isConnected } = useWalletAuth();
   const [showDetails, setShowDetails] = useState(false);
 
-  // ✅ SIMPLIFIED: Get all reward data from one hook (includes stakedAmount)
+  // Get all reward data from one hook (includes stakedAmount)
   const rewardsSummary = useUserRewardsSummary(address);
   const periodInfo = useCurrentPeriodInfo();
 
-  // ✅ FIXED: Extract data from new hook structure
+  // Extract data from new hook structure
   const {
     pendingRewards,
-    pendingEthRewards,
+    pendingEthRewards, // This might be combined ETH+WETH, we'll need to separate
     pendingEmarkRewards,
     stakedAmount,
-    periodEthRewards,
+    periodEthRewards, // This might be combined ETH+WETH, we'll need to separate
     periodEmarkRewards,
     isLoadingRewards,
     authInfo
@@ -48,7 +52,7 @@ export const RewardsCalculator: React.FC = () => {
 
   const effectiveAddress = address || authInfo?.effectiveUserAddress || undefined;
 
-  // ✅ FIXED: Calculate current "week" from period data
+  // Calculate current "week" from period data
   const currentWeek = useMemo(() => {
     if (!periodInfo.periodStart || periodInfo.periodStart === 0) return 1;
     
@@ -59,7 +63,7 @@ export const RewardsCalculator: React.FC = () => {
 
   const displayWeek = periodInfo.isLoading ? 'Loading...' : currentWeek;
 
-  // Get contracts (only need CardCatalog for delegation info now)
+  // Get contracts
   const emarkContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
@@ -83,8 +87,6 @@ export const RewardsCalculator: React.FC = () => {
       enabled: !!effectiveAddress,
     },
   });
-
-  // ✅ REMOVED: We get stakedAmount from rewards hook, no need for duplicate query
 
   // Get delegation info from CardCatalog (stakedAmount comes from rewards hook)
   const { data: delegatedPower } = useReadContract({
@@ -111,75 +113,131 @@ export const RewardsCalculator: React.FC = () => {
     );
   }
 
-  // ✅ FIXED: Use stakedAmount from rewards hook instead of duplicate CardCatalog query
+  // Use stakedAmount from rewards hook instead of duplicate CardCatalog query
   const actualWEmarkBalance = BigInt(stakedAmount || 0);
   const actualDelegatedPower = BigInt(delegatedPower || 0);
   const availablePower = actualWEmarkBalance > actualDelegatedPower ? 
     actualWEmarkBalance - actualDelegatedPower : BigInt(0);
 
-  // ✅ FIXED: Use new reward structure - current pending + period estimates
+  // ✅ TODO: Separate ETH and WETH rewards when contract supports it
+  // For now, assuming pendingEthRewards includes both ETH and WETH
+  // You may need to add separate contract calls for ETH vs WETH rewards
   const safePendingEthRewards = pendingEthRewards || BigInt(0);
+  const safePendingWethRewards = BigInt(0); // TODO: Get separate WETH rewards
   const safePendingEmarkRewards = pendingEmarkRewards || BigInt(0);
   const safePeriodEthRewards = periodEthRewards || BigInt(0);
+  const safePeriodWethRewards = BigInt(0); // TODO: Get separate WETH period rewards
   const safePeriodEmarkRewards = periodEmarkRewards || BigInt(0);
 
+  // ✅ CALCULATE: Separate ETH, WETH, and EMARK totals
+  const totalEthRewards = safePendingEthRewards + safePeriodEthRewards;
+  const totalWethRewards = safePendingWethRewards + safePeriodWethRewards;
+  const totalEmarkRewards = safePendingEmarkRewards + safePeriodEmarkRewards;
+
   // Check if rewards are funded and if user has staked balance
-  const hasAnyRewards = safePendingEthRewards > BigInt(0) || safePendingEmarkRewards > BigInt(0) || 
-                       safePeriodEthRewards > BigInt(0) || safePeriodEmarkRewards > BigInt(0);
+  const hasEthRewards = totalEthRewards > BigInt(0);
+  const hasWethRewards = totalWethRewards > BigInt(0);
+  const hasEmarkRewards = totalEmarkRewards > BigInt(0);
+  const hasAnyRewards = hasEthRewards || hasWethRewards || hasEmarkRewards;
   const hasStakedBalance = actualWEmarkBalance > BigInt(0);
 
-  // ✅ FIXED: Use new reward structure with ETH + EMARK breakdown
+  // ✅ SEPARATED: Calculate time-based projections for each token
+  const secondsInPeriod = periodInfo.periodEnd - periodInfo.periodStart;
+  const secondsInWeek = 7 * 24 * 60 * 60;
+  const secondsInMonth = 30 * 24 * 60 * 60;
+  const secondsInYear = 365 * 24 * 60 * 60;
+  
+  const weeklyMultiplier = secondsInPeriod > 0 ? secondsInWeek / secondsInPeriod : 1;
+  const monthlyMultiplier = secondsInPeriod > 0 ? secondsInMonth / secondsInPeriod : 1;
+  const yearlyMultiplier = secondsInPeriod > 0 ? secondsInYear / secondsInPeriod : 1;
+
+  // ✅ ETH Projections
+  const weeklyEthRewards = totalEthRewards * BigInt(Math.floor(weeklyMultiplier));
+  const monthlyEthRewards = totalEthRewards * BigInt(Math.floor(monthlyMultiplier));
+  const yearlyEthRewards = totalEthRewards * BigInt(Math.floor(yearlyMultiplier));
+
+  // ✅ WETH Projections
+  const weeklyWethRewards = totalWethRewards * BigInt(Math.floor(weeklyMultiplier));
+  const monthlyWethRewards = totalWethRewards * BigInt(Math.floor(monthlyMultiplier));
+  const yearlyWethRewards = totalWethRewards * BigInt(Math.floor(yearlyMultiplier));
+
+  // ✅ EMARK Projections  
+  const weeklyEmarkRewards = totalEmarkRewards * BigInt(Math.floor(weeklyMultiplier));
+  const monthlyEmarkRewards = totalEmarkRewards * BigInt(Math.floor(monthlyMultiplier));
+  const yearlyEmarkRewards = totalEmarkRewards * BigInt(Math.floor(yearlyMultiplier));
+
+  // ✅ Format amounts separately
+  const ethFormatted = {
+    weekly: formatEmark(weeklyEthRewards, 4),
+    monthly: formatEmark(monthlyEthRewards, 4),
+    yearly: formatEmark(yearlyEthRewards, 4)
+  };
+
+  const wethFormatted = {
+    weekly: formatEmark(weeklyWethRewards, 4),
+    monthly: formatEmark(monthlyWethRewards, 4),
+    yearly: formatEmark(yearlyWethRewards, 4)
+  };
+
+  const emarkFormatted = {
+    weekly: formatEmark(weeklyEmarkRewards, 4),
+    monthly: formatEmark(monthlyEmarkRewards, 4),
+    yearly: formatEmark(yearlyEmarkRewards, 4)
+  };
+
+  // ✅ Calculate separate APRs (Annual Percentage Rate in native tokens)
+  const ethAPR = actualWEmarkBalance > BigInt(0) && ethFormatted.yearly
+    ? ((parseFloat(ethFormatted.yearly) / parseFloat(formatEmark(actualWEmarkBalance, 6) || '1')) * 100)
+    : 0;
+
+  const wethAPR = actualWEmarkBalance > BigInt(0) && wethFormatted.yearly
+    ? ((parseFloat(wethFormatted.yearly) / parseFloat(formatEmark(actualWEmarkBalance, 6) || '1')) * 100)
+    : 0;
+
+  const emarkAPR = actualWEmarkBalance > BigInt(0) && emarkFormatted.yearly
+    ? ((parseFloat(emarkFormatted.yearly) / parseFloat(formatEmark(actualWEmarkBalance, 6) || '1')) * 100)
+    : 0;
+
+  // ✅ UPDATED: Reward components showing three separate amounts
   const rewardComponents: RewardComponent[] = [
     {
-      name: 'WETH/ETH Rewards',
-      amount: safePendingEthRewards + safePeriodEthRewards,
-      multiplier: 1,
-      description: `From ${formatWEmarkWithSymbol(actualWEmarkBalance, 2)} staked (WETH pool)`,
-      icon: <LockIcon className="h-4 w-4 text-blue-600" />,
+      name: 'ETH Rewards',
+      ethAmount: totalEthRewards,
+      wethAmount: BigInt(0),
+      emarkAmount: BigInt(0),
+      description: `From ${formatWEmarkWithSymbol(actualWEmarkBalance, 2)} staked`,
+      icon: <DollarSignIcon className="h-4 w-4 text-gray-800" />,
+      isLoading: isLoadingRewards
+    },
+    {
+      name: 'WETH Rewards',
+      ethAmount: BigInt(0),
+      wethAmount: totalWethRewards,
+      emarkAmount: BigInt(0),
+      description: `From ${formatWEmarkWithSymbol(actualWEmarkBalance, 2)} staked`,
+      icon: <CoinsIcon className="h-4 w-4 text-blue-600" />,
       isLoading: isLoadingRewards
     },
     {
       name: 'EMARK Token Rewards',
-      amount: safePendingEmarkRewards + safePeriodEmarkRewards,
-      multiplier: 1,
-      description: `From ${formatWEmarkWithSymbol(actualWEmarkBalance, 2)} staked (EMARK pool)`,
+      ethAmount: BigInt(0),
+      wethAmount: BigInt(0),
+      emarkAmount: totalEmarkRewards,
+      description: `From ${formatWEmarkWithSymbol(actualWEmarkBalance, 2)} staked`,
       icon: <CoinsIcon className="h-4 w-4 text-purple-600" />,
       isLoading: isLoadingRewards
     },
     {
       name: 'Voting Power Used',
-      amount: BigInt(0), // This is informational, not a reward
-      multiplier: 1,
+      ethAmount: BigInt(0),
+      wethAmount: BigInt(0),
+      emarkAmount: BigInt(0),
       description: `${actualWEmarkBalance > BigInt(0) ? 
         ((Number(actualDelegatedPower) / Number(actualWEmarkBalance)) * 100).toFixed(1) : '0.0'}% voting power delegated`,
       icon: <VoteIcon className="h-4 w-4 text-green-600" />,
       isLoading: isLoadingRewards
     }
   ];
-
-  // ✅ FIXED: Calculate totals from both ETH and EMARK rewards
-  const totalCurrentRewards = safePendingEthRewards + safePendingEmarkRewards;
-  const totalPeriodRewards = safePeriodEthRewards + safePeriodEmarkRewards;
-  const totalWeeklyEstimate = totalCurrentRewards + totalPeriodRewards;
-  
-  // ✅ FIXED: Convert to per-week basis since periods might be different lengths
-  const secondsInPeriod = periodInfo.periodEnd - periodInfo.periodStart;
-  const secondsInWeek = 7 * 24 * 60 * 60;
-  const weeklyMultiplier = secondsInPeriod > 0 ? secondsInWeek / secondsInPeriod : 1;
-  
-  const finalWeeklyRewards = totalWeeklyEstimate * BigInt(Math.floor(weeklyMultiplier));
-  const projectedMonthlyRewards = finalWeeklyRewards * BigInt(4);
-  const projectedYearlyRewards = finalWeeklyRewards * BigInt(52);
-
-  // Format amounts
-  const weeklyFormatted = formatEmark(finalWeeklyRewards, 2);
-  const monthlyFormatted = formatEmark(projectedMonthlyRewards, 2);
-  const yearlyFormatted = formatEmark(projectedYearlyRewards, 2);
-
-  // Calculate APY
-  const effectiveAPY = actualWEmarkBalance > BigInt(0) && yearlyFormatted
-    ? ((parseFloat(yearlyFormatted) / parseFloat(formatEmark(actualWEmarkBalance, 6) || '1')) * 100)
-    : 0;
 
   const isLoading = periodInfo.isLoading || isLoadingRewards;
 
@@ -239,61 +297,130 @@ export const RewardsCalculator: React.FC = () => {
         </p>
       </div>
 
-      {/* Summary Stats */}
+      {/* ✅ THREE-COLUMN: ETH, WETH, EMARK reward display */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-lg">
-          <div className="flex items-center mb-2">
-            <CoinsIcon className="h-5 w-5 text-purple-600 mr-2" />
-            <span className="text-sm text-purple-600 font-medium">Weekly</span>
+        {/* ETH Rewards Column */}
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
+          <div className="flex items-center mb-3">
+            <DollarSignIcon className="h-5 w-5 text-gray-700 mr-2" />
+            <h4 className="font-medium text-gray-900">ETH Rewards</h4>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
-            {isLoading ? (
-              <span className="text-lg">Loading...</span>
-            ) : (
-              weeklyFormatted || '0.00'
-            )}
-          </p>
-          <p className="text-xs text-gray-600 mt-1">Mixed tokens (ETH + $EMARK)</p>
+          
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-700">Weekly:</span>
+              <span className="font-bold text-gray-900">
+                {isLoading ? "Loading..." : `${ethFormatted.weekly || '0.00'} ETH`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-700">Monthly:</span>
+              <span className="font-bold text-gray-900">
+                {isLoading ? "Loading..." : `${ethFormatted.monthly || '0.00'} ETH`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-700">Yearly:</span>
+              <span className="font-bold text-gray-900">
+                {isLoading ? "Loading..." : `${ethFormatted.yearly || '0.00'} ETH`}
+              </span>
+            </div>
+            <div className="pt-2 border-t border-gray-200">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-700">APR:</span>
+                <span className="font-bold text-gray-900">
+                  {isLoading ? "Loading..." : ethAPR > 0 ? `${ethAPR.toFixed(2)}%` : 'N/A'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 p-4 rounded-lg">
-          <div className="flex items-center mb-2">
+        {/* WETH Rewards Column */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
+          <div className="flex items-center mb-3">
             <CoinsIcon className="h-5 w-5 text-blue-600 mr-2" />
-            <span className="text-sm text-blue-600 font-medium">Monthly</span>
+            <h4 className="font-medium text-blue-900">WETH Rewards</h4>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
-            {isLoading ? (
-              <span className="text-lg">Loading...</span>
-            ) : (
-              monthlyFormatted || '0.00'
-            )}
-          </p>
-          <p className="text-xs text-gray-600 mt-1">Mixed tokens (ETH + $EMARK)</p>
+          
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-blue-700">Weekly:</span>
+              <span className="font-bold text-blue-900">
+                {isLoading ? "Loading..." : `${wethFormatted.weekly || '0.00'} WETH`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-blue-700">Monthly:</span>
+              <span className="font-bold text-blue-900">
+                {isLoading ? "Loading..." : `${wethFormatted.monthly || '0.00'} WETH`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-blue-700">Yearly:</span>
+              <span className="font-bold text-blue-900">
+                {isLoading ? "Loading..." : `${wethFormatted.yearly || '0.00'} WETH`}
+              </span>
+            </div>
+            <div className="pt-2 border-t border-blue-200">
+              <div className="flex justify-between">
+                <span className="text-sm text-blue-700">APR:</span>
+                <span className="font-bold text-blue-900">
+                  {isLoading ? "Loading..." : wethAPR > 0 ? `${wethAPR.toFixed(2)}%` : 'N/A'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-4 rounded-lg">
-          <div className="flex items-center mb-2">
-            <CoinsIcon className="h-5 w-5 text-green-600 mr-2" />
-            <span className="text-sm text-green-600 font-medium">Yearly</span>
+        {/* EMARK Rewards Column */}
+        <div className="bg-gradient-to-br from-purple-50 to-violet-50 p-4 rounded-lg border border-purple-200">
+          <div className="flex items-center mb-3">
+            <CoinsIcon className="h-5 w-5 text-purple-600 mr-2" />
+            <h4 className="font-medium text-purple-900">$EMARK Rewards</h4>
           </div>
-          <p className="text-2xl font-bold text-gray-900">
-            {isLoading ? (
-              <span className="text-lg">Loading...</span>
-            ) : (
-              yearlyFormatted || '0.00'
-            )}
-          </p>
-          <p className="text-xs text-gray-600 mt-1">Mixed tokens (ETH + $EMARK)</p>
+          
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm text-purple-700">Weekly:</span>
+              <span className="font-bold text-purple-900">
+                {isLoading ? "Loading..." : `${emarkFormatted.weekly || '0.00'} EMARK`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-purple-700">Monthly:</span>
+              <span className="font-bold text-purple-900">
+                {isLoading ? "Loading..." : `${emarkFormatted.monthly || '0.00'} EMARK`}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-purple-700">Yearly:</span>
+              <span className="font-bold text-purple-900">
+                {isLoading ? "Loading..." : `${emarkFormatted.yearly || '0.00'} EMARK`}
+              </span>
+            </div>
+            <div className="pt-2 border-t border-purple-200">
+              <div className="flex justify-between">
+                <span className="text-sm text-purple-700">APR:</span>
+                <span className="font-bold text-purple-900">
+                  {isLoading ? "Loading..." : emarkAPR > 0 ? `${emarkAPR.toFixed(2)}%` : 'N/A'}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Breakdown */}
+      {/* ✅ UPDATED: Breakdown showing individual amounts */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-700">
           {hasAnyRewards ? 'Live Reward Breakdown' : 'Potential Reward Structure'}
         </h4>
         {rewardComponents.map((component, index) => {
-          const componentFormatted = formatEmark(component.amount, 4);
+          const ethAmount = formatEmark(component.ethAmount, 4);
+          const wethAmount = formatEmark(component.wethAmount, 4);
+          const emarkAmount = formatEmark(component.emarkAmount, 4);
+          
           return (
             <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center">
@@ -314,17 +441,28 @@ export const RewardsCalculator: React.FC = () => {
                     {((Number(actualDelegatedPower) / Math.max(Number(actualWEmarkBalance), 1)) * 100).toFixed(1)}%
                   </p>
                 ) : (
-                  <>
-                    <p className="text-sm font-bold text-gray-900">
-                      {componentFormatted ? `${componentFormatted}` : '0.00'} 
-                      {component.name.includes('WETH') ? ' ETH' : ' tokens'}
-                    </p>
-                    {!hasAnyRewards && hasStakedBalance && (
+                  <div className="space-y-1">
+                    {component.ethAmount > BigInt(0) && (
+                      <p className="text-sm font-bold text-gray-900">
+                        {ethAmount || '0.00'} ETH
+                      </p>
+                    )}
+                    {component.wethAmount > BigInt(0) && (
+                      <p className="text-sm font-bold text-blue-900">
+                        {wethAmount || '0.00'} WETH
+                      </p>
+                    )}
+                    {component.emarkAmount > BigInt(0) && (
+                      <p className="text-sm font-bold text-purple-900">
+                        {emarkAmount || '0.00'} EMARK
+                      </p>
+                    )}
+                    {!hasAnyRewards && hasStakedBalance && component.name !== 'Voting Power Used' && (
                       <p className="text-xs text-amber-600">
                         Ready to earn
                       </p>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>
@@ -343,7 +481,6 @@ export const RewardsCalculator: React.FC = () => {
               </div>
               <div>
                 <strong>Staked (wEMARK):</strong> {formatWEmarkWithSymbol(actualWEmarkBalance, 2)}
-                <span className="text-xs text-blue-600 ml-1">(from rewards contract)</span>
               </div>
               <div>
                 <strong>Delegated Power:</strong> {formatWEmarkWithSymbol(actualDelegatedPower, 2)}
@@ -361,58 +498,66 @@ export const RewardsCalculator: React.FC = () => {
                 <strong>Pending ETH:</strong> {toEther(safePendingEthRewards)} ETH
               </div>
               <div>
+                <strong>Pending WETH:</strong> {toEther(safePendingWethRewards)} WETH
+              </div>
+              <div>
                 <strong>Pending EMARK:</strong> {toEther(safePendingEmarkRewards)} $EMARK
               </div>
             </div>
           </div>
 
           <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-            <h4 className="text-sm font-medium text-green-900 mb-2">How the New Dual-Token Rewards Work</h4>
+            <h4 className="text-sm font-medium text-green-900 mb-2">How the Triple-Token Rewards Work</h4>
             <ul className="text-sm text-green-800 space-y-1">
-              <li>• <strong>Stake $EMARK:</strong> Convert liquid $EMARK to wEMARK to earn from both ETH and $EMARK pools</li>
-              <li>• <strong>Dual rewards:</strong> Earn both WETH/ETH and $EMARK tokens based on your wEMARK stake</li>
-              <li>• <strong>Periodic rebalancing:</strong> Reward rates adjust automatically based on pool sizes</li>
-              <li>• <strong>Simplified tracking:</strong> Rewards contract tracks your staked balance automatically</li>
+              <li>• <strong>Stake $EMARK:</strong> Convert liquid $EMARK to wEMARK to earn from ETH, WETH, and $EMARK pools</li>
+              <li>• <strong>Triple rewards:</strong> Earn ETH, WETH, and $EMARK tokens based on your wEMARK stake</li>
+              <li>• <strong>Separate pools:</strong> Each token type has its own funding and reward rate</li>
+              <li>• <strong>Individual APRs:</strong> Each token type has its own annual percentage rate in native tokens</li>
             </ul>
           </div>
 
           <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-            <h4 className="text-sm font-medium text-amber-900 mb-2">Token Types Explained</h4>
+            <h4 className="text-sm font-medium text-amber-900 mb-2">APR Calculations</h4>
             <div className="text-sm text-amber-800 space-y-2">
-              <div><strong>$EMARK:</strong> Liquid token for transactions, minting, and trading</div>
-              <div><strong>wEMARK:</strong> Staked $EMARK that earns dual rewards (ETH + $EMARK)</div>
-              <div><strong>Process:</strong> Stake $EMARK → Get wEMARK → Earn ETH + $EMARK rewards</div>
+              <div><strong>ETH APR:</strong> (Yearly ETH rewards / wEMARK balance) × 100</div>
+              <div><strong>WETH APR:</strong> (Yearly WETH rewards / wEMARK balance) × 100</div>
+              <div><strong>EMARK APR:</strong> (Yearly EMARK rewards / wEMARK balance) × 100</div>
+              <div><strong>Note:</strong> All APRs are calculated in native tokens. ETH and WETH are nearly equivalent in value.</div>
             </div>
           </div>
         </div>
       )}
 
-      {/* APY Display */}
-      <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+      {/* ✅ UPDATED: Triple-token overview */}
+      <div className="mt-6 p-4 bg-gradient-to-r from-gray-50 via-blue-50 via-purple-50 to-indigo-50 rounded-lg border border-gray-200">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-purple-900 font-medium">
-              {hasAnyRewards ? 'Current APY' : 'Potential APY'}
+            <p className="text-sm text-gray-900 font-medium">
+              {hasAnyRewards ? 'Total Triple-Token Yield' : 'Potential Total Yield'}
             </p>
-            <p className="text-xs text-purple-700 mt-1">Based on wEMARK balance & dual-token rewards</p>
+            <p className="text-xs text-gray-600 mt-1">Combined ETH + WETH + EMARK rewards from your wEMARK stake</p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-purple-900">
-              {isLoading ? (
-                <RefreshCwIcon className="h-6 w-6 animate-spin" />
-              ) : effectiveAPY > 0 ? (
-                `${effectiveAPY.toFixed(1)}%`
-              ) : hasStakedBalance ? (
-                <span className="text-lg text-purple-600">Ready</span>
-              ) : (
-                'N/A'
+            <div className="space-y-1">
+              {ethAPR > 0 && (
+                <p className="text-sm font-bold text-gray-900">
+                  {ethAPR.toFixed(2)}% ETH APR
+                </p>
               )}
-            </p>
-            {actualWEmarkBalance > BigInt(0) && (
-              <p className="text-xs text-purple-700 mt-1">
-                On {formatEmark(actualWEmarkBalance, 2)} wEMARK
-              </p>
-            )}
+              {wethAPR > 0 && (
+                <p className="text-sm font-bold text-blue-900">
+                  {wethAPR.toFixed(2)}% WETH APR
+                </p>
+              )}
+              {emarkAPR > 0 && (
+                <p className="text-sm font-bold text-purple-900">
+                  {emarkAPR.toFixed(2)}% EMARK APR
+                </p>
+              )}
+              {!hasAnyRewards && hasStakedBalance && (
+                <p className="text-sm text-gray-600">Ready to earn</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -423,7 +568,7 @@ export const RewardsCalculator: React.FC = () => {
           💡 <strong>Live Data:</strong> {hasAnyRewards ? 
             'All calculations use real-time data from mainnet contracts.' :
             'Ready to calculate rewards when reward pools are funded.'
-          } Stake $EMARK to get wEMARK and start earning dual-token rewards (ETH + $EMARK).
+          } APRs shown in native tokens. {ethAPR === 0 && wethAPR === 0 && emarkAPR === 0 ? 'Fund pools to see live rates.' : 'Each token pool can be funded independently.'}
         </p>
       </div>
     </div>
