@@ -63,7 +63,7 @@ const ProfilePage: React.FC = () => {
               >
                 <div className="flex items-center justify-center space-x-2">
                   <CoinsIcon className="h-4 w-4" />
-                  <span>Wrapping & Staking</span>
+                  <span>wEMARK</span>
                 </div>
               </button>
             )}
