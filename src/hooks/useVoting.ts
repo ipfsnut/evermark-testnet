@@ -1,14 +1,26 @@
+// Fixed useVoting.ts - Use unified wallet provider instead of thirdweb directly
+// Replace your entire src/hooks/useVoting.ts with this:
+
 import { useState, useCallback, useMemo } from "react";
-import { useReadContract, useSendTransaction } from "thirdweb/react";
+import { useReadContract } from "thirdweb/react";
 import { getContract, prepareContractCall } from "thirdweb";
+import { encodeFunctionData } from "viem";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, VOTING_ABI, CARD_CATALOG_ABI } from "../lib/contracts";
+import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ USE UNIFIED PROVIDER
 import { toEther, toWei } from "thirdweb/utils";
 
 export function useVoting(evermarkId: string, userAddress?: string) {
   const [isVoting, setIsVoting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  
+  // ✅ CRITICAL FIX: Use unified wallet providers
+  const { address: walletAddress, isConnected, requireConnection } = useWalletAuth();
+  const { sendTransaction, walletType } = useWalletConnection();
+  
+  // ✅ Use wallet provider address if userAddress not provided
+  const effectiveUserAddress = userAddress || walletAddress;
   
   // Both contracts needed for full voting functionality
   const votingContract = useMemo(() => getContract({
@@ -32,37 +44,37 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     params: [],
   });
 
-  // ✅ FIXED: Get voting power from CardCatalog (not voting contract)
+  // Get voting power from CardCatalog
   const { data: availableVotingPower, isLoading: isLoadingVotingPower, refetch: refetchVotingPower } = useReadContract({
-    contract: cardCatalogContract, // ✅ Use CardCatalog for voting power
-    method: "getAvailableVotingPower", // ✅ Correct method name
-    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    contract: cardCatalogContract,
+    method: "getAvailableVotingPower",
+    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress,
+      enabled: !!effectiveUserAddress,
     },
   });
 
-  // ✅ FIXED: Get total voting power from CardCatalog
+  // Get total voting power from CardCatalog
   const { data: totalVotingPower } = useReadContract({
-    contract: cardCatalogContract, // ✅ Use CardCatalog
-    method: "getTotalVotingPower", // ✅ Correct method name
-    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    contract: cardCatalogContract,
+    method: "getTotalVotingPower",
+    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress,
+      enabled: !!effectiveUserAddress,
     },
   });
 
-  // ✅ BONUS: Also get total wEMARK balance for debugging
+  // Get total wEMARK balance for debugging
   const { data: totalWemark } = useReadContract({
     contract: cardCatalogContract,
     method: "balanceOf",
-    params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
+    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
-      enabled: !!userAddress,
+      enabled: !!effectiveUserAddress,
     },
   });
 
-  // ✅ Get total votes for this Evermark (cycle-specific)
+  // Get total votes for this Evermark (cycle-specific)
   const { data: totalVotes, isLoading: isLoadingTotalVotes, refetch: refetchTotalVotes } = useReadContract({
     contract: votingContract,
     method: "getEvermarkVotesInCycle",
@@ -72,21 +84,21 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // ✅ Get user's votes for this Evermark (cycle-specific)
+  // Get user's votes for this Evermark (cycle-specific)
   const userVotesQuery = useReadContract({
     contract: votingContract,
     method: "getUserVotesInCycle",
     params: [
       currentCycle || BigInt(1), 
-      userAddress || "0x0000000000000000000000000000000000000000", 
+      effectiveUserAddress || "0x0000000000000000000000000000000000000000", 
       BigInt(evermarkId || "0")
     ] as const,
     queryOptions: {
-      enabled: !!userAddress && !!evermarkId && evermarkId !== "0" && !!currentCycle,
+      enabled: !!effectiveUserAddress && !!evermarkId && evermarkId !== "0" && !!currentCycle,
     },
   });
 
-  // ✅ Get cycle info
+  // Get cycle info
   const { data: cycleInfo } = useReadContract({
     contract: votingContract,
     method: "getCycleInfo",
@@ -96,32 +108,38 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // ✅ Get time remaining
+  // Get time remaining
   const { data: timeRemaining } = useReadContract({
     contract: votingContract,
     method: "getTimeRemainingInCurrentCycle",
     params: [] as const,
   });
 
-  // 🔍 DEBUG: Log voting power info (only in development)
+  // Debug logging
   if (process.env.NODE_ENV === 'development') {
     console.log("🔍 Voting Power:", {
-      userAddress: userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` : null,
+      userAddress: effectiveUserAddress ? `${effectiveUserAddress.slice(0, 6)}...${effectiveUserAddress.slice(-4)}` : null,
       totalWemark: totalWemark ? toEther(totalWemark) : "0",
       availableVotingPower: availableVotingPower ? toEther(availableVotingPower) : "0",
       totalVotingPower: totalVotingPower ? toEther(totalVotingPower) : "0",
       currentCycle: currentCycle?.toString(),
+      walletType,
+      isConnected
     });
   }
-
-  const { mutate: sendTransaction } = useSendTransaction();
   
-  // ✅ Delegate votes function
+  // ✅ CRITICAL FIX: Delegate votes using unified wallet provider
   const delegateVotes = useCallback(async (amount: string) => {
-    if (!userAddress) {
-      const errorMsg = "Please connect your wallet";
-      setError(errorMsg);
-      return { success: false, error: errorMsg };
+    console.log('🗳️ Starting delegate votes process...');
+    
+    // ✅ Use unified connection check
+    if (!isConnected) {
+      const connectionResult = await requireConnection();
+      if (!connectionResult.success) {
+        const errorMsg = connectionResult.error || "Please connect your wallet";
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
+      }
     }
     
     if (!amount || parseFloat(amount) <= 0) {
@@ -140,7 +158,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setError(null);
     setSuccess(null);
 
-    // ✅ CRITICAL FIX: Refresh data immediately before transaction
+    // Refresh data immediately before transaction
     await Promise.all([
       refetchCycle(),
       refetchVotingPower(), 
@@ -148,7 +166,6 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       userVotesQuery.refetch?.(),
     ]);
 
-    // Small delay to ensure data is fresh
     await new Promise(resolve => setTimeout(resolve, 500));
     
     const voteAmountWei = toWei(amount);
@@ -157,14 +174,12 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     const freshVotingPowerResult = await refetchVotingPower();
     const actualAvailable = freshVotingPowerResult.data || availableVotingPower || BigInt(0);
     
-    // 🔍 DEBUG: Log transaction attempt
-    if (process.env.NODE_ENV === 'development') {
-      console.log("🔍 Voting:", {
-        amount: `${amount} wEMARK`,
-        available: `${toEther(actualAvailable)} wEMARK`,
-        hasEnough: voteAmountWei <= actualAvailable,
-      });
-    }
+    console.log("🔍 Voting attempt:", {
+      amount: `${amount} wEMARK`,
+      available: `${toEther(actualAvailable)} wEMARK`,
+      hasEnough: voteAmountWei <= actualAvailable,
+      walletType
+    });
 
     // Check with fresh data
     if (voteAmountWei > actualAvailable) {
@@ -175,78 +190,103 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     }
     
     try {
-      const transaction = prepareContractCall({
-        contract: votingContract,
-        method: "delegateVotes",
-        params: [BigInt(evermarkId), voteAmountWei] as const,
-      });
+      // ✅ CRITICAL FIX: Prepare transaction based on wallet type
+      let transaction;
       
-      // 🔍 DEBUG: Log the exact transaction details
-      if (process.env.NODE_ENV === 'development') {
-        console.log("🔍 Transaction Details:", {
-          contractAddress: votingContract.address,
+      if (walletType === 'farcaster') {
+        // Use viem encoding for Farcaster frames
+        const data = encodeFunctionData({
+          abi: VOTING_ABI,
+          functionName: 'delegateVotes',
+          args: [BigInt(evermarkId), voteAmountWei]
+        });
+        
+        transaction = {
+          to: CONTRACTS.VOTING as `0x${string}`,
+          data,
+        };
+      } else {
+        // Use thirdweb for desktop
+        transaction = prepareContractCall({
+          contract: votingContract,
           method: "delegateVotes",
-          evermarkId: evermarkId,
-          amount: toEther(voteAmountWei),
-          userAddressFromUI: userAddress,
-          chainId: votingContract.chain.id,
+          params: [BigInt(evermarkId), voteAmountWei] as const,
         });
       }
       
-      return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
-        sendTransaction(transaction, {
-          onSuccess: () => {
-            const successMsg = `Successfully delegated ${amount} wEMARK to this Evermark!`;
-            setSuccess(successMsg);
-            
-            // Refetch all relevant data
-            setTimeout(() => {
-              refetchCycle();
-              refetchTotalVotes();
-              refetchVotingPower();
-              userVotesQuery.refetch?.();
-            }, 2000);
-            
-            resolve({ success: true, message: successMsg });
-          },
-          onError: (error: any) => {
-            console.error("Error delegating votes:", error);
-            
-            let errorMsg = "Failed to delegate votes";
-            if (error.message?.includes("Cannot vote on own Evermark")) {
-              errorMsg = "You cannot vote on your own Evermark";
-            } else if (error.message?.includes("Insufficient voting power")) {
-              errorMsg = "Insufficient voting power available";
-            } else if (error.message?.includes("Evermark does not exist")) {
-              errorMsg = "This Evermark does not exist";
-            } else if (error.message?.includes("Current cycle is finalized")) {
-              errorMsg = "Current voting cycle has ended";
-            } else if (error.message?.includes("user rejected")) {
-              errorMsg = "Transaction was rejected";
-            } else if (error.message) {
-              errorMsg = error.message;
-            }
-            
-            setError(errorMsg);
-            resolve({ success: false, error: errorMsg });
-          }
-        });
-      });
+      console.log('📡 Sending vote transaction via unified provider...');
+      
+      // ✅ Use unified wallet provider's sendTransaction
+      const result = await sendTransaction(transaction);
+      
+      if (result.success) {
+        console.log("✅ Vote delegation successful:", result.transactionHash);
+        
+        const successMsg = `Successfully delegated ${amount} wEMARK to this Evermark!`;
+        setSuccess(successMsg);
+        
+        // Refetch all relevant data
+        setTimeout(() => {
+          refetchCycle();
+          refetchTotalVotes();
+          refetchVotingPower();
+          userVotesQuery.refetch?.();
+        }, 2000);
+        
+        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+      } else {
+        throw new Error(result.error || 'Transaction failed');
+      }
+      
     } catch (err: any) {
-      const errorMsg = err.message || "Failed to delegate votes";
+      console.error("❌ Vote delegation failed:", err);
+      
+      let errorMsg = "Failed to delegate votes";
+      if (err.message?.includes("Cannot vote on own Evermark")) {
+        errorMsg = "You cannot vote on your own Evermark";
+      } else if (err.message?.includes("Insufficient voting power")) {
+        errorMsg = "Insufficient voting power available";
+      } else if (err.message?.includes("Evermark does not exist")) {
+        errorMsg = "This Evermark does not exist";
+      } else if (err.message?.includes("Current cycle is finalized")) {
+        errorMsg = "Current voting cycle has ended";
+      } else if (err.message?.includes("user rejected")) {
+        errorMsg = "Transaction was rejected";
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsVoting(false);
     }
-  }, [userAddress, evermarkId, availableVotingPower, totalWemark, votingContract, sendTransaction, refetchCycle, refetchTotalVotes, refetchVotingPower, userVotesQuery]);
+  }, [
+    isConnected, 
+    requireConnection, 
+    evermarkId, 
+    availableVotingPower, 
+    walletType,
+    votingContract, 
+    sendTransaction, 
+    refetchCycle, 
+    refetchTotalVotes, 
+    refetchVotingPower, 
+    userVotesQuery
+  ]);
   
-  // ✅ Undelegate votes function
+  // ✅ CRITICAL FIX: Undelegate votes using unified wallet provider
   const undelegateVotes = useCallback(async (amount: string) => {
-    if (!userAddress) {
-      const errorMsg = "Please connect your wallet";
-      setError(errorMsg);
-      return { success: false, error: errorMsg };
+    console.log('🗳️ Starting undelegate votes process...');
+    
+    // ✅ Use unified connection check
+    if (!isConnected) {
+      const connectionResult = await requireConnection();
+      if (!connectionResult.success) {
+        const errorMsg = connectionResult.error || "Please connect your wallet";
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
+      }
     }
     
     const userVotes = userVotesQuery.data;
@@ -274,55 +314,86 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setSuccess(null);
     
     try {
-      const transaction = prepareContractCall({
-        contract: votingContract,
-        method: "undelegateVotes",
-        params: [BigInt(evermarkId), withdrawAmountWei] as const,
-      });
+      // ✅ CRITICAL FIX: Prepare transaction based on wallet type
+      let transaction;
       
-      return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
-        sendTransaction(transaction, {
-          onSuccess: () => {
-            const successMsg = `Successfully withdrew ${amount} wEMARK from this Evermark!`;
-            setSuccess(successMsg);
-            
-            // Refetch all relevant data
-            setTimeout(() => {
-              refetchCycle();
-              refetchTotalVotes();
-              refetchVotingPower();
-              userVotesQuery.refetch?.();
-            }, 2000);
-            
-            resolve({ success: true, message: successMsg });
-          },
-          onError: (error: any) => {
-            console.error("Error undelegating votes:", error);
-            
-            let errorMsg = "Failed to undelegate votes";
-            if (error.message?.includes("Insufficient delegated votes")) {
-              errorMsg = "You don't have enough votes delegated to this Evermark";
-            } else if (error.message?.includes("Current cycle is finalized")) {
-              errorMsg = "Current voting cycle has ended";
-            } else if (error.message?.includes("user rejected")) {
-              errorMsg = "Transaction was rejected";
-            } else if (error.message) {
-              errorMsg = error.message;
-            }
-            
-            setError(errorMsg);
-            resolve({ success: false, error: errorMsg });
-          }
+      if (walletType === 'farcaster') {
+        // Use viem encoding for Farcaster frames
+        const data = encodeFunctionData({
+          abi: VOTING_ABI,
+          functionName: 'undelegateVotes',
+          args: [BigInt(evermarkId), withdrawAmountWei]
         });
-      });
+        
+        transaction = {
+          to: CONTRACTS.VOTING as `0x${string}`,
+          data,
+        };
+      } else {
+        // Use thirdweb for desktop
+        transaction = prepareContractCall({
+          contract: votingContract,
+          method: "undelegateVotes",
+          params: [BigInt(evermarkId), withdrawAmountWei] as const,
+        });
+      }
+      
+      console.log('📡 Sending unvote transaction via unified provider...');
+      
+      // ✅ Use unified wallet provider's sendTransaction
+      const result = await sendTransaction(transaction);
+      
+      if (result.success) {
+        console.log("✅ Vote undelegation successful:", result.transactionHash);
+        
+        const successMsg = `Successfully withdrew ${amount} wEMARK from this Evermark!`;
+        setSuccess(successMsg);
+        
+        // Refetch all relevant data
+        setTimeout(() => {
+          refetchCycle();
+          refetchTotalVotes();
+          refetchVotingPower();
+          userVotesQuery.refetch?.();
+        }, 2000);
+        
+        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+      } else {
+        throw new Error(result.error || 'Transaction failed');
+      }
+      
     } catch (err: any) {
-      const errorMsg = err.message || "Failed to undelegate votes";
+      console.error("❌ Vote undelegation failed:", err);
+      
+      let errorMsg = "Failed to undelegate votes";
+      if (err.message?.includes("Insufficient delegated votes")) {
+        errorMsg = "You don't have enough votes delegated to this Evermark";
+      } else if (err.message?.includes("Current cycle is finalized")) {
+        errorMsg = "Current voting cycle has ended";
+      } else if (err.message?.includes("user rejected")) {
+        errorMsg = "Transaction was rejected";
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
       setIsVoting(false);
     }
-  }, [userAddress, userVotesQuery.data, evermarkId, votingContract, sendTransaction, refetchCycle, refetchTotalVotes, refetchVotingPower, userVotesQuery]);
+  }, [
+    isConnected,
+    requireConnection,
+    userVotesQuery.data, 
+    evermarkId, 
+    walletType,
+    votingContract, 
+    sendTransaction, 
+    refetchCycle, 
+    refetchTotalVotes, 
+    refetchVotingPower, 
+    userVotesQuery
+  ]);
   
   // Clear messages
   const clearMessages = useCallback(() => {
@@ -332,8 +403,8 @@ export function useVoting(evermarkId: string, userAddress?: string) {
 
   // Calculate derived values
   const isLoadingVotingData = isLoadingCycle || isLoadingTotalVotes || 
-    (!!userAddress && userVotesQuery.isLoading) || 
-    (!!userAddress && isLoadingVotingPower);
+    (!!effectiveUserAddress && userVotesQuery.isLoading) || 
+    (!!effectiveUserAddress && isLoadingVotingPower);
     
   const cycleEndTime = useMemo(() => {
     if (!cycleInfo) return null;
@@ -341,7 +412,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
   }, [cycleInfo]);
   
   const isCycleFinalized = cycleInfo?.finalized || false;
-  const canVote = !!userAddress && !isLoadingVotingData && !isCycleFinalized && 
+  const canVote = !!effectiveUserAddress && !isLoadingVotingData && !isCycleFinalized && 
                   (availableVotingPower || BigInt(0)) > BigInt(0);
   
   return {
@@ -350,7 +421,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     userVotes: userVotesQuery.data || BigInt(0),
     availableVotingPower: availableVotingPower || BigInt(0),
     
-    // ✅ BONUS: Expose wEMARK balance for debugging
+    // Debug info
     totalWemarkBalance: totalWemark || BigInt(0),
     totalVotingPower: totalVotingPower || BigInt(0),
     
@@ -404,5 +475,12 @@ export function useVoting(evermarkId: string, userAddress?: string) {
         return `${minutes}m remaining`;
       }
     }, []),
+    
+    // ✅ Auth info for debugging
+    authInfo: {
+      effectiveUserAddress,
+      isConnected,
+      walletType
+    }
   };
 }

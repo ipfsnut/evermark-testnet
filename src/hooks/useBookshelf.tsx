@@ -1,4 +1,3 @@
-// src/hooks/useBookshelf.ts
 import { useState, useEffect, useCallback } from 'react';
 
 export interface BookshelfItem {
