@@ -123,12 +123,9 @@ const EnhancedHomePage: React.FC = () => {
             <img 
               src="/EvermarkLogo.png" 
               alt="Evermark Protocol" 
-              className="h-500 w-auto"
+              className="h-160 w-auto"
             />
           </div>
-          <h1 className="text-4xl font-serif font-bold text-gray-900 mb-4">
-            Evermark Protocol
-          </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
             Evermark online content so you can always find it; share Evermarks to earn rewards.
           </p>
