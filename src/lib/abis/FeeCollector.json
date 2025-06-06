@@ -1,29 +1,12 @@
 [
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_treasuryWallet",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_devWallet",
-				"type": "address"
-			}
-		],
+		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "owner",
-				"type": "address"
-			}
-		],
-		"name": "OwnableInvalidOwner",
+		"inputs": [],
+		"name": "AccessControlBadConfirmation",
 		"type": "error"
 	},
 	{
@@ -32,9 +15,72 @@
 				"internalType": "address",
 				"name": "account",
 				"type": "address"
+			},
+			{
+				"internalType": "bytes32",
+				"name": "neededRole",
+				"type": "bytes32"
 			}
 		],
-		"name": "OwnableUnauthorizedAccount",
+		"name": "AccessControlUnauthorizedAccount",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "target",
+				"type": "address"
+			}
+		],
+		"name": "AddressEmptyCode",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "ERC1967InvalidImplementation",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ERC1967NonPayable",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FailedCall",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidInitialization",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotInitializing",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "UUPSUnauthorizedCallContext",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "slot",
+				"type": "bytes32"
+			}
+		],
+		"name": "UUPSUnsupportedProxiableUUID",
 		"type": "error"
 	},
 	{
@@ -42,12 +88,24 @@
 		"inputs": [
 			{
 				"indexed": false,
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			},
+			{
+				"indexed": false,
 				"internalType": "uint256",
-				"name": "amount",
+				"name": "totalAmount",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "destinationCount",
 				"type": "uint256"
 			}
 		],
-		"name": "AuctionFeesCollected",
+		"name": "BatchProcessed",
 		"type": "event"
 	},
 	{
@@ -56,36 +114,29 @@
 			{
 				"indexed": false,
 				"internalType": "string",
-				"name": "contractType",
+				"name": "tokenSymbol",
 				"type": "string"
 			},
 			{
-				"indexed": true,
+				"indexed": false,
 				"internalType": "address",
-				"name": "oldAddress",
+				"name": "destination",
 				"type": "address"
 			},
 			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "newAddress",
-				"type": "address"
-			}
-		],
-		"name": "ContractUpdated",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "amount",
+				"name": "basisPoints",
 				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
 			}
 		],
-		"name": "EmarkFeesCollected",
+		"name": "DestinationConfigured",
 		"type": "event"
 	},
 	{
@@ -111,32 +162,7 @@
 				"type": "uint256"
 			}
 		],
-		"name": "EthFeesCollected",
-		"type": "event"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "treasury",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "dev",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "rewards",
-				"type": "uint256"
-			}
-		],
-		"name": "FeePercentagesUpdated",
+		"name": "EthWrappedForRewards",
 		"type": "event"
 	},
 	{
@@ -145,7 +171,57 @@
 			{
 				"indexed": true,
 				"internalType": "address",
-				"name": "destination",
+				"name": "newContract",
+				"type": "address"
+			}
+		],
+		"name": "EvermarkRewardsUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "source",
+				"type": "string"
+			}
+		],
+		"name": "FeeCollected",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "to",
 				"type": "address"
 			},
 			{
@@ -157,11 +233,11 @@
 			{
 				"indexed": false,
 				"internalType": "string",
-				"name": "feeType",
+				"name": "destinationName",
 				"type": "string"
 			}
 		],
-		"name": "FeesRouted",
+		"name": "FeeRouted",
 		"type": "event"
 	},
 	{
@@ -169,24 +245,12 @@
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "uint256",
-				"name": "treasury",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "dev",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "rewards",
-				"type": "uint256"
+				"internalType": "uint64",
+				"name": "version",
+				"type": "uint64"
 			}
 		],
-		"name": "FeesStored",
+		"name": "Initialized",
 		"type": "event"
 	},
 	{
@@ -194,12 +258,125 @@
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
 			}
 		],
-		"name": "NftFeesCollected",
+		"name": "Paused",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "previousAdminRole",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "newAdminRole",
+				"type": "bytes32"
+			}
+		],
+		"name": "RoleAdminChanged",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			}
+		],
+		"name": "RoleGranted",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "sender",
+				"type": "address"
+			}
+		],
+		"name": "RoleRevoked",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "symbol",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "tokenAddress",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			}
+		],
+		"name": "TokenAdded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "Unpaused",
 		"type": "event"
 	},
 	{
@@ -208,26 +385,125 @@
 			{
 				"indexed": true,
 				"internalType": "address",
-				"name": "previousOwner",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "newOwner",
+				"name": "implementation",
 				"type": "address"
 			}
 		],
-		"name": "OwnershipTransferred",
+		"name": "Upgraded",
 		"type": "event"
-	},
-	{
-		"stateMutability": "payable",
-		"type": "fallback"
 	},
 	{
 		"inputs": [],
-		"name": "batchDistributeEmarkFees",
+		"name": "ADMIN_ROLE",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "DEFAULT_ADMIN_ROLE",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "FEE_MANAGER_ROLE",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "UPGRADER_ROLE",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "UPGRADE_INTERFACE_VERSION",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "symbol",
+				"type": "string"
+			},
+			{
+				"internalType": "address",
+				"name": "tokenAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			}
+		],
+		"name": "addTokenSupport",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "wethTokenAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "emarkTokenAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "evermarkRewardsAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "devAddress",
+				"type": "address"
+			}
+		],
+		"name": "bootstrapWethEmarkConfig",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -240,23 +516,16 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "collectAuctionFees",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
+				"internalType": "string",
+				"name": "source",
+				"type": "string"
 			}
 		],
-		"name": "collectEmarkTradingFees",
+		"name": "collectETH",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
 		"type": "function"
 	},
 	{
@@ -269,74 +538,78 @@
 	{
 		"inputs": [
 			{
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "source",
+				"type": "string"
+			}
+		],
+		"name": "collectToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
 			}
 		],
-		"name": "depositEmarkFees",
+		"name": "collectWethTradingFees",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "devPercentage",
-		"outputs": [
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			},
+			{
+				"internalType": "address[]",
+				"name": "destinations",
+				"type": "address[]"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "basisPoints",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "names",
+				"type": "string[]"
+			}
+		],
+		"name": "configureFeeDestinations",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
 			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "amount",
 				"type": "uint256"
 			}
 		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "devWallet",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "distributeDevFees",
+		"name": "depositWethFees",
 		"outputs": [],
 		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "distributePendingEthFees",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "distributeTreasuryFees",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "emarkToken",
-		"outputs": [
-			{
-				"internalType": "contract IERC20",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
 		"type": "function"
 	},
 	{
@@ -358,9 +631,14 @@
 				"internalType": "address payable",
 				"name": "recipient",
 				"type": "address"
+			},
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
 			}
 		],
-		"name": "emergencyWithdrawEth",
+		"name": "emergencyWithdrawETH",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -368,9 +646,9 @@
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
 			},
 			{
 				"internalType": "address",
@@ -393,7 +671,7 @@
 		"name": "evermarkRewards",
 		"outputs": [
 			{
-				"internalType": "address",
+				"internalType": "contract IEvermarkRewards",
 				"name": "",
 				"type": "address"
 			}
@@ -402,28 +680,39 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "getCollectedFees",
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"name": "feeDestinations",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "emarkFees",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "destination",
+				"type": "address"
 			},
 			{
 				"internalType": "uint256",
-				"name": "ethFees",
+				"name": "basisPoints",
 				"type": "uint256"
 			},
 			{
-				"internalType": "uint256",
-				"name": "nftFees",
-				"type": "uint256"
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
 			},
 			{
-				"internalType": "uint256",
-				"name": "auctionFees",
-				"type": "uint256"
+				"internalType": "bool",
+				"name": "active",
+				"type": "bool"
 			}
 		],
 		"stateMutability": "view",
@@ -431,28 +720,162 @@
 	},
 	{
 		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			}
+		],
+		"name": "getFeeDestinations",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "address",
+						"name": "destination",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "basisPoints",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "name",
+						"type": "string"
+					},
+					{
+						"internalType": "bool",
+						"name": "active",
+						"type": "bool"
+					}
+				],
+				"internalType": "struct FeeCollector.FeeDestination[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			}
+		],
+		"name": "getRoleAdmin",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "grantRole",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "hasRole",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "paused",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			},
 			{
 				"internalType": "uint256",
 				"name": "amount",
 				"type": "uint256"
 			}
 		],
-		"name": "getFeeBreakdown",
+		"name": "previewFeeSplit",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "treasuryAmount",
-				"type": "uint256"
+				"internalType": "address[]",
+				"name": "destinations",
+				"type": "address[]"
 			},
 			{
-				"internalType": "uint256",
-				"name": "devAmount",
-				"type": "uint256"
+				"internalType": "uint256[]",
+				"name": "amounts",
+				"type": "uint256[]"
 			},
 			{
-				"internalType": "uint256",
-				"name": "rewardsAmount",
-				"type": "uint256"
+				"internalType": "string[]",
+				"name": "names",
+				"type": "string[]"
 			}
 		],
 		"stateMutability": "view",
@@ -460,107 +883,31 @@
 	},
 	{
 		"inputs": [],
-		"name": "getPendingEthFees",
+		"name": "proxiableUUID",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "treasury",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "dev",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "rewards",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "total",
-				"type": "uint256"
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
 			}
 		],
 		"stateMutability": "view",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "owner",
-		"outputs": [
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
 			{
 				"internalType": "address",
-				"name": "",
+				"name": "callerConfirmation",
 				"type": "address"
 			}
 		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pendingDevEth",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pendingRewardsEth",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "pendingTreasuryEth",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "renounceOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardsPercentage",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "routeEmarkToRewards",
+		"name": "renounceRole",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -568,25 +915,17 @@
 	{
 		"inputs": [
 			{
-				"internalType": "address",
-				"name": "_devWallet",
-				"type": "address"
-			}
-		],
-		"name": "setDevWallet",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
 			{
 				"internalType": "address",
-				"name": "_emarkToken",
+				"name": "account",
 				"type": "address"
 			}
 		],
-		"name": "setEmarkToken",
+		"name": "revokeRole",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
@@ -620,23 +959,54 @@
 	{
 		"inputs": [
 			{
+				"internalType": "string",
+				"name": "tokenSymbol",
+				"type": "string"
+			},
+			{
 				"internalType": "address",
-				"name": "_treasuryWallet",
+				"name": "devAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "rewardsAddress",
 				"type": "address"
 			}
 		],
-		"name": "setTreasuryWallet",
+		"name": "setup50_50Split",
 		"outputs": [],
 		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "totalAuctionFeesCollected",
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"name": "supportedTokens",
 		"outputs": [
 			{
+				"internalType": "bool",
+				"name": "supported",
+				"type": "bool"
+			},
+			{
+				"internalType": "address",
+				"name": "tokenAddress",
+				"type": "address"
+			},
+			{
+				"internalType": "string",
+				"name": "name",
+				"type": "string"
+			},
+			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "totalCollected",
 				"type": "uint256"
 			}
 		],
@@ -644,13 +1014,38 @@
 		"type": "function"
 	},
 	{
-		"inputs": [],
-		"name": "totalEmarkCollected",
+		"inputs": [
+			{
+				"internalType": "bytes4",
+				"name": "interfaceId",
+				"type": "bytes4"
+			}
+		],
+		"name": "supportsInterface",
 		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
 			{
 				"internalType": "uint256",
 				"name": "",
 				"type": "uint256"
+			}
+		],
+		"name": "tokenSymbols",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
 			}
 		],
 		"stateMutability": "view",
@@ -671,33 +1066,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "totalNftFeesCollected",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newOwner",
-				"type": "address"
-			}
-		],
-		"name": "transferOwnership",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "treasuryPercentage",
+		"name": "totalTokensProcessed",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -710,38 +1079,40 @@
 	},
 	{
 		"inputs": [],
-		"name": "treasuryWallet",
-		"outputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "_treasuryPercentage",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
 			},
 			{
-				"internalType": "uint256",
-				"name": "_devPercentage",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "_rewardsPercentage",
-				"type": "uint256"
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
 			}
 		],
-		"name": "updateFeePercentages",
+		"name": "upgradeToAndCall",
 		"outputs": [],
-		"stateMutability": "nonpayable",
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "version",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "pure",
 		"type": "function"
 	},
 	{

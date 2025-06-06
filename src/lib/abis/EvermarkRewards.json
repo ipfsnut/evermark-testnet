@@ -1,18 +1,5 @@
 [
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "fundWeeklyRewards",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"stateMutability": "nonpayable",
 		"type": "constructor"
@@ -52,52 +39,6 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256[]",
-				"name": "weekNumbers",
-				"type": "uint256[]"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "amounts",
-				"type": "uint256[]"
-			},
-			{
-				"internalType": "bytes32[][]",
-				"name": "merkleProofs",
-				"type": "bytes32[][]"
-			}
-		],
-		"name": "batchClaimRewards",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "token",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			},
-			{
-				"internalType": "address",
-				"name": "recipient",
-				"type": "address"
-			}
-		],
-		"name": "emergencyWithdraw",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
 				"internalType": "address",
 				"name": "implementation",
 				"type": "address"
@@ -117,60 +58,6 @@
 		"type": "error"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "stakingSnapshot",
-				"type": "uint256"
-			}
-		],
-		"name": "finalizeWeek",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "role",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "grantRole",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_rewardToken",
-				"type": "address"
-			},
-			{
-				"internalType": "address",
-				"name": "_stakingProvider",
-				"type": "address"
-			}
-		],
-		"name": "initialize",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"inputs": [],
 		"name": "InvalidInitialization",
 		"type": "error"
@@ -178,6 +65,17 @@
 	{
 		"inputs": [],
 		"name": "NotInitializing",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "token",
+				"type": "address"
+			}
+		],
+		"name": "SafeERC20FailedOperation",
 		"type": "error"
 	},
 	{
@@ -201,12 +99,37 @@
 		"inputs": [
 			{
 				"indexed": false,
-				"internalType": "uint64",
-				"name": "version",
-				"type": "uint64"
+				"internalType": "string",
+				"name": "tokenType",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newRate",
+				"type": "uint256"
 			}
 		],
-		"name": "Initialized",
+		"name": "DistributionRateUpdated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			}
+		],
+		"name": "EmarkPoolFunded",
 		"type": "event"
 	},
 	{
@@ -214,26 +137,70 @@
 		"inputs": [
 			{
 				"indexed": true,
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
 			},
 			{
 				"indexed": false,
-				"internalType": "bytes32",
-				"name": "merkleRoot",
-				"type": "bytes32"
+				"internalType": "uint256",
+				"name": "reward",
+				"type": "uint256"
 			}
 		],
-		"name": "MerkleRootSet",
+		"name": "EmarkRewardPaid",
 		"type": "event"
 	},
 	{
-		"inputs": [],
-		"name": "pause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "from",
+				"type": "address"
+			}
+		],
+		"name": "EthPoolFunded",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "user",
+				"type": "address"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "reward",
+				"type": "uint256"
+			}
+		],
+		"name": "EthRewardPaid",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint64",
+				"name": "version",
+				"type": "uint64"
+			}
+		],
+		"name": "Initialized",
+		"type": "event"
 	},
 	{
 		"anonymous": false,
@@ -249,96 +216,46 @@
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "role",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "address",
-				"name": "callerConfirmation",
-				"type": "address"
-			}
-		],
-		"name": "renounceRole",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "newStartTime",
-				"type": "uint256"
-			}
-		],
-		"name": "resetProtocolStart",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "bytes32",
-				"name": "role",
-				"type": "bytes32"
-			},
-			{
-				"internalType": "address",
-				"name": "account",
-				"type": "address"
-			}
-		],
-		"name": "revokeRole",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "amount",
-				"type": "uint256"
-			}
-		],
-		"name": "RewardsClaimed",
-		"type": "event"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
 				"indexed": true,
 				"internalType": "uint256",
-				"name": "week",
+				"name": "periodStart",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "periodEnd",
 				"type": "uint256"
 			},
 			{
 				"indexed": false,
 				"internalType": "uint256",
-				"name": "amount",
+				"name": "ethPoolSnapshot",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "emarkPoolSnapshot",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEthRate",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "newEmarkRate",
 				"type": "uint256"
 			}
 		],
-		"name": "RewardsFunded",
+		"name": "PeriodRebalanced",
 		"type": "event"
 	},
 	{
@@ -417,115 +334,6 @@
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "pauseUntil",
-				"type": "uint256"
-			}
-		],
-		"name": "setEmergencyPause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_rewardDistributor",
-				"type": "address"
-			}
-		],
-		"name": "setRewardDistributor",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_helper",
-				"type": "address"
-			}
-		],
-		"name": "setRewardsCalculatorHelper",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_rewardToken",
-				"type": "address"
-			}
-		],
-		"name": "setRewardToken",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "_stakingProvider",
-				"type": "address"
-			}
-		],
-		"name": "setStakingProvider",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bytes32",
-				"name": "merkleRoot",
-				"type": "bytes32"
-			}
-		],
-		"name": "setWeeklyMerkleRoot",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "totalStaked",
-				"type": "uint256"
-			}
-		],
-		"name": "StakingSnapshotCached",
-		"type": "event"
-	},
-	{
-		"inputs": [],
-		"name": "unpause",
-		"outputs": [],
-		"stateMutability": "nonpayable",
-		"type": "function"
-	},
-	{
 		"anonymous": false,
 		"inputs": [
 			{
@@ -552,49 +360,6 @@
 		"type": "event"
 	},
 	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "newImplementation",
-				"type": "address"
-			},
-			{
-				"internalType": "bytes",
-				"name": "data",
-				"type": "bytes"
-			}
-		],
-		"name": "upgradeToAndCall",
-		"outputs": [],
-		"stateMutability": "payable",
-		"type": "function"
-	},
-	{
-		"anonymous": false,
-		"inputs": [
-			{
-				"indexed": true,
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "rewardPool",
-				"type": "uint256"
-			},
-			{
-				"indexed": false,
-				"internalType": "uint256",
-				"name": "creatorPool",
-				"type": "uint256"
-			}
-		],
-		"name": "WeekFinalized",
-		"type": "event"
-	},
-	{
 		"inputs": [],
 		"name": "ADMIN_ROLE",
 		"outputs": [
@@ -602,135 +367,6 @@
 				"internalType": "bytes32",
 				"name": "",
 				"type": "bytes32"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "totalPool",
-				"type": "uint256"
-			}
-		],
-		"name": "calculateRewardSplit",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "tokenStakerPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "creatorPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "basePool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "variablePool",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			}
-		],
-		"name": "calculateUserWeeklyRewards",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "baseRewards",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "variableRewards",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "nftRewards",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "user",
-				"type": "address"
-			},
-			{
-				"internalType": "uint256[]",
-				"name": "weekNumbers",
-				"type": "uint256[]"
-			}
-		],
-		"name": "checkClaimedStatus",
-		"outputs": [
-			{
-				"internalType": "bool[]",
-				"name": "claimed",
-				"type": "bool[]"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "claimedBitmap",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "currentWeek",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -764,6 +400,213 @@
 	},
 	{
 		"inputs": [],
+		"name": "UPGRADER_ROLE",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "UPGRADE_INTERFACE_VERSION",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "balanceOf",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "claimRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "currentPeriodEnd",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "currentPeriodStart",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emarkDistributionRate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "emarkEarned",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emarkLastUpdateTime",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emarkRewardPerToken",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emarkRewardPerTokenStored",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emarkRewardRate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "emarkRewards_user",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emarkToken",
+		"outputs": [
+			{
+				"internalType": "contract IERC20",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "emarkTotalDistributed",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
 		"name": "emergencyPauseUntil",
 		"outputs": [
 			{
@@ -777,27 +620,194 @@
 	},
 	{
 		"inputs": [],
-		"name": "getCurrentWeekInfo",
+		"name": "ethDistributionRate",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "week",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "ethEarned",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "ethLastUpdateTime",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "ethRewardPerToken",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "ethRewardPerTokenStored",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "ethRewardRate",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "ethRewards_user",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "ethTotalDistributed",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "fundEmarkRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "amount",
+				"type": "uint256"
+			}
+		],
+		"name": "fundWethRewards",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "getPeriodStatus",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "periodStart",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "timeRemaining",
+				"name": "periodEnd",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "rewardPool",
+				"name": "timeUntilRebalance",
 				"type": "uint256"
 			},
 			{
-				"internalType": "bool",
-				"name": "finalized",
-				"type": "bool"
+				"internalType": "uint256",
+				"name": "currentEthPool",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "currentEmarkPool",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "currentEthRate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "currentEmarkRate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "nextEthRate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "nextEmarkRate",
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -830,26 +840,31 @@
 				"type": "address"
 			}
 		],
-		"name": "getUserClaimSummary",
+		"name": "getUserRewardInfo",
 		"outputs": [
 			{
 				"internalType": "uint256",
-				"name": "totalClaimed",
+				"name": "pendingEth",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "lastClaimWeek",
+				"name": "pendingEmark",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "lastClaimTime",
+				"name": "stakedAmount",
 				"type": "uint256"
 			},
 			{
 				"internalType": "uint256",
-				"name": "userIdx",
+				"name": "periodEthRewards",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "periodEmarkRewards",
 				"type": "uint256"
 			}
 		],
@@ -859,45 +874,19 @@
 	{
 		"inputs": [
 			{
-				"internalType": "uint256",
-				"name": "week",
-				"type": "uint256"
-			}
-		],
-		"name": "getWeekData",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "rewardPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "creatorPool",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "finalizedAt",
-				"type": "uint256"
-			},
-			{
-				"internalType": "bool",
-				"name": "finalized",
-				"type": "bool"
-			},
-			{
-				"internalType": "bool",
-				"name": "merkleGenerated",
-				"type": "bool"
-			},
-			{
 				"internalType": "bytes32",
-				"name": "merkleRoot",
+				"name": "role",
 				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
 			}
 		],
-		"stateMutability": "view",
+		"name": "grantRole",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -927,17 +916,49 @@
 	{
 		"inputs": [
 			{
+				"internalType": "address",
+				"name": "_emarkToken",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_stakingToken",
+				"type": "address"
+			},
+			{
+				"internalType": "address",
+				"name": "_wethToken",
+				"type": "address"
+			},
+			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "_wethDistributionRate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_emarkDistributionRate",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_rebalancePeriod",
 				"type": "uint256"
 			}
 		],
-		"name": "indexToUser",
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "lastEmarkPoolSnapshot",
 		"outputs": [
 			{
-				"internalType": "address",
+				"internalType": "uint256",
 				"name": "",
-				"type": "address"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -945,7 +966,7 @@
 	},
 	{
 		"inputs": [],
-		"name": "nextUserIndex",
+		"name": "lastEthPoolSnapshot",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -954,6 +975,33 @@
 			}
 		],
 		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "lastTimeRewardApplicable",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "manualRebalance",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "pause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
 		"type": "function"
 	},
 	{
@@ -964,19 +1012,6 @@
 				"internalType": "bool",
 				"name": "",
 				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "protocolStartTime",
-		"outputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -997,51 +1032,12 @@
 	},
 	{
 		"inputs": [],
-		"name": "rewardDistributor",
+		"name": "rebalancePeriod",
 		"outputs": [
 			{
-				"internalType": "contract IRewardDistributor",
+				"internalType": "uint256",
 				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardsCalculatorHelper",
-		"outputs": [
-			{
-				"internalType": "contract IRewardsCalculatorHelper",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "rewardToken",
-		"outputs": [
-			{
-				"internalType": "contract IERC20",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [],
-		"name": "stakingProvider",
-		"outputs": [
-			{
-				"internalType": "contract IStakingDataProvider",
-				"name": "",
-				"type": "address"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -1050,27 +1046,99 @@
 	{
 		"inputs": [
 			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "callerConfirmation",
+				"type": "address"
+			}
+		],
+		"name": "renounceRole",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "role",
+				"type": "bytes32"
+			},
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "revokeRole",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
 				"internalType": "uint256",
-				"name": "",
+				"name": "_rate",
 				"type": "uint256"
 			}
 		],
-		"name": "stakingSnapshots",
+		"name": "setEmarkDistributionRate",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_period",
+				"type": "uint256"
+			}
+		],
+		"name": "setRebalancePeriod",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "uint256",
+				"name": "_rate",
+				"type": "uint256"
+			}
+		],
+		"name": "setWethDistributionRate",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "_wethToken",
+				"type": "address"
+			}
+		],
+		"name": "setWethToken",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "stakingToken",
 		"outputs": [
 			{
-				"internalType": "uint256",
-				"name": "totalStaked",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "snapshotTime",
-				"type": "uint256"
-			},
-			{
-				"internalType": "uint256",
-				"name": "blockNumber",
-				"type": "uint256"
+				"internalType": "contract ICardCatalog",
+				"name": "",
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",
@@ -1097,12 +1165,12 @@
 	},
 	{
 		"inputs": [],
-		"name": "UPGRADE_INTERFACE_VERSION",
+		"name": "totalSupply",
 		"outputs": [
 			{
-				"internalType": "string",
+				"internalType": "uint256",
 				"name": "",
-				"type": "string"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -1110,12 +1178,43 @@
 	},
 	{
 		"inputs": [],
-		"name": "UPGRADER_ROLE",
+		"name": "unpause",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"name": "userEmarkRewardPerTokenPaid",
 		"outputs": [
 			{
-				"internalType": "bytes32",
+				"internalType": "uint256",
 				"name": "",
-				"type": "bytes32"
+				"type": "uint256"
 			}
 		],
 		"stateMutability": "view",
@@ -1129,36 +1228,7 @@
 				"type": "address"
 			}
 		],
-		"name": "userClaims",
-		"outputs": [
-			{
-				"internalType": "uint128",
-				"name": "totalClaimed",
-				"type": "uint128"
-			},
-			{
-				"internalType": "uint64",
-				"name": "lastClaimWeek",
-				"type": "uint64"
-			},
-			{
-				"internalType": "uint64",
-				"name": "lastClaimTime",
-				"type": "uint64"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "address",
-				"name": "",
-				"type": "address"
-			}
-		],
-		"name": "userIndex",
+		"name": "userEthRewardPerTokenPaid",
 		"outputs": [
 			{
 				"internalType": "uint256",
@@ -1171,70 +1241,12 @@
 	},
 	{
 		"inputs": [],
-		"name": "version",
+		"name": "wethToken",
 		"outputs": [
 			{
-				"internalType": "string",
+				"internalType": "contract IERC20",
 				"name": "",
-				"type": "string"
-			}
-		],
-		"stateMutability": "pure",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "weekData",
-		"outputs": [
-			{
-				"internalType": "uint128",
-				"name": "rewardPool",
-				"type": "uint128"
-			},
-			{
-				"internalType": "uint128",
-				"name": "creatorPool",
-				"type": "uint128"
-			},
-			{
-				"internalType": "uint32",
-				"name": "finalizedAt",
-				"type": "uint32"
-			},
-			{
-				"internalType": "bool",
-				"name": "finalized",
-				"type": "bool"
-			},
-			{
-				"internalType": "bool",
-				"name": "merkleGenerated",
-				"type": "bool"
-			}
-		],
-		"stateMutability": "view",
-		"type": "function"
-	},
-	{
-		"inputs": [
-			{
-				"internalType": "uint256",
-				"name": "",
-				"type": "uint256"
-			}
-		],
-		"name": "weeklyMerkleRoots",
-		"outputs": [
-			{
-				"internalType": "bytes32",
-				"name": "",
-				"type": "bytes32"
+				"type": "address"
 			}
 		],
 		"stateMutability": "view",

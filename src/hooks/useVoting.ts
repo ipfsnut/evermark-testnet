@@ -32,20 +32,20 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     params: [],
   });
 
-  // ✅ FIXED: Get voting power from EvermarkVoting (matches transaction behavior)
+  // ✅ FIXED: Get voting power from CardCatalog (not voting contract)
   const { data: availableVotingPower, isLoading: isLoadingVotingPower, refetch: refetchVotingPower } = useReadContract({
-    contract: votingContract,
-    method: "getRemainingVotingPower", 
+    contract: cardCatalogContract, // ✅ Use CardCatalog for voting power
+    method: "getAvailableVotingPower", // ✅ Correct method name
     params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!userAddress,
     },
   });
 
-  // ✅ BONUS: Also get voting power direct from CardCatalog (for debugging)
-  const { data: cardCatalogDirectPower } = useReadContract({
-    contract: cardCatalogContract,
-    method: "getAvailableVotingPower",
+  // ✅ FIXED: Get total voting power from CardCatalog
+  const { data: totalVotingPower } = useReadContract({
+    contract: cardCatalogContract, // ✅ Use CardCatalog
+    method: "getTotalVotingPower", // ✅ Correct method name
     params: [userAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!userAddress,
@@ -103,15 +103,16 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     params: [] as const,
   });
 
-  // 🔍 DEBUG: Log voting power info  
-  console.log("🔍 Voting Power:", {
-    userAddress: userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` : null,
-    totalWemark: totalWemark ? toEther(totalWemark) : "0",
-    availableVotingPower: availableVotingPower ? toEther(availableVotingPower) : "0",
-    cardCatalogDirectPower: cardCatalogDirectPower ? toEther(cardCatalogDirectPower) : "0",
-    powerMatch: availableVotingPower?.toString() === cardCatalogDirectPower?.toString(),
-    currentCycle: currentCycle?.toString(),
-  });
+  // 🔍 DEBUG: Log voting power info (only in development)
+  if (process.env.NODE_ENV === 'development') {
+    console.log("🔍 Voting Power:", {
+      userAddress: userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` : null,
+      totalWemark: totalWemark ? toEther(totalWemark) : "0",
+      availableVotingPower: availableVotingPower ? toEther(availableVotingPower) : "0",
+      totalVotingPower: totalVotingPower ? toEther(totalVotingPower) : "0",
+      currentCycle: currentCycle?.toString(),
+    });
+  }
 
   const { mutate: sendTransaction } = useSendTransaction();
   
@@ -157,11 +158,13 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     const actualAvailable = freshVotingPowerResult.data || availableVotingPower || BigInt(0);
     
     // 🔍 DEBUG: Log transaction attempt
-    console.log("🔍 Voting:", {
-      amount: `${amount} wEMARK`,
-      available: `${toEther(actualAvailable)} wEMARK`,
-      hasEnough: voteAmountWei <= actualAvailable,
-    });
+    if (process.env.NODE_ENV === 'development') {
+      console.log("🔍 Voting:", {
+        amount: `${amount} wEMARK`,
+        available: `${toEther(actualAvailable)} wEMARK`,
+        hasEnough: voteAmountWei <= actualAvailable,
+      });
+    }
 
     // Check with fresh data
     if (voteAmountWei > actualAvailable) {
@@ -179,17 +182,19 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       });
       
       // 🔍 DEBUG: Log the exact transaction details
-      console.log("🔍 Transaction Details:", {
-        contractAddress: votingContract.address,
-        method: "delegateVotes",
-        evermarkId: evermarkId,
-        amount: toEther(voteAmountWei),
-        userAddressFromUI: userAddress,
-        chainId: votingContract.chain.id,
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.log("🔍 Transaction Details:", {
+          contractAddress: votingContract.address,
+          method: "delegateVotes",
+          evermarkId: evermarkId,
+          amount: toEther(voteAmountWei),
+          userAddressFromUI: userAddress,
+          chainId: votingContract.chain.id,
+        });
+      }
       
       return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
-        sendTransaction(transaction as any, {
+        sendTransaction(transaction, {
           onSuccess: () => {
             const successMsg = `Successfully delegated ${amount} wEMARK to this Evermark!`;
             setSuccess(successMsg);
@@ -276,7 +281,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       });
       
       return new Promise<{ success: boolean; message?: string; error?: string }>((resolve) => {
-        sendTransaction(transaction as any, {
+        sendTransaction(transaction, {
           onSuccess: () => {
             const successMsg = `Successfully withdrew ${amount} wEMARK from this Evermark!`;
             setSuccess(successMsg);
@@ -347,6 +352,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     
     // ✅ BONUS: Expose wEMARK balance for debugging
     totalWemarkBalance: totalWemark || BigInt(0),
+    totalVotingPower: totalVotingPower || BigInt(0),
     
     // Cycle information
     currentCycle: currentCycle ? Number(currentCycle) : 0,
