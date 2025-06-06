@@ -75,7 +75,7 @@ function useShareTracking(evermarkId: string) {
     
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        const response = await fetch('/api/shares', {
+        const response = await fetch('/.netlify/functions/shares', {
           method: 'POST',
           headers: { 
             'Content-Type': 'application/json',
@@ -146,6 +146,17 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     }
   };
   
+  // Generate Farcaster Frame URL for dynamic content
+  const getFarcasterFrameUrl = () => {
+    const frameUrl = `${window.location.origin}/api/frames/evermark/${evermarkId}`;
+    const params = new URLSearchParams({
+      utm_source: 'farcaster',
+      utm_medium: 'frame',
+      utm_campaign: 'evermark_share'
+    });
+    return `${frameUrl}?${params.toString()}`;
+  };
+  
   // Generate platform-specific share URLs
   const getTwitterUrl = () => {
     const url = getShareUrl('twitter');
@@ -166,9 +177,23 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   };
   
   const getFarcasterUrl = () => {
-    const url = getShareUrl('farcaster');
+    // Use Farcaster's new dynamic URL capabilities
+    const frameUrl = getFarcasterFrameUrl();
     const text = `Check out "${title}" on Evermark`;
-    return `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(url)}`;
+    
+    // Create a Farcaster cast with embedded frame
+    return `https://warpcast.com/~/compose?text=${encodeURIComponent(text)}&embeds[]=${encodeURIComponent(frameUrl)}`;
+  };
+  
+  const getFarcasterDirectUrl = () => {
+    // Alternative: Direct Farcaster Mini App URL
+    const miniAppUrl = `https://evermark-mini.vercel.app/evermark/${evermarkId}`;
+    const params = new URLSearchParams({
+      utm_source: 'farcaster_miniapp',
+      utm_medium: 'direct',
+      utm_campaign: 'evermark_share'
+    });
+    return `${miniAppUrl}?${params.toString()}`;
   };
   
   const getFacebookUrl = () => {
@@ -198,6 +223,19 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy to clipboard:', err);
+    }
+  };
+  
+  const copyFarcasterFrame = async () => {
+    try {
+      const frameUrl = getFarcasterFrameUrl();
+      await navigator.clipboard.writeText(frameUrl);
+      setCopied(true);
+      await trackShare('farcaster_frame_copy');
+      
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy frame URL:', err);
     }
   };
   
@@ -244,7 +282,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
           />
           
           {/* Share menu */}
-          <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+          <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
             <div className="p-4">
               <h3 className="text-sm font-medium text-gray-900 mb-3">Share this Evermark</h3>
               
@@ -269,14 +307,43 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
                 <div className="border-t pt-2 mt-2">
                   <p className="text-xs text-gray-500 mb-2">🌐 Decentralized Social</p>
                   
-                  {/* Farcaster */}
+                  {/* Farcaster with Frame */}
                   <button
                     onClick={() => handlePlatformShare('farcaster', getFarcasterUrl())}
                     disabled={isTracking}
                     className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
                   >
                     <MessageCircleIcon className="h-4 w-4 mr-3 text-purple-600" />
-                    <span className="text-sm">Share on Farcaster</span>
+                    <div className="flex-1 text-left">
+                      <div className="text-sm">Share on Farcaster</div>
+                      <div className="text-xs text-gray-500">With interactive frame</div>
+                    </div>
+                  </button>
+                  
+                  {/* Farcaster Frame URL Copy */}
+                  <button
+                    onClick={copyFarcasterFrame}
+                    disabled={isTracking}
+                    className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <LinkIcon className="h-4 w-4 mr-3 text-purple-400" />
+                    <div className="flex-1 text-left">
+                      <div className="text-sm">Copy Frame URL</div>
+                      <div className="text-xs text-gray-500">For custom Farcaster posts</div>
+                    </div>
+                  </button>
+                  
+                  {/* Farcaster Mini App */}
+                  <button
+                    onClick={() => handlePlatformShare('farcaster_miniapp', getFarcasterDirectUrl())}
+                    disabled={isTracking}
+                    className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    <ZapIcon className="h-4 w-4 mr-3 text-purple-500" />
+                    <div className="flex-1 text-left">
+                      <div className="text-sm">Open in Farcaster Mini App</div>
+                      <div className="text-xs text-gray-500">Direct mini app experience</div>
+                    </div>
                   </button>
                   
                   {/* Bluesky */}
@@ -369,7 +436,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   );
 };
 
-// Share page component for handling redirects (unchanged)
+// Share page component for handling redirects
 export const ShareRedirect: React.FC = () => {
   const [evermarkId, setEvermarkId] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);

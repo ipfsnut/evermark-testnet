@@ -42,7 +42,7 @@ export function useSupabaseShareAnalytics() {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch('/api/shares', {
+      const response = await fetch('/.netlify/functions/shares', {
         method: 'GET',
         headers: { 'Accept': 'application/json' }
       });
