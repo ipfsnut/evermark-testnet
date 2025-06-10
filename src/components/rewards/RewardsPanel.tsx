@@ -7,7 +7,7 @@ import { DevRewardsDashboard } from "./DevRewardsDashboard";
 export function RewardsPanel() {
   const { address } = useWalletAuth();
   
-  // 🔧 DRY: Use shared rewards calculation hook
+  // 🔧 SIMPLIFIED: Use shared rewards calculation hook for dual-token system
   const {
     current,
     format,
@@ -50,7 +50,7 @@ export function RewardsPanel() {
             <p className="text-gray-600">
               {authInfo?.isInFarcaster 
                 ? "Authenticate in Farcaster or connect a wallet to see and claim your dual-token rewards"
-                : "Connect your wallet to see and claim your dual-token rewards (ETH + $EMARK)"
+                : "Connect your wallet to see and claim your dual-token rewards (WETH + $EMARK)"
               }
             </p>
           </div>
@@ -69,7 +69,7 @@ export function RewardsPanel() {
           <h3 className="text-lg font-semibold text-gray-900">Your Dual-Token Rewards</h3>
         </div>
         
-        {/* 🔧 DRY: Using shared calculation logic */}
+        {/* 🔧 SIMPLIFIED: Dual-token reward display */}
         <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-lg border border-yellow-200 mb-6">
           <div className="flex flex-col sm:flex-row items-center sm:justify-between">
             <div className="mb-4 sm:mb-0">
@@ -81,13 +81,13 @@ export function RewardsPanel() {
                 </p>
               ) : current.hasClaimableRewards ? (
                 <div className="space-y-1">
-                  {/* Show individual reward types */}
+                  {/* Show individual reward types with correct labeling */}
                   {current.hasEthRewards && (
                     <div className="flex items-center space-x-2">
                       <p className="text-xl font-bold text-blue-800">
-                        {format.ethRewards()} ETH
+                        {format.ethRewards()} WETH
                       </p>
-                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">ETH Rewards</span>
+                      <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">WETH Rewards</span>
                     </div>
                   )}
                   {current.hasEmarkRewards && (
@@ -154,16 +154,16 @@ export function RewardsPanel() {
           </div>
         )}
         
-        {/* Reward breakdown display */}
+        {/* 🔧 SIMPLIFIED: Dual-token breakdown display */}
         {current.hasClaimableRewards && (
           <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
             <h4 className="text-sm font-medium text-gray-900 mb-2">Detailed Reward Breakdown</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               {current.hasEthRewards && (
                 <div className="flex items-center justify-between p-2 bg-white rounded">
-                  <span className="text-blue-700">ETH/WETH Rewards:</span>
+                  <span className="text-blue-700">WETH Rewards:</span>
                   <span className="font-bold text-blue-900">
-                    {format.ethRewards()} ETH
+                    {format.ethRewards()} WETH
                   </span>
                 </div>
               )}
@@ -190,7 +190,7 @@ export function RewardsPanel() {
           <ul className="space-y-2 text-sm text-gray-600">
             <li className="flex items-start">
               <span className="h-5 w-5 bg-green-100 rounded-full flex items-center justify-center mr-2 text-green-600 text-xs">1</span>
-              <span>Stake $EMARK to get wEMARK and earn from both ETH and $EMARK reward pools</span>
+              <span>Stake $EMARK to get wEMARK and earn from both WETH and $EMARK reward pools</span>
             </li>
             <li className="flex items-start">
               <span className="h-5 w-5 bg-green-100 rounded-full flex items-center justify-center mr-2 text-green-600 text-xs">2</span>
@@ -209,7 +209,7 @@ export function RewardsPanel() {
         
         <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
           <p className="text-xs text-gray-600">
-            💡 <strong>Dual-Token System:</strong> Earn both ETH and $EMARK tokens automatically. 
+            💡 <strong>Dual-Token System:</strong> Earn both WETH and $EMARK tokens automatically. 
             Reward rates adjust periodically based on pool funding and staking participation.
             {current.hasClaimableRewards && (
               <strong className="text-green-700"> You currently have {format.totalRewards()} tokens ready to claim!</strong>
