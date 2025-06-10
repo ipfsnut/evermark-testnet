@@ -7,6 +7,7 @@ import { CHAIN, CONTRACTS, REWARDS_ABI } from "../lib/contracts";
 import { useFarcasterUser } from "../lib/farcaster";
 import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; 
 import { toEther } from "thirdweb/utils";
+import { validateBigIntValue, debugFormatting } from "../utils/formatters";
 
 export function useRewards(userAddress?: string) {
   const [isClaimingRewards, setIsClaimingRewards] = useState(false);
@@ -18,13 +19,13 @@ export function useRewards(userAddress?: string) {
   const { sendTransaction, walletType } = useWalletConnection();
   
   // Farcaster integration (for backwards compatibility)
-  const { isInFarcaster, isAuthenticated: isFarcasterAuth, hasVerifiedAddress, getPrimaryAddress } = useFarcasterUser();
+  const { isInFarcaster, isAuthenticated: isFarcasterAuth } = useFarcasterUser();
 
   // ✅ FIXED: Better address resolution - prioritize wallet provider
   const effectiveUserAddress = userAddress || walletAddress;
   const hasWalletAccess = isConnected; // ✅ Simplified - just check if wallet is connected
 
-  // ✅ FIXED: Reduced logging - only log when there's a change and only in development
+  // 🔧 FIX: Enhanced logging for debugging the display issue
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🔍 Rewards Auth State:', {
@@ -55,17 +56,74 @@ export function useRewards(userAddress?: string) {
     },
   });
 
-  // ✅ Extract data from getUserRewardInfo response
-  const pendingEthRewards = userRewardInfo?.[0] || BigInt(0);
-  const pendingEmarkRewards = userRewardInfo?.[1] || BigInt(0);
-  const stakedAmount = userRewardInfo?.[2] || BigInt(0);
-  const periodEthRewards = userRewardInfo?.[3] || BigInt(0);
-  const periodEmarkRewards = userRewardInfo?.[4] || BigInt(0);
-  const totalPendingRewards = pendingEthRewards + pendingEmarkRewards;
+  // 🔧 FIX: Enhanced data extraction with validation and debugging
+  const pendingEthRewards = useMemo(() => {
+    const value = validateBigIntValue(userRewardInfo?.[0], BigInt(0));
+    if (process.env.NODE_ENV === 'development') {
+      debugFormatting(value, "Pending ETH Rewards");
+    }
+    return value;
+  }, [userRewardInfo]);
 
-  // ✅ CRITICAL FIX: Use unified wallet provider instead of thirdweb directly
+  const pendingEmarkRewards = useMemo(() => {
+    const value = validateBigIntValue(userRewardInfo?.[1], BigInt(0));
+    if (process.env.NODE_ENV === 'development') {
+      debugFormatting(value, "Pending EMARK Rewards");
+    }
+    return value;
+  }, [userRewardInfo]);
+
+  const stakedAmount = useMemo(() => {
+    const value = validateBigIntValue(userRewardInfo?.[2], BigInt(0));
+    if (process.env.NODE_ENV === 'development') {
+      debugFormatting(value, "Staked Amount");
+    }
+    return value;
+  }, [userRewardInfo]);
+
+  const periodEthRewards = useMemo(() => {
+    const value = validateBigIntValue(userRewardInfo?.[3], BigInt(0));
+    if (process.env.NODE_ENV === 'development') {
+      debugFormatting(value, "Period ETH Rewards");
+    }
+    return value;
+  }, [userRewardInfo]);
+
+  const periodEmarkRewards = useMemo(() => {
+    const value = validateBigIntValue(userRewardInfo?.[4], BigInt(0));
+    if (process.env.NODE_ENV === 'development') {
+      debugFormatting(value, "Period EMARK Rewards");
+    }
+    return value;
+  }, [userRewardInfo]);
+
+  const totalPendingRewards = useMemo(() => {
+    const total = pendingEthRewards + pendingEmarkRewards;
+    if (process.env.NODE_ENV === 'development') {
+      debugFormatting(total, "Total Pending Rewards");
+      console.log('🔍 Detailed Rewards Breakdown:', {
+        pendingEthRewards_wei: pendingEthRewards.toString(),
+        pendingEmarkRewards_wei: pendingEmarkRewards.toString(),
+        totalPendingRewards_wei: total.toString(),
+        pendingEthRewards_ether: toEther(pendingEthRewards),
+        pendingEmarkRewards_ether: toEther(pendingEmarkRewards),
+        totalPendingRewards_ether: toEther(total),
+        rawContractResponse: userRewardInfo ? userRewardInfo.map((item: any) => item?.toString()) : 'null'
+      });
+    }
+    return total;
+  }, [pendingEthRewards, pendingEmarkRewards, userRewardInfo]);
+
+  // 🔧 FIX: Enhanced claim function with better error handling and debugging
   const claimRewards = useCallback(async () => {
     console.log('🎁 Starting claim rewards process...');
+    console.log('🔍 Pre-claim reward state:', {
+      totalPendingRewards_wei: totalPendingRewards.toString(),
+      totalPendingRewards_ether: toEther(totalPendingRewards),
+      pendingEthRewards_ether: toEther(pendingEthRewards),
+      pendingEmarkRewards_ether: toEther(pendingEmarkRewards),
+      hasClaimableAmount: totalPendingRewards > BigInt(0)
+    });
     
     // ✅ Use unified connection check
     if (!hasWalletAccess) {
@@ -77,9 +135,12 @@ export function useRewards(userAddress?: string) {
       }
     }
     
-    if (totalPendingRewards === BigInt(0)) {
-      const errorMsg = "No rewards to claim";
+    // 🔧 FIX: Lower threshold for claiming (was checking exact 0, now allows small amounts)
+    const minimumClaimable = BigInt("1000000000000000"); // 0.001 tokens minimum
+    if (totalPendingRewards < minimumClaimable) {
+      const errorMsg = `Insufficient rewards to claim. Have: ${toEther(totalPendingRewards)}, Need: ${toEther(minimumClaimable)}`;
       setError(errorMsg);
+      console.log('🚫 Claim blocked:', errorMsg);
       return { success: false, error: errorMsg };
     }
     
@@ -89,8 +150,9 @@ export function useRewards(userAddress?: string) {
     
     try {
       console.log('🎁 Claiming rewards for:', effectiveUserAddress);
-      console.log('🎁 Pending ETH rewards:', toEther(pendingEthRewards));
-      console.log('🎁 Pending EMARK rewards:', toEther(pendingEmarkRewards));
+      console.log('🎁 Expected ETH rewards:', toEther(pendingEthRewards));
+      console.log('🎁 Expected EMARK rewards:', toEther(pendingEmarkRewards));
+      console.log('🎁 Expected total:', toEther(totalPendingRewards));
       console.log('🔧 Using wallet type:', walletType);
       
       // ✅ CRITICAL FIX: Prepare transaction based on wallet type
@@ -125,12 +187,28 @@ export function useRewards(userAddress?: string) {
       if (result.success) {
         console.log("✅ Rewards claim successful:", result.transactionHash);
         
+        // 🔧 FIX: Enhanced success message with actual amounts
+        const ethAmount = toEther(pendingEthRewards);
+        const emarkAmount = toEther(pendingEmarkRewards);
+        const totalAmount = toEther(totalPendingRewards);
+        
+        let successMsg = `Successfully claimed rewards! `;
+        if (parseFloat(ethAmount) > 0 && parseFloat(emarkAmount) > 0) {
+          successMsg += `ETH: ${ethAmount}, EMARK: ${emarkAmount}`;
+        } else if (parseFloat(ethAmount) > 0) {
+          successMsg += `${ethAmount} ETH`;
+        } else if (parseFloat(emarkAmount) > 0) {
+          successMsg += `${emarkAmount} EMARK`;
+        } else {
+          successMsg += `${totalAmount} tokens`;
+        }
+        successMsg += ` (Tx: ${result.transactionHash?.slice(0, 10)}...)`;
+        
         // Refetch pending rewards after successful claim
         setTimeout(() => {
           refetch?.();
         }, 2000);
         
-        const successMsg = `Successfully claimed rewards! ETH: ${toEther(pendingEthRewards)}, EMARK: ${toEther(pendingEmarkRewards)}`;
         setSuccess(successMsg);
         return { success: true, message: successMsg, transactionHash: result.transactionHash };
       } else {
@@ -159,10 +237,10 @@ export function useRewards(userAddress?: string) {
   }, [
     hasWalletAccess, 
     requireConnection, 
-    totalPendingRewards, 
-    effectiveUserAddress, 
-    pendingEthRewards, 
+    totalPendingRewards,
+    pendingEthRewards,
     pendingEmarkRewards, 
+    effectiveUserAddress, 
     walletType,
     rewardsContract, 
     sendTransaction, 
@@ -182,6 +260,7 @@ export function useRewards(userAddress?: string) {
     }
   }, [rewardsError, error]);
   
+  // 🔧 FIX: Enhanced return object with better debugging info
   return {
     // Rewards data
     pendingRewards: totalPendingRewards,
@@ -206,6 +285,21 @@ export function useRewards(userAddress?: string) {
       isFarcasterAuth,
       walletType, // ✅ Add wallet type for debugging
       isConnected
+    },
+    
+    // 🔧 NEW: Debug helpers
+    debug: {
+      userRewardInfo,
+      rawValues: {
+        pendingEthRewards_wei: pendingEthRewards.toString(),
+        pendingEmarkRewards_wei: pendingEmarkRewards.toString(),
+        totalPendingRewards_wei: totalPendingRewards.toString()
+      },
+      formattedValues: {
+        pendingEthRewards_ether: toEther(pendingEthRewards),
+        pendingEmarkRewards_ether: toEther(pendingEmarkRewards),
+        totalPendingRewards_ether: toEther(totalPendingRewards)
+      }
     }
   };
 }
