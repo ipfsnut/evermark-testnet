@@ -2,15 +2,11 @@ import { useMemo } from 'react';
 import { toEther } from "thirdweb/utils";
 import { useRewards, useCurrentPeriodInfo } from './useRewards';
 
-/**
- * 🔧 SHARED: Single source of truth for reward calculations and formatting
- * Both RewardsPanel and RewardsCalculator should use this hook
- */
+
 export function useRewardsDisplay(userAddress?: string) {
   const rewardsData = useRewards(userAddress);
   const periodData = useCurrentPeriodInfo();
 
-  // 🔧 CENTRALIZED: All reward calculations in one place
   const calculations = useMemo(() => {
     const {
       pendingEthRewards,
@@ -20,15 +16,14 @@ export function useRewardsDisplay(userAddress?: string) {
       periodEmarkRewards,
     } = rewardsData;
 
-    // Convert all BigInt values to numbers using consistent method
-    const ethRewards = pendingEthRewards ? parseFloat(toEther(pendingEthRewards)) : 0;
-    const emarkRewards = pendingEmarkRewards ? parseFloat(toEther(pendingEmarkRewards)) : 0;
-    const totalRewards = ethRewards + emarkRewards;
+    const currentEthRewards = pendingEthRewards ? parseFloat(toEther(pendingEthRewards)) : 0;
+    const currentEmarkRewards = pendingEmarkRewards ? parseFloat(toEther(pendingEmarkRewards)) : 0;
+    const totalCurrentRewards = currentEthRewards + currentEmarkRewards;
     const stakedAmountNum = stakedAmount ? parseFloat(toEther(stakedAmount)) : 0;
+
     const periodEthNum = periodEthRewards ? parseFloat(toEther(periodEthRewards)) : 0;
     const periodEmarkNum = periodEmarkRewards ? parseFloat(toEther(periodEmarkRewards)) : 0;
 
-    // Calculate time-based projections
     const secondsInWeek = 7 * 24 * 60 * 60;
     const secondsInMonth = 30 * 24 * 60 * 60;
     const secondsInYear = 365 * 24 * 60 * 60;
@@ -38,20 +33,18 @@ export function useRewardsDisplay(userAddress?: string) {
     const monthlyMultiplier = periodDuration > 0 ? secondsInMonth / periodDuration : 0;
     const yearlyMultiplier = periodDuration > 0 ? secondsInYear / periodDuration : 0;
 
-    // Projections for each token type
     const ethProjections = {
-      weekly: ethRewards * weeklyMultiplier,
-      monthly: ethRewards * monthlyMultiplier,
-      yearly: ethRewards * yearlyMultiplier,
+      weekly: periodEthNum * weeklyMultiplier,
+      monthly: periodEthNum * monthlyMultiplier,
+      yearly: periodEthNum * yearlyMultiplier,
     };
 
     const emarkProjections = {
-      weekly: emarkRewards * weeklyMultiplier,
-      monthly: emarkRewards * monthlyMultiplier,
-      yearly: emarkRewards * yearlyMultiplier,
+      weekly: periodEmarkNum * weeklyMultiplier,
+      monthly: periodEmarkNum * monthlyMultiplier,
+      yearly: periodEmarkNum * yearlyMultiplier,
     };
 
-    // APR calculations
     const ethAPR = stakedAmountNum > 0 && ethProjections.yearly > 0 
       ? (ethProjections.yearly / stakedAmountNum) * 100 
       : 0;
@@ -60,31 +53,51 @@ export function useRewardsDisplay(userAddress?: string) {
       ? (emarkProjections.yearly / stakedAmountNum) * 100 
       : 0;
 
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 APR Calculation Debug:', {
+        currentRewards: {
+          pendingEthRewards: currentEthRewards,
+          pendingEmarkRewards: currentEmarkRewards,
+        },
+        periodRewards: {
+          periodEthRewards: periodEthNum,
+          periodEmarkRewards: periodEmarkNum,
+        },
+        projections: {
+          ethYearly: ethProjections.yearly,
+          emarkYearly: emarkProjections.yearly,
+        },
+        apr: {
+          ethAPR: ethAPR.toFixed(2) + '%',
+          emarkAPR: emarkAPR.toFixed(2) + '%',
+        },
+        stakedAmount: stakedAmountNum,
+        periodDuration: periodDuration + ' seconds',
+        yearlyMultiplier: yearlyMultiplier.toFixed(2),
+      });
+    }
+
     return {
-      // Current rewards (for claiming)
       current: {
-        ethRewards,
-        emarkRewards,
-        totalRewards,
-        hasClaimableRewards: totalRewards > 0.0001,
-        hasEthRewards: ethRewards > 0.0001,
-        hasEmarkRewards: emarkRewards > 0.0001,
+        ethRewards: currentEthRewards,
+        emarkRewards: currentEmarkRewards,
+        totalRewards: totalCurrentRewards,
+        hasClaimableRewards: totalCurrentRewards > 0.0001,
+        hasEthRewards: currentEthRewards > 0.0001,
+        hasEmarkRewards: currentEmarkRewards > 0.0001,
       },
 
-      // Projections (for calculator)
       projections: {
         eth: ethProjections,
         emark: emarkProjections,
       },
 
-      // APRs
       apr: {
         eth: ethAPR,
         emark: emarkAPR,
-        combined: ethAPR + emarkAPR, // Note: This is additive since they're separate reward streams
+        combined: ethAPR + emarkAPR,
       },
 
-      // Period info
       period: {
         ethPool: periodData.currentEthPool ? parseFloat(toEther(periodData.currentEthPool)) : 0,
         emarkPool: periodData.currentEmarkPool ? parseFloat(toEther(periodData.currentEmarkPool)) : 0,
@@ -96,18 +109,16 @@ export function useRewardsDisplay(userAddress?: string) {
           : 0,
       },
 
-      // User info
       user: {
         stakedAmount: stakedAmountNum,
         periodEthRewards: periodEthNum,
         periodEmarkRewards: periodEmarkNum,
       },
 
-      // Formatting helpers
       format: {
-        ethRewards: (decimals = 6) => ethRewards.toFixed(decimals),
-        emarkRewards: (decimals = 6) => emarkRewards.toFixed(decimals),
-        totalRewards: (decimals = 6) => totalRewards.toFixed(decimals),
+        ethRewards: (decimals = 6) => currentEthRewards.toFixed(decimals),
+        emarkRewards: (decimals = 6) => currentEmarkRewards.toFixed(decimals),
+        totalRewards: (decimals = 6) => totalCurrentRewards.toFixed(decimals),
         stakedAmount: (decimals = 2) => stakedAmountNum.toFixed(decimals),
         ethAPR: (decimals = 2) => ethAPR.toFixed(decimals),
         emarkAPR: (decimals = 2) => emarkAPR.toFixed(decimals),
@@ -130,7 +141,6 @@ export function useRewardsDisplay(userAddress?: string) {
 
   return {
     ...calculations,
-    // Pass through the original hook data for functions like claimRewards
     originalRewardsData: rewardsData,
     originalPeriodData: periodData,
     isLoading: rewardsData.isLoadingRewards || periodData.isLoading,
