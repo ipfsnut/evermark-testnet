@@ -66,10 +66,28 @@ export const RewardsCalculator: React.FC = () => {
     },
   });
 
-  // Calculate current week from period data
-  const currentWeek = period.timeUntilRebalance > 0 
-    ? Math.floor((Date.now() / 1000 - 1704067200) / (7 * 24 * 60 * 60)) + 1
-    : 'Loading...';
+  // 🔧 FIXED: Calculate current period starting from 0 (resets on Sundays)
+  const calculateCurrentPeriod = () => {
+    if (period.timeUntilRebalance <= 0) return 'Loading...';
+    
+    // Get current time
+    const now = new Date();
+    
+    // Find the most recent Sunday (start of current week) at 00:00:00 UTC
+    const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const mostRecentSunday = new Date(now);
+    mostRecentSunday.setUTCDate(now.getUTCDate() - dayOfWeek);
+    mostRecentSunday.setUTCHours(0, 0, 0, 0);
+    
+    // Calculate weeks since the reference Sunday
+    const referenceTimestamp = Math.floor(mostRecentSunday.getTime() / 1000);
+    const currentTimestamp = Math.floor(now.getTime() / 1000);
+    const weeksSinceReference = Math.floor((currentTimestamp - referenceTimestamp) / (7 * 24 * 60 * 60));
+    
+    return weeksSinceReference;
+  };
+
+  const currentWeek = calculateCurrentPeriod();
 
   // Handle wallet connection state
   if (!isConnected) {
