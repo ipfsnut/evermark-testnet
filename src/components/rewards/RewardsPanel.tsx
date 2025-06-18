@@ -130,7 +130,7 @@ export function RewardsPanel() {
                 <>
                   <GiftIcon className="h-4 w-4 mr-2 inline-block" />
                   {current.hasClaimableRewards ? 
-                    `Claim ${format.totalRewards(4)} Tokens` : 
+                    `Claim ${format.totalRewards()} Tokens` : 
                     'No Rewards'
                   }
                 </>
