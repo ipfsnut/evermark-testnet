@@ -263,7 +263,7 @@ export const RewardsCalculator: React.FC = () => {
               </div>
             ) : (
               <p className="text-sm font-bold text-blue-900">
-                {format.ethRewards(6)} WETH
+                {format.ethRewards()} WETH
               </p>
             )}
           </div>
@@ -285,7 +285,7 @@ export const RewardsCalculator: React.FC = () => {
               </div>
             ) : (
               <p className="text-sm font-bold text-purple-900">
-                {format.emarkRewards(4)} EMARK
+                {format.emarkRewards()} EMARK
               </p>
             )}
           </div>

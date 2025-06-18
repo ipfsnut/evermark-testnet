@@ -116,13 +116,13 @@ export function useRewardsDisplay(userAddress?: string) {
       },
 
       format: {
-        ethRewards: (decimals = 6) => currentEthRewards.toFixed(decimals),
-        emarkRewards: (decimals = 6) => currentEmarkRewards.toFixed(decimals),
-        totalRewards: (decimals = 6) => totalCurrentRewards.toFixed(decimals),
-        stakedAmount: (decimals = 2) => stakedAmountNum.toFixed(decimals),
-        ethAPR: (decimals = 2) => ethAPR.toFixed(decimals),
-        emarkAPR: (decimals = 2) => emarkAPR.toFixed(decimals),
-      },
+  ethRewards: (decimals = 0) => currentEthRewards.toFixed(decimals),
+  emarkRewards: (decimals = 0) => currentEmarkRewards.toFixed(decimals),
+  totalRewards: (decimals = 0) => totalCurrentRewards.toFixed(decimals),
+  stakedAmount: (decimals = 0) => stakedAmountNum.toFixed(decimals),
+  ethAPR: (decimals = 2) => ethAPR.toFixed(decimals), 
+  emarkAPR: (decimals = 2) => emarkAPR.toFixed(decimals), 
+},
     };
   }, [
     rewardsData.pendingEthRewards,
