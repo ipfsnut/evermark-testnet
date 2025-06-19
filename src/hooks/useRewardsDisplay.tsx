@@ -115,14 +115,21 @@ export function useRewardsDisplay(userAddress?: string) {
         periodEmarkRewards: periodEmarkNum,
       },
 
+      // 🔧 FIXED: Better default decimal places for each token type
       format: {
-  ethRewards: (decimals = 0) => currentEthRewards.toFixed(decimals),
-  emarkRewards: (decimals = 0) => currentEmarkRewards.toFixed(decimals),
-  totalRewards: (decimals = 0) => totalCurrentRewards.toFixed(decimals),
-  stakedAmount: (decimals = 0) => stakedAmountNum.toFixed(decimals),
-  ethAPR: (decimals = 2) => ethAPR.toFixed(decimals), 
-  emarkAPR: (decimals = 2) => emarkAPR.toFixed(decimals), 
-},
+        ethRewards: (decimals = 4) => currentEthRewards.toFixed(decimals),
+        emarkRewards: (decimals = 2) => currentEmarkRewards.toFixed(decimals),  
+        totalRewards: (decimals = 2) => totalCurrentRewards.toFixed(decimals),
+        stakedAmount: (decimals = 2) => stakedAmountNum.toFixed(decimals),
+        ethAPR: (decimals = 2) => ethAPR.toFixed(decimals), 
+        emarkAPR: (decimals = 2) => emarkAPR.toFixed(decimals), 
+        
+        // 🔧 NEW: Additional formatting helpers for consistent display
+        ethRewardsDisplay: () => currentEthRewards.toFixed(4),
+        emarkRewardsDisplay: () => currentEmarkRewards.toFixed(2),
+        totalRewardsDisplay: () => totalCurrentRewards.toFixed(2),
+        stakedAmountDisplay: () => stakedAmountNum.toFixed(2),
+      },
     };
   }, [
     rewardsData.pendingEthRewards,

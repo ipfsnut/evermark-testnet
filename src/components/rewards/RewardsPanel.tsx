@@ -69,7 +69,7 @@ export function RewardsPanel() {
           <h3 className="text-lg font-semibold text-gray-900">Your Dual-Token Rewards</h3>
         </div>
         
-        {/* 🔧 SIMPLIFIED: Dual-token reward display */}
+        {/* 🔧 FIXED: Dual-token reward display with proper decimal formatting */}
         <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-lg border border-yellow-200 mb-6">
           <div className="flex flex-col sm:flex-row items-center sm:justify-between">
             <div className="mb-4 sm:mb-0">
@@ -81,11 +81,11 @@ export function RewardsPanel() {
                 </p>
               ) : current.hasClaimableRewards ? (
                 <div className="space-y-1">
-                  {/* Show individual reward types with correct labeling */}
+                  {/* 🔧 FIXED: Use consistent decimal formatting */}
                   {current.hasEthRewards && (
                     <div className="flex items-center space-x-2">
                       <p className="text-xl font-bold text-blue-800">
-                        {format.ethRewards()} WETH
+                        {format.ethRewardsDisplay()} WETH
                       </p>
                       <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">WETH Rewards</span>
                     </div>
@@ -93,15 +93,15 @@ export function RewardsPanel() {
                   {current.hasEmarkRewards && (
                     <div className="flex items-center space-x-2">
                       <p className="text-xl font-bold text-purple-800">
-                        {format.emarkRewards()} $EMARK
+                        {format.emarkRewardsDisplay()} $EMARK
                       </p>
                       <span className="text-xs text-purple-600 bg-purple-100 px-2 py-1 rounded">EMARK Rewards</span>
                     </div>
                   )}
                   
-                  {/* Show total */}
+                  {/* 🔧 FIXED: Total value with proper formatting */}
                   <p className="text-sm text-amber-700 mt-2">
-                    Total Value: {format.totalRewards()} tokens
+                    Total Value: {format.totalRewardsDisplay()} tokens
                   </p>
                 </div>
               ) : (
@@ -110,7 +110,7 @@ export function RewardsPanel() {
                     <span className="text-lg text-amber-600">No rewards available</span>
                   </p>
                   <p className="text-xs text-gray-600">
-                    Current amount: {format.totalRewards()} tokens (minimum: 0.0001)
+                    Current amount: {format.totalRewardsDisplay()} tokens (minimum: 0.0001)
                   </p>
                 </div>
               )}
@@ -130,7 +130,7 @@ export function RewardsPanel() {
                 <>
                   <GiftIcon className="h-4 w-4 mr-2 inline-block" />
                   {current.hasClaimableRewards ? 
-                    `Claim ${format.totalRewards()} Tokens` : 
+                    `Claim ${format.totalRewardsDisplay()} Tokens` : 
                     'No Rewards'
                   }
                 </>
@@ -154,7 +154,7 @@ export function RewardsPanel() {
           </div>
         )}
         
-        {/* 🔧 SIMPLIFIED: Dual-token breakdown display */}
+        {/* 🔧 FIXED: Dual-token breakdown display with proper decimals */}
         {current.hasClaimableRewards && (
           <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
             <h4 className="text-sm font-medium text-gray-900 mb-2">Detailed Reward Breakdown</h4>
@@ -163,7 +163,7 @@ export function RewardsPanel() {
                 <div className="flex items-center justify-between p-2 bg-white rounded">
                   <span className="text-blue-700">WETH Rewards:</span>
                   <span className="font-bold text-blue-900">
-                    {format.ethRewards()} WETH
+                    {format.ethRewardsDisplay()} WETH
                   </span>
                 </div>
               )}
@@ -171,14 +171,14 @@ export function RewardsPanel() {
                 <div className="flex items-center justify-between p-2 bg-white rounded">
                   <span className="text-purple-700">$EMARK Rewards:</span>
                   <span className="font-bold text-purple-900">
-                    {format.emarkRewards()} $EMARK
+                    {format.emarkRewardsDisplay()} $EMARK
                   </span>
                 </div>
               )}
               <div className="flex items-center justify-between p-2 bg-gray-50 rounded col-span-full">
                 <span className="text-gray-700">Total Claimable Value:</span>
                 <span className="font-bold text-gray-900">
-                  {format.totalRewards()} tokens
+                  {format.totalRewardsDisplay()} tokens
                 </span>
               </div>
             </div>
@@ -212,7 +212,7 @@ export function RewardsPanel() {
             💡 <strong>Dual-Token System:</strong> Earn both WETH and $EMARK tokens automatically. 
             Reward rates adjust periodically based on pool funding and staking participation.
             {current.hasClaimableRewards && (
-              <strong className="text-green-700"> You currently have {format.totalRewards()} tokens ready to claim!</strong>
+              <strong className="text-green-700"> You currently have {format.totalRewardsDisplay()} tokens ready to claim!</strong>
             )}
           </p>
         </div>

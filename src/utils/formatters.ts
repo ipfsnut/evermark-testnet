@@ -4,7 +4,7 @@ import { toEther } from "thirdweb/utils";
  * 🔧 FIXED: Format EMARK amounts with proper decimal handling
  * This was likely the source of the 10x-11x display bug
  */
-export function formatEmark(value: bigint | undefined | null, decimals: number = 2): string {
+export function formatEmark(value: bigint | undefined | null, decimals: number = 0): string {
   if (!value || value === BigInt(0)) {
     return "0";
   }

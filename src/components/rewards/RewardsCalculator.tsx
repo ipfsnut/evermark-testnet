@@ -164,7 +164,7 @@ export const RewardsCalculator: React.FC = () => {
         </p>
       </div>
 
-      {/* 🔧 SIMPLIFIED: Two-column reward display (WETH + EMARK only) */}
+      {/* 🔧 FIXED: Two-column reward display with proper decimal formatting */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* WETH Rewards Column */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
@@ -177,19 +177,19 @@ export const RewardsCalculator: React.FC = () => {
             <div className="flex justify-between">
               <span className="text-sm text-blue-700">Weekly:</span>
               <span className="font-bold text-blue-900">
-                {isLoading ? "Loading..." : `${projections.eth.weekly.toFixed(6)} WETH`}
+                {isLoading ? "Loading..." : `${projections.eth.weekly.toFixed(4)} WETH`}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-blue-700">Monthly:</span>
               <span className="font-bold text-blue-900">
-                {isLoading ? "Loading..." : `${projections.eth.monthly.toFixed(6)} WETH`}
+                {isLoading ? "Loading..." : `${projections.eth.monthly.toFixed(4)} WETH`}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-blue-700">Yearly:</span>
               <span className="font-bold text-blue-900">
-                {isLoading ? "Loading..." : `${projections.eth.yearly.toFixed(6)} WETH`}
+                {isLoading ? "Loading..." : `${projections.eth.yearly.toFixed(4)} WETH`}
               </span>
             </div>
             <div className="pt-2 border-t border-blue-200">
@@ -214,19 +214,19 @@ export const RewardsCalculator: React.FC = () => {
             <div className="flex justify-between">
               <span className="text-sm text-purple-700">Weekly:</span>
               <span className="font-bold text-purple-900">
-                {isLoading ? "Loading..." : `${projections.emark.weekly.toFixed(4)} EMARK`}
+                {isLoading ? "Loading..." : `${projections.emark.weekly.toFixed(2)} EMARK`}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-purple-700">Monthly:</span>
               <span className="font-bold text-purple-900">
-                {isLoading ? "Loading..." : `${projections.emark.monthly.toFixed(4)} EMARK`}
+                {isLoading ? "Loading..." : `${projections.emark.monthly.toFixed(2)} EMARK`}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-purple-700">Yearly:</span>
               <span className="font-bold text-purple-900">
-                {isLoading ? "Loading..." : `${projections.emark.yearly.toFixed(4)} EMARK`}
+                {isLoading ? "Loading..." : `${projections.emark.yearly.toFixed(2)} EMARK`}
               </span>
             </div>
             <div className="pt-2 border-t border-purple-200">
@@ -241,7 +241,7 @@ export const RewardsCalculator: React.FC = () => {
         </div>
       </div>
 
-      {/* 🔧 SIMPLIFIED: Breakdown using dual-token calculations */}
+      {/* 🔧 FIXED: Breakdown using dual-token calculations with proper formatting */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-700">
           {current.hasClaimableRewards ? 'Live Reward Breakdown' : 'Potential Reward Structure'}
@@ -252,7 +252,7 @@ export const RewardsCalculator: React.FC = () => {
             <CoinsIcon className="h-4 w-4 text-blue-600 mr-3" />
             <div>
               <p className="text-sm font-medium text-gray-900">WETH Rewards</p>
-              <p className="text-xs text-gray-600">From {format.stakedAmount()} wEMARK staked</p>
+              <p className="text-xs text-gray-600">From {format.stakedAmountDisplay()} wEMARK staked</p>
             </div>
           </div>
           <div className="text-right">
@@ -263,7 +263,7 @@ export const RewardsCalculator: React.FC = () => {
               </div>
             ) : (
               <p className="text-sm font-bold text-blue-900">
-                {format.ethRewards()} WETH
+                {format.ethRewardsDisplay()} WETH
               </p>
             )}
           </div>
@@ -274,7 +274,7 @@ export const RewardsCalculator: React.FC = () => {
             <CoinsIcon className="h-4 w-4 text-purple-600 mr-3" />
             <div>
               <p className="text-sm font-medium text-gray-900">EMARK Token Rewards</p>
-              <p className="text-xs text-gray-600">From {format.stakedAmount()} wEMARK staked</p>
+              <p className="text-xs text-gray-600">From {format.stakedAmountDisplay()} wEMARK staked</p>
             </div>
           </div>
           <div className="text-right">
@@ -285,7 +285,7 @@ export const RewardsCalculator: React.FC = () => {
               </div>
             ) : (
               <p className="text-sm font-bold text-purple-900">
-                {format.emarkRewards()} EMARK
+                {format.emarkRewardsDisplay()} EMARK
               </p>
             )}
           </div>
@@ -320,7 +320,7 @@ export const RewardsCalculator: React.FC = () => {
                 <strong>Liquid $EMARK:</strong> {formatEmarkWithSymbol(emarkBalance, 2)}
               </div>
               <div>
-                <strong>Staked (wEMARK):</strong> {format.stakedAmount()} wEMARK
+                <strong>Staked (wEMARK):</strong> {format.stakedAmountDisplay()} wEMARK
               </div>
               <div>
                 <strong>Delegated Power:</strong> {formatWEmarkWithSymbol(actualDelegatedPower, 2)}
@@ -335,10 +335,10 @@ export const RewardsCalculator: React.FC = () => {
                 <strong>Period Progress:</strong> {period.periodProgress.toFixed(1)}%
               </div>
               <div>
-                <strong>Pending WETH:</strong> {format.ethRewards()} WETH
+                <strong>Pending WETH:</strong> {format.ethRewardsDisplay()} WETH
               </div>
               <div>
-                <strong>Pending EMARK:</strong> {format.emarkRewards()} $EMARK
+                <strong>Pending EMARK:</strong> {format.emarkRewardsDisplay()} $EMARK
               </div>
             </div>
           </div>
