@@ -27,6 +27,18 @@ interface WrappingDashboardProps {
   className?: string;
 }
 
+// ✅ FIXED: Helper function to format token amounts consistently
+const formatTokenAmount = (amount: bigint, decimals: number = 2): string => {
+  try {
+    const etherValue = toEther(amount || BigInt(0));
+    const numericValue = parseFloat(etherValue);
+    return isNaN(numericValue) ? '0.00' : numericValue.toFixed(decimals);
+  } catch (error) {
+    console.error('Error formatting token amount:', error);
+    return '0.00';
+  }
+};
+
 // Quick Stats Overview Component
 const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress }) => {
   const { totalWrapped, availableVotingPower } = useWrapping(userAddress);
@@ -36,7 +48,7 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
   const stats = [
     {
       label: 'Total Wrapped',
-      value: toEther(totalWrapped || BigInt(0)),
+      value: formatTokenAmount(totalWrapped || BigInt(0), 2), // ✅ FIXED: Now shows 2 decimals
       suffix: 'wEMARK',
       icon: <LockIcon className="h-5 w-5 text-purple-600" />,
       bgColor: 'bg-purple-50',
@@ -44,7 +56,7 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
     },
     {
       label: 'Voting Power',
-      value: toEther(availableVotingPower || BigInt(0)),
+      value: formatTokenAmount(availableVotingPower || BigInt(0), 2), // ✅ FIXED: Now shows 2 decimals
       suffix: 'wEMARK',
       icon: <CoinsIcon className="h-5 w-5 text-blue-600" />,
       bgColor: 'bg-blue-50',
@@ -52,7 +64,7 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
     },
     {
       label: 'Pending Rewards',
-      value: toEther(pendingRewards || BigInt(0)),
+      value: formatTokenAmount(pendingRewards || BigInt(0), 2), // ✅ FIXED: This was the main issue - now shows 2 decimals instead of 18!
       suffix: '$EMARK',
       icon: <TrendingUpIcon className="h-5 w-5 text-green-600" />,
       bgColor: 'bg-green-50',
@@ -175,7 +187,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
           </div>
           <div className="flex items-center justify-between mt-1">
             <span className="text-sm text-purple-100">Total Protocol Wrapped</span>
-            <span className="text-sm">{toEther(wrappingStats.totalProtocolWrapped)} wEMARK</span>
+            <span className="text-sm">{formatTokenAmount(wrappingStats.totalProtocolWrapped, 2)} wEMARK</span>
           </div>
         </div>
       </div>
