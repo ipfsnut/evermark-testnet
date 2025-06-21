@@ -1,324 +1,351 @@
+// src/pages/LeaderboardPage.tsx - Enhanced with delegation integration
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { TrophyIcon, BookOpenIcon, UserIcon, CalendarIcon, ClockIcon, ImageIcon } from 'lucide-react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
-import { useReadContract } from "thirdweb/react";
-import { getContract } from "thirdweb";
-import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, VOTING_ABI } from "../lib/contracts";
-import { toEther } from "thirdweb/utils";
-import PageContainer from '../components/layout/PageContainer';
-import { formatDistanceToNow } from 'date-fns';
+import { useProfile } from '../hooks/useProfile';
+import { useDelegationHistory } from '../hooks/useDelegationHistory';
+import { VotingPanel } from '../components/voting/VotingPanel';
+import { toEther } from 'thirdweb/utils';
 
-// Enhanced Leaderboard Entry Component
-const LeaderboardEntryCard: React.FC<{ entry: any; index: number }> = ({ entry, index }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+type LeaderboardTab = 'current' | 'previous' | 'delegate';
+
+export default function LeaderboardPage() {
+  const [activeTab, setActiveTab] = useState<LeaderboardTab>('current');
+  const [selectedEvermarkId, setSelectedEvermarkId] = useState<string | null>(null);
   
-  const isTopThree = index < 3;
-  const rankColors = {
-    0: 'border-yellow-400 bg-yellow-50',
-    1: 'border-gray-400 bg-gray-50', 
-    2: 'border-amber-600 bg-amber-50',
-  };
-
-  const handleImageLoad = () => setImageLoading(false);
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoading(false);
-  };
+  const { primaryAddress } = useProfile();
+  const { delegationStats } = useDelegationHistory(primaryAddress);
+  
+  // Get current and previous week leaderboards
+  const currentWeek = useLeaderboard();
+  const previousWeekNumber = currentWeek.weekNumber > 1 ? currentWeek.weekNumber - 1 : 1;
+  const previousWeek = useLeaderboard(previousWeekNumber);
+  
+  const activeLeaderboard = activeTab === 'current' ? currentWeek : previousWeek;
 
   return (
-    <Link 
-      to={`/evermark/${entry.evermark.id}`}
-      className="block hover:bg-gray-50 transition-colors"
-    >
-      <div className={`p-6 flex items-center ${isTopThree ? 'border-l-4' : ''} ${
-        isTopThree ? rankColors[index as keyof typeof rankColors] : ''
-      }`}>
-        {/* Rank Badge */}
-        <div className={`flex items-center justify-center h-12 w-12 rounded-full mr-4 flex-shrink-0 font-bold text-lg ${
-          index === 0 ? 'bg-yellow-100 text-yellow-700' :
-          index === 1 ? 'bg-gray-100 text-gray-700' :
-          index === 2 ? 'bg-amber-100 text-amber-700' :
-          'bg-purple-100 text-purple-700'
-        }`}>
-          {entry.rank}
-        </div>
-        
-        {/* Image */}
-        <div className="w-16 h-16 bg-gray-100 rounded-lg mr-4 flex-shrink-0 overflow-hidden">
-          {entry.evermark.image && !imageError ? (
-            <div className="relative w-full h-full">
-              {imageLoading && (
-                <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-lg"></div>
-              )}
-              <img
-                src={entry.evermark.image}
-                alt={entry.evermark.title}
-                className="w-full h-full object-cover rounded-lg"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">🏆 Leaderboard</h1>
+              <p className="text-gray-600 mt-1">
+                Weekly rankings of the most supported Evermarks
+              </p>
             </div>
-          ) : (
-            <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-lg">
-              <ImageIcon className="h-6 w-6 text-gray-400" />
+            
+            {/* Quick Stats */}
+            <div className="text-right">
+              <div className="text-sm text-gray-600">Week {currentWeek.weekNumber}</div>
+              <div className="text-lg font-semibold">
+                {currentWeek.isFinalized ? '✅ Finalized' : '🔄 Active'}
+              </div>
+            </div>
+          </div>
+
+          {/* User Delegation Summary */}
+          {primaryAddress && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-purple-900">Your Delegation Power</h3>
+                  <div className="flex items-center gap-4 mt-1 text-sm">
+                    <span className="text-purple-800">
+                      {delegationStats.delegationPercentage.toFixed(1)}% delegated
+                    </span>
+                    <span className="text-purple-800">
+                      {delegationStats.rewardMultiplier.toFixed(2)}x multiplier
+                    </span>
+                    <span className="text-purple-800">
+                      {delegationStats.weeklyDelegations} votes this week
+                    </span>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <a 
+                    href="/wrapping" 
+                    className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+                  >
+                    Get wEMARK
+                  </a>
+                  <button
+                    onClick={() => setActiveTab('delegate')}
+                    className="bg-white text-purple-600 border border-purple-600 px-3 py-1 rounded text-sm hover:bg-purple-50"
+                  >
+                    Delegate Votes
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
-        
-        {/* Content */}
-        <div className="flex-grow min-w-0 mr-4">
-          <h3 className="font-medium text-gray-900 truncate mb-1">
-            {entry.evermark.title}
-          </h3>
-          <div className="flex items-center text-sm text-gray-500 mb-1">
-            <UserIcon className="h-3 w-3 mr-1" />
-            <span className="truncate">{entry.evermark.author}</span>
-          </div>
-          {entry.evermark.description && (
-            <p className="text-sm text-gray-600 line-clamp-2 mb-1">
-              {entry.evermark.description}
-            </p>
-          )}
-          <div className="flex items-center text-xs text-gray-500">
-            <CalendarIcon className="h-3 w-3 mr-1" />
-            <span>{formatDistanceToNow(new Date(entry.evermark.creationTime), { addSuffix: true })}</span>
-          </div>
-        </div>
-        
-        {/* Vote Count */}
-        <div className="flex-shrink-0 text-right">
-          <p className="font-bold text-purple-600 text-xl">
-            {toEther(entry.votes)}
-          </p>
-          <p className="text-xs text-gray-500">
-            vote{Number(toEther(entry.votes)) !== 1 ? 's' : ''}
-          </p>
-        </div>
-        
-        {/* Crown for #1 */}
-        {entry.rank === 1 && (
-          <div className="ml-3 text-2xl">
-            👑
-          </div>
-        )}
       </div>
-    </Link>
-  );
-};
 
-const LeaderboardPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'current' | 'previous'>('current');
-  
-  // Get current cycle from voting contract
-  const votingContract = getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.VOTING,
-    abi: VOTING_ABI,
-  });
-  
-  const { data: currentCycle } = useReadContract({
-    contract: votingContract,
-    method: "getCurrentCycle",
-    params: [],
-  });
-  
-  const currentWeek = currentCycle ? Number(currentCycle) : 1;
-  const previousWeek = Math.max(1, currentWeek - 1);
-  
-  // Use the leaderboard hook for both current and previous weeks
-  const currentWeekData = useLeaderboard(currentWeek);
-  const previousWeekData = useLeaderboard(previousWeek);
-  
-  // Select active data based on tab
-  const activeData = activeTab === 'current' ? currentWeekData : previousWeekData;
-  const activeWeek = activeTab === 'current' ? currentWeek : previousWeek;
-  
-  return (
-    <PageContainer title="Leaderboard">
-      <div className="space-y-6">
-        <div className="text-center">
-          <TrophyIcon className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-          <h1 className="text-2xl font-serif font-bold text-gray-900">Leaderboard</h1>
-          <p className="text-gray-600">Top-voted content in the community</p>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="bg-white rounded-lg shadow-sm p-1 border border-gray-200">
-          <div className="flex space-x-1">
+      {/* Tab Navigation */}
+      <div className="bg-white border-b">
+        <div className="container mx-auto px-4">
+          <div className="flex gap-8">
             <button
               onClick={() => setActiveTab('current')}
-              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`py-4 px-2 border-b-2 font-medium text-sm ${
                 activeTab === 'current'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <div className="flex items-center justify-center space-x-2">
-                <ClockIcon className="h-4 w-4" />
-                <span>Current Week {currentWeek}</span>
-                {!currentWeekData.isFinalized && (
-                  <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
-                    Live
-                  </span>
-                )}
-              </div>
+              📊 Current Week
             </button>
-            
             <button
               onClick={() => setActiveTab('previous')}
-              className={`flex-1 px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+              className={`py-4 px-2 border-b-2 font-medium text-sm ${
                 activeTab === 'previous'
-                  ? 'bg-purple-600 text-white'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              <div className="flex items-center justify-center space-x-2">
-                <TrophyIcon className="h-4 w-4" />
-                <span>Previous Week {previousWeek}</span>
-                {previousWeekData.isFinalized && (
-                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-                    Final
-                  </span>
-                )}
-              </div>
+              📈 Previous Week
+            </button>
+            <button
+              onClick={() => setActiveTab('delegate')}
+              className={`py-4 px-2 border-b-2 font-medium text-sm ${
+                activeTab === 'delegate'
+                  ? 'border-purple-600 text-purple-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🗳️ Delegate Votes
             </button>
           </div>
         </div>
+      </div>
 
-        {/* Leaderboard Content */}
-        {activeData.isLoading ? (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="bg-gradient-to-r from-yellow-50 to-amber-50 px-6 py-4 border-b border-gray-200">
-              <div className="h-6 bg-gray-200 rounded animate-pulse"></div>
-            </div>
-            <div className="divide-y divide-gray-200">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="p-6 flex items-center">
-                  <div className="h-12 w-12 bg-gray-200 rounded-full mr-4 animate-pulse"></div>
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg mr-4 animate-pulse"></div>
-                  <div className="flex-grow space-y-2">
-                    <div className="h-5 bg-gray-200 rounded w-3/4 animate-pulse"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-                    <div className="h-3 bg-gray-200 rounded w-2/3 animate-pulse"></div>
-                  </div>
-                  <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+      {/* Content */}
+      <div className="container mx-auto px-4 py-8">
+        {(activeTab === 'current' || activeTab === 'previous') && (
+          <>
+            {/* Leaderboard Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+              <div className="bg-white rounded-lg border p-6 text-center">
+                <div className="text-2xl font-bold text-blue-600">
+                  {activeLeaderboard.entries.length}
                 </div>
-              ))}
+                <div className="text-sm text-gray-600">Total Entries</div>
+              </div>
+              <div className="bg-white rounded-lg border p-6 text-center">
+                <div className="text-2xl font-bold text-green-600">
+                  {activeLeaderboard.entries.length > 0 
+                    ? parseFloat(toEther(activeLeaderboard.entries[0].votes)).toFixed(0)
+                    : '0'
+                  }
+                </div>
+                <div className="text-sm text-gray-600">Top Votes</div>
+              </div>
+              <div className="bg-white rounded-lg border p-6 text-center">
+                <div className="text-2xl font-bold text-purple-600">
+                  Week {activeLeaderboard.weekNumber}
+                </div>
+                <div className="text-sm text-gray-600">Voting Cycle</div>
+              </div>
+              <div className="bg-white rounded-lg border p-6 text-center">
+                <div className={`text-2xl font-bold ${
+                  activeLeaderboard.isFinalized ? 'text-green-600' : 'text-orange-600'
+                }`}>
+                  {activeLeaderboard.isFinalized ? 'Final' : 'Live'}
+                </div>
+                <div className="text-sm text-gray-600">Status</div>
+              </div>
             </div>
-          </div>
-        ) : activeData.error ? (
-          <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-            <div className="text-red-600 mb-4">
-              <TrophyIcon className="mx-auto h-8 w-8 mb-2 opacity-50" />
-              <p className="font-medium">Error Loading Leaderboard</p>
-              <p className="text-sm mt-1">{activeData.error}</p>
-            </div>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        ) : activeData.entries.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="text-center py-12">
-              <TrophyIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {activeTab === 'current' ? 'No Votes Yet This Week' : 'No Data Available'}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {activeTab === 'current' 
-                  ? 'Be the first to vote on Evermarks this week! Voting helps great content rise to the top.'
-                  : 'No leaderboard data available for this week.'
-                }
-              </p>
-              {activeTab === 'current' && (
-                <Link 
-                  to="/" 
-                  className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  <BookOpenIcon className="h-5 w-5 mr-2" />
-                  Explore Evermarks
-                </Link>
+
+            {/* Leaderboard Entries */}
+            <div className="bg-white rounded-lg border">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-semibold">
+                  {activeTab === 'current' ? 'Current' : 'Previous'} Week Rankings
+                </h2>
+              </div>
+              
+              {activeLeaderboard.isLoading ? (
+                <div className="p-8 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                  <p className="text-gray-600">Loading leaderboard...</p>
+                </div>
+              ) : activeLeaderboard.error ? (
+                <div className="p-8 text-center">
+                  <p className="text-red-600 mb-4">Error loading leaderboard: {activeLeaderboard.error}</p>
+                  <button 
+                    onClick={() => window.location.reload()}
+                    className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : activeLeaderboard.entries.length === 0 ? (
+                <div className="p-8 text-center">
+                  <div className="text-gray-400 text-6xl mb-4">🏆</div>
+                  <h3 className="text-xl font-medium text-gray-900 mb-2">No Entries Yet</h3>
+                  <p className="text-gray-600">Be the first to delegate votes this week!</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {activeLeaderboard.entries.map((entry, index) => (
+                    <div key={entry.evermark.id} className="p-6 hover:bg-gray-50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          {/* Rank */}
+                          <div className={`text-2xl font-bold ${
+                            entry.rank === 1 ? 'text-yellow-500' :
+                            entry.rank === 2 ? 'text-gray-400' :
+                            entry.rank === 3 ? 'text-orange-600' :
+                            'text-gray-600'
+                          }`}>
+                            #{entry.rank}
+                          </div>
+                          
+                          {/* Evermark Info */}
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3">
+                              {entry.evermark.image && (
+                                <img 
+                                  src={entry.evermark.image} 
+                                  alt={entry.evermark.title}
+                                  className="w-12 h-12 object-cover rounded"
+                                />
+                              )}
+                              <div>
+                                <h3 className="font-semibold text-gray-900">
+                                  <a 
+                                    href={`/evermark/${entry.evermark.id}`}
+                                    className="hover:text-purple-600"
+                                  >
+                                    {entry.evermark.title}
+                                  </a>
+                                </h3>
+                                <p className="text-sm text-gray-600">
+                                  by {entry.evermark.author}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Votes and Action */}
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-lg font-semibold text-purple-600">
+                              {parseFloat(toEther(entry.votes)).toFixed(0)} votes
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {parseFloat(toEther(entry.votes)).toFixed(4)} wEMARK
+                            </div>
+                          </div>
+                          
+                          {primaryAddress && !activeLeaderboard.isFinalized && (
+                            <button
+                              onClick={() => {
+                                setSelectedEvermarkId(entry.evermark.id);
+                                setActiveTab('delegate');
+                              }}
+                              className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+                            >
+                              Vote
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {entry.evermark.description && (
+                        <p className="text-sm text-gray-600 mt-3 ml-16">
+                          {entry.evermark.description.length > 150 
+                            ? `${entry.evermark.description.substring(0, 150)}...`
+                            : entry.evermark.description
+                          }
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
-          </div>
-        ) : (
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-            <div className="bg-gradient-to-r from-yellow-50 to-amber-50 px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium text-gray-900">
-                  {activeTab === 'current' ? 'Current Rankings' : 'Final Results'}
-                </h2>
-                <div className="text-sm text-gray-600">
-                  Week {activeWeek}
-                  {activeData.isFinalized ? (
-                    <span className="ml-2 text-green-600 font-medium">(Finalized)</span>
-                  ) : (
-                    <span className="ml-2 text-blue-600 font-medium">(Live)</span>
-                  )}
-                </div>
-              </div>
-            </div>
-            
-            <div className="divide-y divide-gray-200">
-              {activeData.entries.map((entry, index) => (
-                <LeaderboardEntryCard 
-                  key={entry.evermark.id} 
-                  entry={entry} 
-                  index={index} 
-                />
-              ))}
-            </div>
-          </div>
+          </>
         )}
 
-        {/* Weekly Stats */}
-        {activeData.entries.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-              <div className="flex items-center">
-                <TrophyIcon className="h-5 w-5 text-yellow-500 mr-2" />
-                <div>
-                  <p className="text-sm text-gray-600">Total Entries</p>
-                  <p className="text-lg font-bold text-gray-900">{activeData.entries.length}</p>
-                </div>
+        {/* Delegation Tab */}
+        {activeTab === 'delegate' && (
+          <div className="space-y-8">
+            {!primaryAddress ? (
+              <div className="bg-white rounded-lg border p-8 text-center">
+                <div className="text-gray-400 text-6xl mb-4">🔗</div>
+                <h3 className="text-xl font-medium text-gray-900 mb-2">Connect Your Wallet</h3>
+                <p className="text-gray-600">
+                  Connect your wallet to delegate voting power to your favorite Evermarks
+                </p>
               </div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-              <div className="flex items-center">
-                <UserIcon className="h-5 w-5 text-purple-500 mr-2" />
-                <div>
-                  <p className="text-sm text-gray-600">Top Votes</p>
-                  <p className="text-lg font-bold text-gray-900">
-                    {activeData.entries[0] ? toEther(activeData.entries[0].votes) : '0'}
-                  </p>
+            ) : (
+              <>
+                {/* Instructions */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                    🗳️ How Delegation Works
+                  </h3>
+                  <div className="text-blue-800 space-y-2 text-sm">
+                    <p>• Wrap your EMARK tokens to get wEMARK (voting power)</p>
+                    <p>• Delegate wEMARK to support your favorite Evermarks</p>
+                    <p>• Earn reward multipliers: 50%+ = 1.25x, 75%+ = 1.5x, 100% = 2x</p>
+                    <p>• Get consistency bonuses for regular participation</p>
+                  </div>
                 </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
-              <div className="flex items-center">
-                <CalendarIcon className="h-5 w-5 text-green-500 mr-2" />
-                <div>
-                  <p className="text-sm text-gray-600">Week Status</p>
-                  <p className="text-lg font-bold text-gray-900">
-                    {activeData.isFinalized ? 'Complete' : 'Ongoing'}
-                  </p>
-                </div>
-              </div>
-            </div>
+
+                {/* Voting Panel */}
+                {selectedEvermarkId ? (
+                  <div className="bg-white rounded-lg border">
+                    <div className="p-6 border-b">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">
+                          Delegate to Evermark #{selectedEvermarkId}
+                        </h3>
+                        <button
+                          onClick={() => setSelectedEvermarkId(null)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          ✕ Close
+                        </button>
+                      </div>
+                    </div>
+                    <div className="p-6">
+                      <VotingPanel evermarkId={selectedEvermarkId} />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-lg border p-8 text-center">
+                    <div className="text-gray-400 text-6xl mb-4">🎯</div>
+                    <h3 className="text-xl font-medium text-gray-900 mb-2">
+                      Select an Evermark to Delegate
+                    </h3>
+                    <p className="text-gray-600 mb-6">
+                      Click "Vote" next to any Evermark above, or browse all Evermarks to find ones you want to support.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                      <button
+                        onClick={() => setActiveTab('current')}
+                        className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+                      >
+                        View Current Leaderboard
+                      </button>
+                      <a 
+                        href="/"
+                        className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                      >
+                        Browse All Evermarks
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>
-    </PageContainer>
+    </div>
   );
-};
-
-export default LeaderboardPage;
+}

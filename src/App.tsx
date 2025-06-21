@@ -1,4 +1,4 @@
-// Updated App.tsx for Mainnet - Enhanced Farcaster Mini App Integration
+// Updated App.tsx for Mainnet - Enhanced Farcaster Mini App Integration + Delegation
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppThirdwebProvider } from './lib/thirdweb';
@@ -23,6 +23,9 @@ import PublicProfilePage from './pages/PublicProfilePage';
 // New sharing components
 import { ShareHandler } from './components/sharing/ShareHandler';
 import { CreateFromCast } from './components/sharing/CreateFromCast';
+
+// NEW: Delegation component
+import { DelegationHistory } from './components/voting/DelegationHistory';
 
 // Farcaster context types
 interface FarcasterContext {
@@ -210,11 +213,24 @@ function AppContent() {
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
           <Route path="/about" element={<AboutPage />} />
           
+          {/* NEW: Delegation route */}
+          <Route path="/delegation" element={
+            <div className="container mx-auto px-4 py-8">
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">🗳️ Delegation History</h1>
+                <p className="text-gray-600">
+                  Track your voting power delegation and earn rewards for supporting great Evermarks
+                </p>
+              </div>
+              <DelegationHistory />
+            </div>
+          } />
+          
           {/* Public Profile Routes */}
           <Route path="/:address" element={<PublicProfilePage />} />
           <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
           
-          {/* Share functionality - NEW ROUTES */}
+          {/* Share functionality - Existing routes */}
           <Route path="/share" element={<ShareHandler />} />
           <Route path="/share/create" element={<CreateFromCast />} />
           <Route path="/share/:id" element={<ShareRedirect />} />
@@ -223,8 +239,10 @@ function AppContent() {
           {/* Temporary placeholder routes */}
           <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
           <Route path="/bookshelf" element={<ComingSoonPage feature="Bookshelf" />} />
+          
           {/* Mini App sub-path routing */}
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
+          
           {/* Handle any sub-paths that might come from Mini App URLs */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -233,7 +251,7 @@ function AppContent() {
   );
 }
 
-// Enhanced coming soon page with Farcaster context
+// Enhanced coming soon page with Farcaster context + delegation info
 function ComingSoonPage({ feature }: { feature: string }) {
   const { isInFarcaster, isAuthenticated, hasVerifiedAddress } = useFarcasterUser();
   const farcasterContext = useFarcasterContext();
@@ -253,6 +271,28 @@ function ComingSoonPage({ feature }: { feature: string }) {
           <p className="text-green-800 text-sm">
             🚀 <strong>Mainnet is Live!</strong> Create and collect Evermarks with real $EMARK tokens.
           </p>
+        </div>
+
+        {/* NEW: Delegation call-to-action */}
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+          <h3 className="font-medium text-purple-900 mb-2">🗳️ Available Now: Delegation</h3>
+          <p className="text-purple-800 text-sm mb-3">
+            Support your favorite Evermarks and earn rewards by delegating your voting power!
+          </p>
+          <div className="flex gap-2 justify-center">
+            <a 
+              href="/delegation" 
+              className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+            >
+              View Delegation
+            </a>
+            <a 
+              href="/leaderboard" 
+              className="bg-white text-purple-600 border border-purple-600 px-3 py-1 rounded text-sm hover:bg-purple-50"
+            >
+              See Leaderboard
+            </a>
+          </div>
         </div>
 
         {/* Farcaster Mini App status */}

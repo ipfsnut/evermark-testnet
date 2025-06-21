@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { useProfile } from '../../hooks/useProfile';
+import { useProfile, useContractAuth } from '../../hooks/useProfile';
 import { 
   X as CloseIcon, 
   Home as HomeIcon, 
@@ -10,7 +10,9 @@ import {
   Plus as CreateIcon,
   Copy as CopyIcon,
   WifiIcon,
-  WifiOffIcon
+  WifiOffIcon,
+  CoinsIcon,
+  UserIcon
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -30,12 +32,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     farcasterUser
   } = useProfile();
   
-  // Define navigation items
+  const contractAuth = useContractAuth();
+  
+  // Define navigation items with conditional wrapping link
   const navItems = [
     { path: '/', label: 'Home', icon: <HomeIcon className="h-5 w-5" /> },
     { path: '/leaderboard', label: 'Leaderboard', icon: <TrophyIcon className="h-5 w-5" /> },
     { path: '/create', label: 'Create', icon: <CreateIcon className="h-5 w-5" /> },
     { path: '/my-evermarks', label: 'My Collection', icon: <BookOpenIcon className="h-5 w-5" /> },
+    // Add wrapping link only if user can interact with contracts
+    ...(contractAuth.canInteract ? [{
+      path: '/wrapping', 
+      label: 'Wrapping', 
+      icon: <CoinsIcon className="h-5 w-5" />,
+      badge: 'wEMARK',
+      description: 'Manage your EMARK tokens'
+    }] : []),
+    { path: '/profile', label: 'Profile', icon: <UserIcon className="h-5 w-5" /> },
     { path: '/about', label: 'About', icon: <AboutIcon className="h-5 w-5" /> },
   ];
   
@@ -168,19 +181,38 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                       : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'
                   }`}
                   onClick={() => closeSidebar()}
+                  title={item.description || item.label}
                 >
                   <span className={`mr-3 ${isActive(item.path) ? 'text-purple-600' : 'text-gray-500'}`}>
                     {item.icon}
                   </span>
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {/* Show badge if item has one */}
+                  {item.badge && (
+                    <span className="ml-2 px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
         
-        {/* Footer with Logo */}
+        {/* Enhanced footer with contract status indicator */}
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 mt-auto">
+          {/* Contract status indicator */}
+          {contractAuth && (
+            <div className="mb-3 p-2 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600">Contract Access:</span>
+                <span className={`font-medium ${contractAuth.canInteract ? 'text-green-600' : 'text-amber-600'}`}>
+                  {contractAuth.canInteract ? 'Available' : 'Limited'}
+                </span>
+              </div>
+            </div>
+          )}
+          
           <div className="flex justify-center">
             <img 
               src="/logo.png" 

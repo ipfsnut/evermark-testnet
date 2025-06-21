@@ -1,6 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useReadContract } from "thirdweb/react";
-import { getContract } from "thirdweb";
+// src/hooks/useDelegationHistory.tsx - Simplified ThirdWeb v5 implementation
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useReadContract, useContractEvents } from "thirdweb/react";
+import { getContract, prepareEvent } from "thirdweb";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, VOTING_ABI, CARD_CATALOG_ABI } from "../lib/contracts";
 
@@ -10,6 +11,8 @@ export interface DelegationRecord {
   timestamp: Date;
   cycle: number;
   isActive: boolean;
+  type: 'delegate' | 'undelegate';
+  transactionHash?: string;
 }
 
 export interface DelegationStats {
@@ -18,12 +21,15 @@ export interface DelegationStats {
   delegationPercentage: number;
   rewardMultiplier: number;
   weeklyDelegations: number;
+  consistencyWeeks: number;
+  consistencyBonus: number;
 }
 
 export function useDelegationHistory(userAddress?: string) {
   const [delegationHistory, setDelegationHistory] = useState<DelegationRecord[]>([]);
   const [currentCycleDelegations, setCurrentCycleDelegations] = useState<DelegationRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Get contracts
   const votingContract = useMemo(() => getContract({
@@ -66,21 +72,169 @@ export function useDelegationHistory(userAddress?: string) {
       enabled: !!userAddress,
     },
   });
+
+  // Storage helpers
+  const getStorageKey = useCallback((address: string) => `delegation_history_${address}`, []);
   
-  // Load delegation history (mock data - in production from events or database)
+  const loadFromStorage = useCallback((address: string): DelegationRecord[] => {
+    try {
+      const stored = localStorage.getItem(getStorageKey(address));
+      if (!stored) return [];
+      
+      const parsed = JSON.parse(stored);
+      return parsed.map((record: any) => ({
+        ...record,
+        timestamp: new Date(record.timestamp),
+        amount: BigInt(record.amount)
+      }));
+    } catch (error) {
+      console.error('Error loading delegation history from storage:', error);
+      return [];
+    }
+  }, [getStorageKey]);
+  
+  const saveToStorage = useCallback((address: string, records: DelegationRecord[]) => {
+    try {
+      const serializable = records.map(record => ({
+        ...record,
+        timestamp: record.timestamp.toISOString(),
+        amount: record.amount.toString()
+      }));
+      localStorage.setItem(getStorageKey(address), JSON.stringify(serializable));
+    } catch (error) {
+      console.error('Error saving delegation history to storage:', error);
+    }
+  }, [getStorageKey]);
+
+  // Add new delegation record
+  const addDelegationRecord = useCallback((record: DelegationRecord) => {
+    if (!userAddress) return;
+    
+    setDelegationHistory(prev => {
+      // Check for duplicates by transaction hash
+      if (record.transactionHash && prev.some(r => r.transactionHash === record.transactionHash)) {
+        return prev;
+      }
+      
+      const updated = [...prev, record];
+      saveToStorage(userAddress, updated);
+      console.log('📚 Added delegation record:', record);
+      return updated;
+    });
+  }, [userAddress, saveToStorage]);
+
+  // Prepare events for ThirdWeb v5
+  const delegateEvent = useMemo(() => {
+    try {
+      return prepareEvent({
+        signature: "event VoteDelegated(address indexed user, uint256 indexed evermarkId, uint256 amount, uint256 indexed cycle)"
+      });
+    } catch (error) {
+      console.warn('Could not prepare VoteDelegated event:', error);
+      return null;
+    }
+  }, []);
+
+  const undelegateEvent = useMemo(() => {
+    try {
+      return prepareEvent({
+        signature: "event VoteUndelegated(address indexed user, uint256 indexed evermarkId, uint256 amount, uint256 indexed cycle)"
+      });
+    } catch (error) {
+      console.warn('Could not prepare VoteUndelegated event:', error);
+      return null;
+    }
+  }, []);
+
+  // Watch for delegation events using ThirdWeb v5
+  const delegationEvents = useContractEvents({
+    contract: votingContract,
+    events: delegateEvent ? [delegateEvent] : [],
+  });
+
+  const undelegationEvents = useContractEvents({
+    contract: votingContract,
+    events: undelegateEvent ? [undelegateEvent] : [],
+  });
+
+  // Process delegation events
   useEffect(() => {
-    if (!userAddress || !currentCycle) return;
-    
+    if (!delegationEvents.data || !userAddress) return;
+
+    delegationEvents.data.forEach((event: any) => {
+      // Check if this event is for the current user
+      if (event.args?.user?.toLowerCase() !== userAddress.toLowerCase()) return;
+
+      const record: DelegationRecord = {
+        evermarkId: event.args.evermarkId?.toString() || '0',
+        amount: event.args.amount || BigInt(0),
+        timestamp: new Date(Number(event.blockTimestamp || Date.now() / 1000) * 1000),
+        cycle: Number(event.args.cycle || currentCycle || 0),
+        isActive: true,
+        type: 'delegate',
+        transactionHash: event.transactionHash
+      };
+      
+      addDelegationRecord(record);
+    });
+  }, [delegationEvents.data, userAddress, currentCycle, addDelegationRecord]);
+
+  // Process undelegation events
+  useEffect(() => {
+    if (!undelegationEvents.data || !userAddress) return;
+
+    undelegationEvents.data.forEach((event: any) => {
+      // Check if this event is for the current user
+      if (event.args?.user?.toLowerCase() !== userAddress.toLowerCase()) return;
+
+      const record: DelegationRecord = {
+        evermarkId: event.args.evermarkId?.toString() || '0',
+        amount: event.args.amount || BigInt(0),
+        timestamp: new Date(Number(event.blockTimestamp || Date.now() / 1000) * 1000),
+        cycle: Number(event.args.cycle || currentCycle || 0),
+        isActive: false,
+        type: 'undelegate',
+        transactionHash: event.transactionHash
+      };
+      
+      addDelegationRecord(record);
+    });
+  }, [undelegationEvents.data, userAddress, currentCycle, addDelegationRecord]);
+
+  // Load historical data on component mount
+  useEffect(() => {
+    if (!userAddress) {
+      setIsLoading(false);
+      return;
+    }
+
+    console.log('📚 Loading delegation history for:', userAddress);
     setIsLoading(true);
+    setError(null);
+
+    try {
+      // Load from localStorage for immediate display
+      const storedHistory = loadFromStorage(userAddress);
+      setDelegationHistory(storedHistory);
+      
+      console.log('📚 Loaded', storedHistory.length, 'delegation records from storage');
+      
+    } catch (err) {
+      console.error('❌ Error loading delegation history:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load delegation history');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userAddress, loadFromStorage]);
+
+  // Update current cycle delegations when history or cycle changes
+  useEffect(() => {
+    if (!currentCycle) return;
     
-    // TODO: Replace with real blockchain data reading
-    // For now, return empty array since delegation isn't implemented yet
-    const realHistory: DelegationRecord[] = [];
-    
-    setDelegationHistory(realHistory);
-    setCurrentCycleDelegations(realHistory.filter(d => d.cycle === Number(currentCycle)));
-    setIsLoading(false);
-  }, [userAddress, currentCycle]);
+    const currentCycleNumber = Number(currentCycle);
+    const currentDelegations = delegationHistory.filter(d => d.cycle === currentCycleNumber);
+    setCurrentCycleDelegations(currentDelegations);
+  }, [delegationHistory, currentCycle]);
   
   // Calculate delegation stats
   const delegationStats = useMemo((): DelegationStats => {
@@ -90,7 +244,9 @@ export function useDelegationHistory(userAddress?: string) {
         totalAvailable: BigInt(0),
         delegationPercentage: 0,
         rewardMultiplier: 1,
-        weeklyDelegations: 0
+        weeklyDelegations: 0,
+        consistencyWeeks: 0,
+        consistencyBonus: 0
       };
     }
     
@@ -103,67 +259,134 @@ export function useDelegationHistory(userAddress?: string) {
     // Calculate reward multiplier based on delegation percentage
     let multiplier = 1;
     if (percentage >= 100) {
-      multiplier = 2;
+      multiplier = 2.0;
     } else if (percentage >= 75) {
       multiplier = 1.5;
     } else if (percentage >= 50) {
       multiplier = 1.25;
     }
     
+    // Calculate consistency (how many of the last 4 weeks user delegated)
+    const currentCycleNum = currentCycle ? Number(currentCycle) : 0;
+    let consistencyWeeks = 0;
+    
+    for (let i = 0; i < 4; i++) {
+      const cycleToCheck = currentCycleNum - i;
+      const cycleDelegations = delegationHistory.filter(d => 
+        d.cycle === cycleToCheck && d.type === 'delegate'
+      );
+      if (cycleDelegations.length > 0) {
+        consistencyWeeks++;
+      }
+    }
+    
+    // Calculate consistency bonus
+    let consistencyBonus = 0;
+    if (consistencyWeeks >= 4) consistencyBonus = 0.2; // 20% bonus
+    else if (consistencyWeeks >= 3) consistencyBonus = 0.1; // 10% bonus
+    else if (consistencyWeeks >= 2) consistencyBonus = 0.05; // 5% bonus
+    
     return {
       totalDelegated: delegatedAmount,
       totalAvailable: totalPower,
       delegationPercentage: percentage,
       rewardMultiplier: multiplier,
-      weeklyDelegations: currentCycleDelegations.length
+      weeklyDelegations: currentCycleDelegations.length,
+      consistencyWeeks,
+      consistencyBonus
     };
-  }, [totalVotingPower, currentDelegatedAmount, currentCycleDelegations]);
+  }, [totalVotingPower, currentDelegatedAmount, currentCycleDelegations, delegationHistory, currentCycle]);
   
   // Get delegation history for a specific Evermark
-  const getEvermarkDelegations = (evermarkId: string): DelegationRecord[] => {
+  const getEvermarkDelegations = useCallback((evermarkId: string): DelegationRecord[] => {
     return delegationHistory.filter(d => d.evermarkId === evermarkId);
-  };
+  }, [delegationHistory]);
   
   // Get unique Evermarks that have been delegated to
-  const getSupportedEvermarks = (): string[] => {
-    return [...new Set(delegationHistory.map(d => d.evermarkId))];
-  };
+  const getSupportedEvermarks = useCallback((): string[] => {
+    const evermarkIds = new Set(
+      delegationHistory
+        .filter(d => d.type === 'delegate')
+        .map(d => d.evermarkId)
+    );
+    return Array.from(evermarkIds);
+  }, [delegationHistory]);
   
   // Get delegation history for a specific cycle
-  const getCycleDelegations = (cycle: number): DelegationRecord[] => {
+  const getCycleDelegations = useCallback((cycle: number): DelegationRecord[] => {
     return delegationHistory.filter(d => d.cycle === cycle);
-  };
+  }, [delegationHistory]);
   
-  // Calculate rewards boost based on delegation consistency
-  const getConsistencyBonus = (): number => {
-    if (!currentCycle) return 0;
+  // Get net delegations (accounting for undelegations)
+  const getNetDelegations = useCallback((): Map<string, bigint> => {
+    const netMap = new Map<string, bigint>();
     
-    // Check last 4 weeks
-    let consistentWeeks = 0;
-    for (let i = 0; i < 4; i++) {
-      const cycleNumber = Number(currentCycle) - i;
-      const cycleDelegations = getCycleDelegations(cycleNumber);
-      if (cycleDelegations.length > 0) {
-        consistentWeeks++;
+    delegationHistory.forEach(record => {
+      const currentAmount = netMap.get(record.evermarkId) || BigInt(0);
+      if (record.type === 'delegate') {
+        netMap.set(record.evermarkId, currentAmount + record.amount);
+      } else {
+        netMap.set(record.evermarkId, currentAmount - record.amount);
+      }
+    });
+    
+    // Filter out zero or negative amounts
+    for (const [evermarkId, amount] of netMap.entries()) {
+      if (amount <= BigInt(0)) {
+        netMap.delete(evermarkId);
       }
     }
     
-    // Bonus for consistent participation
-    if (consistentWeeks >= 4) return 0.2; // 20% bonus
-    if (consistentWeeks >= 3) return 0.1; // 10% bonus
-    if (consistentWeeks >= 2) return 0.05; // 5% bonus
-    return 0;
-  };
-  
+    return netMap;
+  }, [delegationHistory]);
+
+  // Manual refresh function for testing
+  const refresh = useCallback(() => {
+    if (userAddress) {
+      const storedHistory = loadFromStorage(userAddress);
+      setDelegationHistory(storedHistory);
+    }
+  }, [userAddress, loadFromStorage]);
+
+  // Clear history (for testing)
+  const clearHistory = useCallback(() => {
+    if (userAddress) {
+      localStorage.removeItem(getStorageKey(userAddress));
+      setDelegationHistory([]);
+      setCurrentCycleDelegations([]);
+    }
+  }, [userAddress, getStorageKey]);
+
   return {
     delegationHistory,
     currentCycleDelegations,
     delegationStats,
     isLoading,
+    error,
+    
+    // Query functions
     getEvermarkDelegations,
     getSupportedEvermarks,
     getCycleDelegations,
-    getConsistencyBonus,
-    currentCycle: currentCycle ? Number(currentCycle) : 0
+    getNetDelegations,
+    
+    // Utility functions
+    refresh,
+    clearHistory,
+    
+    // Raw data for debugging
+    currentCycle: currentCycle ? Number(currentCycle) : 0,
+    totalVotingPower: totalVotingPower || BigInt(0),
+    currentDelegatedAmount: currentDelegatedAmount || BigInt(0),
+    
+    // Event listening status for debugging
+    isListeningForEvents: {
+      delegations: !!delegateEvent && !delegationEvents.isLoading,
+      undelegations: !!undelegateEvent && !undelegationEvents.isLoading,
+    },
+    eventErrors: {
+      delegations: delegationEvents.error,
+      undelegations: undelegationEvents.error,
+    }
   };
 }
