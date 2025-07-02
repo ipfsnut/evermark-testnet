@@ -1,4 +1,4 @@
-// Updated App.tsx for Mainnet - Enhanced Farcaster Mini App Integration + Delegation
+// Updated App.tsx for Mainnet - Enhanced Farcaster Mini App Integration + Delegation + Wrapping
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppThirdwebProvider } from './lib/thirdweb';
@@ -13,6 +13,7 @@ import EnhancedHomePage from './pages/EnhancedHomePage';
 import ProfilePage from './pages/ProfilePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import MyEvermarksPage from './pages/MyEvermarksPage';
+import WrappingPage from './pages/WrappingPage';
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import { EvermarkDetail } from './components/evermark/EvermarkDetail';
 import { ShareRedirect } from './components/sharing/ShareButton';
@@ -204,7 +205,7 @@ function AppContent() {
     <ErrorBoundary>
       <Layout>
         <Routes>
-          {/* Core Routes */}
+          {/* Core Routes - Specific routes MUST come before catch-all routes */}
           <Route path="/" element={<EnhancedHomePage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
@@ -213,7 +214,10 @@ function AppContent() {
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
           <Route path="/about" element={<AboutPage />} />
           
-          {/* NEW: Delegation route */}
+          {/* Wrapping route - MUST come before /:address */}
+          <Route path="/wrapping" element={<WrappingPage />} />
+          
+          {/* Delegation route */}
           <Route path="/delegation" element={
             <div className="container mx-auto px-4 py-8">
               <div className="mb-8">
@@ -226,10 +230,6 @@ function AppContent() {
             </div>
           } />
           
-          {/* Public Profile Routes */}
-          <Route path="/:address" element={<PublicProfilePage />} />
-          <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
-          
           {/* Share functionality - Existing routes */}
           <Route path="/share" element={<ShareHandler />} />
           <Route path="/share/create" element={<CreateFromCast />} />
@@ -240,8 +240,9 @@ function AppContent() {
           <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
           <Route path="/bookshelf" element={<ComingSoonPage feature="Bookshelf" />} />
           
-          {/* Mini App sub-path routing */}
-          <Route path="/evermark/:id" element={<EvermarkDetail />} />
+          {/* Public Profile Routes - THESE MUST COME AFTER ALL SPECIFIC ROUTES */}
+          <Route path="/:address" element={<PublicProfilePage />} />
+          <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
           
           {/* Handle any sub-paths that might come from Mini App URLs */}
           <Route path="*" element={<Navigate to="/" replace />} />
