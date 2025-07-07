@@ -1,11 +1,11 @@
-// src/hooks/useEvermarkCreation.ts - Fixed with unified WalletProvider patterns
+// src/hooks/useEvermarkCreation.ts - Fixed with correct ABI method names
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useReadContract } from "thirdweb/react"; // ✅ For reading only
+import { useReadContract } from "thirdweb/react"; 
 import { getContract, prepareContractCall, readContract } from "thirdweb";
-import { encodeFunctionData } from "viem"; // ✅ For Wagmi transactions
+import { encodeFunctionData } from "viem"; 
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
-import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ Use unified provider
+import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider";
 
 // Enhanced metadata interface with all fields
 export interface EvermarkMetadata {
@@ -269,14 +269,14 @@ export function useEvermarkCreation() {
     abi: EVERMARK_NFT_ABI,
   });
 
-  // ✅ FIXED: Minimal queryOptions to avoid TypeScript issues
+  // ✅ FIXED: Use correct method name from ABI
   const { data: mintingFee, isLoading: isLoadingFee, error: feeError } = useReadContract({
     contract,
     method: "MINTING_FEE",
     params: [],
     queryOptions: {
-      enabled: !!CONTRACTS.EVERMARK_NFT, // Only run if contract address exists
-      retry: 1, // Don't retry on error
+      enabled: !!CONTRACTS.EVERMARK_NFT,
+      retry: 1,
     },
   });
 
@@ -290,7 +290,7 @@ export function useEvermarkCreation() {
     }
   }, [feeError, mintingFee]);
 
-  // ✅ FIXED: Safer prepareTransaction with validation
+  // ✅ Safer prepareTransaction with validation
   const prepareTransaction = useCallback((
     contractAddress: string, 
     abi: any[], 
@@ -354,7 +354,7 @@ export function useEvermarkCreation() {
   const createEvermark = useCallback(async (metadata: EvermarkMetadata): Promise<CreateEvermarkResult> => {
     console.log("🚀 createEvermark called with metadata:", metadata);
     
-    // ✅ FIXED: Better fee validation
+    // ✅ Better fee validation
     if (isLoadingFee) {
       const errorMsg = "Loading minting fee from contract...";
       setError(errorMsg);
@@ -400,7 +400,7 @@ export function useEvermarkCreation() {
     try {
       console.log("🚀 Starting Evermark creation process...");
       console.log("🔧 Using wallet type:", walletType);
-      console.log(" Minting fee:", mintingFee.toString(), "wei");
+      console.log("💰 Minting fee:", mintingFee.toString(), "wei");
 
       let imageUrl = "";
       let castData: CastDataSuccess | null = null;
@@ -645,7 +645,7 @@ export function useEvermarkCreation() {
     error,
     success,
     
-    // ✅ FIXED: Better fee info
+    // ✅ Better fee info
     mintingFee,
     isLoadingFee,
     feeError,

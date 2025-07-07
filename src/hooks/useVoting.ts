@@ -1,5 +1,4 @@
-// Fixed useVoting.ts - Use unified wallet provider instead of thirdweb directly
-// Replace your entire src/hooks/useVoting.ts with this:
+// Fixed useVoting.ts - Use unified wallet provider with correct ABI method names
 
 import { useState, useCallback, useMemo } from "react";
 import { useReadContract } from "thirdweb/react";
@@ -7,7 +6,7 @@ import { getContract, prepareContractCall } from "thirdweb";
 import { encodeFunctionData } from "viem";
 import { client } from "../lib/thirdweb";
 import { CHAIN, CONTRACTS, VOTING_ABI, CARD_CATALOG_ABI } from "../lib/contracts";
-import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider"; // ✅ USE UNIFIED PROVIDER
+import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider";
 import { toEther, toWei } from "thirdweb/utils";
 
 export function useVoting(evermarkId: string, userAddress?: string) {
@@ -15,7 +14,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // ✅ CRITICAL FIX: Use unified wallet providers
+  // ✅ Use unified wallet providers
   const { address: walletAddress, isConnected, requireConnection } = useWalletAuth();
   const { sendTransaction, walletType } = useWalletConnection();
   
@@ -74,7 +73,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // Get total votes for this Evermark (cycle-specific)
+  // ✅ FIXED: Use correct method name for getting votes in cycle
   const { data: totalVotes, isLoading: isLoadingTotalVotes, refetch: refetchTotalVotes } = useReadContract({
     contract: votingContract,
     method: "getEvermarkVotesInCycle",
@@ -84,7 +83,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // Get user's votes for this Evermark (cycle-specific)
+  // ✅ FIXED: Use correct method name for getting user votes in cycle
   const userVotesQuery = useReadContract({
     contract: votingContract,
     method: "getUserVotesInCycle",
@@ -128,7 +127,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     });
   }
   
-  // ✅ CRITICAL FIX: Delegate votes using unified wallet provider
+  // ✅ Delegate votes using unified wallet provider
   const delegateVotes = useCallback(async (amount: string) => {
     console.log('🗳️ Starting delegate votes process...');
     
@@ -190,7 +189,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     }
     
     try {
-      // ✅ CRITICAL FIX: Prepare transaction based on wallet type
+      // ✅ Prepare transaction based on wallet type
       let transaction;
       
       if (walletType === 'farcaster') {
@@ -275,7 +274,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     userVotesQuery
   ]);
   
-  // ✅ CRITICAL FIX: Undelegate votes using unified wallet provider
+  // ✅ Undelegate votes using unified wallet provider
   const undelegateVotes = useCallback(async (amount: string) => {
     console.log('🗳️ Starting undelegate votes process...');
     
@@ -314,7 +313,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setSuccess(null);
     
     try {
-      // ✅ CRITICAL FIX: Prepare transaction based on wallet type
+      // ✅ Prepare transaction based on wallet type
       let transaction;
       
       if (walletType === 'farcaster') {
@@ -394,6 +393,115 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     refetchVotingPower, 
     userVotesQuery
   ]);
+
+  // ✅ NEW: Batch delegate votes function
+  const delegateVotesBatch = useCallback(async (evermarkIds: string[], amounts: string[]) => {
+    console.log('🗳️ Starting batch delegate votes process...');
+    
+    if (!isConnected) {
+      const connectionResult = await requireConnection();
+      if (!connectionResult.success) {
+        const errorMsg = connectionResult.error || "Please connect your wallet";
+        setError(errorMsg);
+        return { success: false, error: errorMsg };
+      }
+    }
+    
+    if (evermarkIds.length !== amounts.length) {
+      const errorMsg = "Evermark IDs and amounts arrays must be the same length";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+    
+    if (evermarkIds.length === 0) {
+      const errorMsg = "No evermarks to vote for";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    setIsVoting(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      const evermarkIdsBigInt = evermarkIds.map(id => BigInt(id));
+      const amountsBigInt = amounts.map(amount => toWei(amount));
+      
+      // ✅ Prepare transaction based on wallet type
+      let transaction;
+      
+      if (walletType === 'farcaster') {
+        // Use viem encoding for Farcaster frames
+        const data = encodeFunctionData({
+          abi: VOTING_ABI,
+          functionName: 'delegateVotesBatch',
+          args: [evermarkIdsBigInt, amountsBigInt]
+        });
+        
+        transaction = {
+          to: CONTRACTS.VOTING as `0x${string}`,
+          data,
+        };
+      } else {
+        // Use thirdweb for desktop
+        transaction = prepareContractCall({
+          contract: votingContract,
+          method: "delegateVotesBatch",
+          params: [evermarkIdsBigInt, amountsBigInt] as const,
+        });
+      }
+      
+      console.log('📡 Sending batch vote transaction via unified provider...');
+      
+      const result = await sendTransaction(transaction);
+      
+      if (result.success) {
+        console.log("✅ Batch vote delegation successful:", result.transactionHash);
+        
+        const successMsg = `Successfully delegated votes to ${evermarkIds.length} Evermarks!`;
+        setSuccess(successMsg);
+        
+        // Refetch all relevant data
+        setTimeout(() => {
+          refetchCycle();
+          refetchTotalVotes();
+          refetchVotingPower();
+          userVotesQuery.refetch?.();
+        }, 2000);
+        
+        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+      } else {
+        throw new Error(result.error || 'Transaction failed');
+      }
+      
+    } catch (err: any) {
+      console.error("❌ Batch vote delegation failed:", err);
+      
+      let errorMsg = "Failed to delegate votes in batch";
+      if (err.message?.includes("Insufficient voting power")) {
+        errorMsg = "Insufficient voting power for batch delegation";
+      } else if (err.message?.includes("user rejected")) {
+        errorMsg = "Transaction was rejected";
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsVoting(false);
+    }
+  }, [
+    isConnected,
+    requireConnection,
+    walletType,
+    votingContract,
+    sendTransaction,
+    refetchCycle,
+    refetchTotalVotes,
+    refetchVotingPower,
+    userVotesQuery
+  ]);
   
   // Clear messages
   const clearMessages = useCallback(() => {
@@ -449,6 +557,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     // Actions
     delegateVotes,
     undelegateVotes,
+    delegateVotesBatch, // ✅ NEW: Batch voting function
     clearMessages,
     
     // Manual refresh

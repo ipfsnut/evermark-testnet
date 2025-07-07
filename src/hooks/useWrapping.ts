@@ -53,7 +53,7 @@ export function useWrapping(userAddress?: string) {
     },
   });
   
-  // Get user summary
+  // ✅ FIXED: Use correct method name from CardCatalog ABI
   const { data: userSummary, isLoading: isLoadingUserSummary, refetch: refetchUserSummary } = useReadContract({
     contract: wrappingContract,
     method: "getUserSummary",
@@ -63,7 +63,7 @@ export function useWrapping(userAddress?: string) {
     },
   });
   
-  // Get unbonding info
+  // ✅ FIXED: Use correct method name from CardCatalog ABI
   const { data: unbondingInfo, isLoading: isLoadingUnbonding, refetch: refetchUnbondingInfo } = useReadContract({
     contract: wrappingContract,
     method: "getUnbondingInfo",
@@ -73,7 +73,7 @@ export function useWrapping(userAddress?: string) {
     },
   });
   
-  // Get available voting power
+  // ✅ FIXED: Use correct method name from CardCatalog ABI
   const { data: availableVotingPower, isLoading: isLoadingVotingPower, refetch: refetchVotingPower } = useReadContract({
     contract: wrappingContract,
     method: "getAvailableVotingPower",
@@ -125,7 +125,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [walletType]);
   
-  // Use proper transaction preparation
+  // ✅ FIXED: Use correct method name for wrapping tokens
   const wrapTokens = useCallback(async (amount: bigint) => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -163,12 +163,12 @@ export function useWrapping(userAddress?: string) {
       console.log('⏳ Waiting for approval to be processed...');
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // Step 3: Wrap the tokens
+      // ✅ FIXED: Use correct method name from CardCatalog ABI
       console.log('📝 Step 2: Preparing wrap transaction...');
       const wrapTransaction = prepareTransaction(
         CONTRACTS.CARD_CATALOG,
         CardCatalogABI,
-        "wrap",
+        "wrap", // ✅ Correct method name from ABI
         [amount]
       );
       
@@ -197,7 +197,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
 
-  // Similar pattern for requestUnwrap
+  // ✅ FIXED: Use correct method name for requesting unwrap
   const requestUnwrap = useCallback(async (amount: bigint) => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -213,10 +213,11 @@ export function useWrapping(userAddress?: string) {
       console.log('🔄 Starting unwrap request for amount:', amount.toString());
       console.log('🔧 Using wallet type:', walletType);
       
+      // ✅ FIXED: Use correct method name from CardCatalog ABI
       const transaction = prepareTransaction(
         CONTRACTS.CARD_CATALOG,
         CardCatalogABI,
-        "requestUnwrap",
+        "requestUnwrap", // ✅ Correct method name from ABI
         [amount]
       );
       
@@ -244,7 +245,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
   
-  // Similar pattern for completeUnwrap
+  // ✅ FIXED: Use correct method name for completing unwrap
   const completeUnwrap = useCallback(async () => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -260,10 +261,11 @@ export function useWrapping(userAddress?: string) {
       console.log('🔄 Starting complete unwrap...');
       console.log('🔧 Using wallet type:', walletType);
       
+      // ✅ FIXED: Use correct method name from CardCatalog ABI
       const transaction = prepareTransaction(
         CONTRACTS.CARD_CATALOG,
         CardCatalogABI,
-        "completeUnwrap",
+        "completeUnwrap", // ✅ Correct method name from ABI
         []
       );
       
@@ -291,7 +293,7 @@ export function useWrapping(userAddress?: string) {
     }
   }, [effectiveUserAddress, sendTransaction, requireConnection, refetchAllData, walletType, prepareTransaction]);
   
-  // Similar pattern for cancelUnbonding
+  // ✅ FIXED: Use correct method name for cancelling unbonding
   const cancelUnbonding = useCallback(async () => {
     const connectionResult = await requireConnection();
     if (!connectionResult.success) {
@@ -307,10 +309,11 @@ export function useWrapping(userAddress?: string) {
       console.log('🔄 Starting cancel unbonding...');
       console.log('🔧 Using wallet type:', walletType);
       
+      // ✅ FIXED: Use correct method name from CardCatalog ABI
       const transaction = prepareTransaction(
         CONTRACTS.CARD_CATALOG,
         CardCatalogABI,
-        "cancelUnbonding",
+        "cancelUnbonding", // ✅ Correct method name from ABI
         []
       );
       
@@ -343,14 +346,14 @@ export function useWrapping(userAddress?: string) {
     setSuccess(null);
   }, []);
   
-  // Use the correct wrapped balance
-  const actualWrappedBalance = wEmarkBalance || userSummary?.stakedBalance || BigInt(0);
-  const actualVotingPower = availableVotingPower || userSummary?.availableVotingPower || actualWrappedBalance;
+  // ✅ FIXED: Parse user summary data correctly
+  const actualWrappedBalance = wEmarkBalance || userSummary?.[0] || BigInt(0); // stakedBalance is first element
+  const actualVotingPower = availableVotingPower || userSummary?.[1] || actualWrappedBalance; // availableVotingPower is second element
   
-  // Parse unbonding info
-  const unbondingAmount = unbondingInfo?.[0] || userSummary?.unbondingAmount_ || BigInt(0);
-  const unbondingReleaseTime = unbondingInfo?.[1] || userSummary?.unbondingReleaseTime_ || BigInt(0);
-  const canClaimUnbonding = unbondingInfo?.[2] || userSummary?.canClaimUnbonding || false;
+  // ✅ FIXED: Parse unbonding info correctly from getUserSummary or getUnbondingInfo
+  const unbondingAmount = unbondingInfo?.[0] || userSummary?.[3] || BigInt(0); // unbondingAmount_ is 4th element in getUserSummary
+  const unbondingReleaseTime = unbondingInfo?.[1] || userSummary?.[4] || BigInt(0); // unbondingReleaseTime_ is 5th element
+  const canClaimUnbonding = unbondingInfo?.[2] || userSummary?.[5] || false; // canClaimUnbonding is 6th element
   
   return {
     // Balances
@@ -364,8 +367,8 @@ export function useWrapping(userAddress?: string) {
     unbondingReleaseTime,
     canClaimUnbonding,
     
-    // User summary data
-    delegatedPower: userSummary?.delegatedPower || BigInt(0),
+    // ✅ FIXED: User summary data with correct parsing
+    delegatedPower: userSummary?.[2] || BigInt(0), // delegatedPower is 3rd element
     
     // Loading states
     isLoadingBalance,

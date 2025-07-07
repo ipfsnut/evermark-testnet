@@ -138,24 +138,15 @@ export function useEvermarks() {
           
           if (!exists) continue;
           
-          // Use the redeployed contract method names
-          const [title, creator, metadataURI] = await readContract({
+          // ✅ FIXED: Use correct method name from ABI
+          const evermarkData = await readContract({
             contract,
-            method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
+            method: "evermarkData",
             params: [BigInt(i)],
           });
           
-          const minter = await readContract({
-            contract,
-            method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
-            params: [BigInt(i)],
-          });
-          
-          const creationTime = await readContract({
-            contract,
-            method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
-            params: [BigInt(i)],
-          });
+          // ✅ FIXED: Extract fields from evermarkData tuple
+          const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
 
           // Fetch IPFS metadata including image (with proper error handling)
           const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
@@ -163,7 +154,7 @@ export function useEvermarks() {
           fetchedEvermarks.push({
             id: i.toString(),
             title,
-            author: creator, // Using creator as author
+            author: creator, // Using creator field from evermarkData
             description,
             sourceUrl,
             image,
@@ -271,24 +262,15 @@ export function useEvermarkDetail(id: string) {
           return;
         }
 
-        // Use redeployed contract method names
-        const [title, creator, metadataURI] = await readContract({
+        // ✅ FIXED: Use correct method name from ABI
+        const evermarkData = await readContract({
           contract,
-          method: "getEvermarkMetadata", // FIXED: Use redeployed contract method name
+          method: "evermarkData",
           params: [tokenId],
         });
 
-        const minter = await readContract({
-          contract,
-          method: "getEvermarkCreator", // FIXED: Use redeployed contract method name
-          params: [tokenId],
-        });
-
-        const creationTime = await readContract({
-          contract,
-          method: "getEvermarkCreationTime", // FIXED: Use redeployed contract method name
-          params: [tokenId],
-        });
+        // ✅ FIXED: Extract fields from evermarkData tuple
+        const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
 
         // Fetch IPFS metadata including image (with proper error handling)
         const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
@@ -328,6 +310,7 @@ export function useEvermarkDetail(id: string) {
 
   return { evermark, isLoading, error };
 }
+
 export function useUserEvermarks(userAddress?: string) {
   const [evermarks, setEvermarks] = useState<Evermark[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -355,9 +338,6 @@ export function useUserEvermarks(userAddress?: string) {
       }
 
       console.log('🔍 useUserEvermarks starting fetch for:', userAddress);
-
-      // REMOVED: Aggressive caching that was preventing updates
-      // The caching was causing the hook to skip fetches even when the component remounted
 
       try {
         setIsLoading(true);
@@ -435,24 +415,15 @@ export function useUserEvermarks(userAddress?: string) {
 
             console.log(`✅ Token ${i} is owned by user, fetching metadata...`);
 
-            // FIXED: Use correct method names
-            const [title, creator, metadataURI] = await readContract({
+            // ✅ FIXED: Use correct method name from ABI
+            const evermarkData = await readContract({
               contract,
-              method: "getEvermarkMetadata", // ✅ Correct method name
+              method: "evermarkData",
               params: [BigInt(i)],
             });
 
-            const minter = await readContract({
-              contract,
-              method: "getEvermarkCreator", // ✅ Correct method name
-              params: [BigInt(i)],
-            });
-
-            const creationTime = await readContract({
-              contract,
-              method: "getEvermarkCreationTime", // ✅ Correct method name
-              params: [BigInt(i)],
-            });
+            // ✅ FIXED: Extract fields from evermarkData tuple
+            const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
 
             console.log(`📖 Token ${i} metadata:`, { title, creator, metadataURI });
 

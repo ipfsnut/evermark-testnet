@@ -115,32 +115,41 @@ export function useLeaderboard(weekNumber?: number) {
         
         console.log(`🔍 Fetching leaderboard for week ${targetWeek}...`);
         
-        // STRATEGY 1: Try to get finalized leaderboard data first
+        // ✅ FIXED: Try the correct leaderboard methods first
         let leaderboardData;
         try {
+          // ✅ Method 1: Try getting from LiveLeaderboard contract
           leaderboardData = await readContract({
-            contract: votingContract, // Use voting contract since it has the method
-            method: "getTopEvermarksInCycle", // ✅ Updated method name
-            params: [BigInt(targetWeek), BigInt(10)], // Get top 10
+            contract: leaderboardContract,
+            method: "getLeaderboard",
+            params: [BigInt(targetWeek), BigInt(1), BigInt(10)], // cycle, startRank, count
           });
-          console.log("✅ Found finalized leaderboard data:", leaderboardData);
+          console.log("✅ Found leaderboard data from LiveLeaderboard:", leaderboardData);
         } catch (leaderboardError) {
-          console.log("⚠️ No finalized leaderboard data, building from live voting data...");
+          console.log("⚠️ LiveLeaderboard not available, trying voting contract...");
           
-          // STRATEGY 2: Fallback - Build leaderboard from current voting data
           try {
-            console.log("📋 Fetching evermarks with votes for cycle:", targetWeek);
-            const evermarksWithVotes = await readContract({
+            // ✅ Method 2: Try getting from Voting contract using correct method
+            leaderboardData = await readContract({
               contract: votingContract,
-              method: "getEvermarksWithVotesInCycle", // ✅ Updated method name
+              method: "getLeaderboard",
+              params: [BigInt(targetWeek)],
+            });
+            console.log("✅ Found leaderboard data from Voting contract:", leaderboardData);
+          } catch (votingError) {
+            console.log("⚠️ No finalized leaderboard data, building from active evermarks...");
+            
+            // ✅ Method 3: Get active evermarks and build leaderboard
+            const activeEvermarksData = await readContract({
+              contract: votingContract,
+              method: "getActiveEvermarksInCycle",
               params: [BigInt(targetWeek)],
             });
             
-            console.log("📋 Evermarks with votes result:", evermarksWithVotes);
-            console.log("📋 Type:", typeof evermarksWithVotes, "Length:", evermarksWithVotes?.length);
+            console.log("📋 Active evermarks result:", activeEvermarksData);
             
-            if (!evermarksWithVotes || evermarksWithVotes.length === 0) {
-              console.log("📭 No evermarks with votes found for cycle", targetWeek);
+            if (!activeEvermarksData || !activeEvermarksData[0] || activeEvermarksData[0].length === 0) {
+              console.log("📭 No active evermarks found for cycle", targetWeek);
               if (isMounted) {
                 setEntries([]);
                 setIsLoading(false);
@@ -148,50 +157,18 @@ export function useLeaderboard(weekNumber?: number) {
               return;
             }
             
-            // Get vote counts for each evermark
-            console.log("🔢 Fetching vote counts for", evermarksWithVotes.length, "evermarks...");
-            const evermarkVoteData = await Promise.all(
-              evermarksWithVotes.map(async (evermarkId: bigint) => {
-                try {
-                  console.log("🗳️ Fetching votes for evermark:", evermarkId.toString());
-                  const votes = await readContract({
-                    contract: votingContract,
-                    method: "getEvermarkVotesInCycle", // ✅ Updated method name
-                    params: [BigInt(targetWeek), evermarkId],
-                  });
-                  
-                  console.log("📊 Evermark", evermarkId.toString(), "has", votes.toString(), "votes");
-                  return {
-                    tokenId: evermarkId,
-                    votes: votes,
-                    rank: BigInt(0),
-                  };
-                } catch (err) {
-                  console.error(`❌ Error fetching votes for evermark ${evermarkId}:`, err);
-                  return null;
-                }
-              })
-            );
+            const [evermarkIds, votes] = activeEvermarksData;
             
-            // Filter out failed requests and sort by votes
-            leaderboardData = evermarkVoteData
-              .filter(data => data !== null)
-              .sort((a, b) => Number(b.votes - a.votes))
-              .slice(0, 10) // Top 10
-              .map((data, index) => ({
-                ...data,
-                rank: BigInt(index + 1),
-              }));
+            // Build leaderboard from active evermarks
+            leaderboardData = evermarkIds.map((id: bigint, index: number) => ({
+              evermarkId: id,
+              votes: votes[index],
+              rank: index + 1,
+            }))
+            .sort((a: any, b: any) => Number(b.votes - a.votes)) // Sort by votes descending
+            .slice(0, 10); // Top 10
             
-            console.log("📈 Built leaderboard from voting data:", leaderboardData.length, "entries");
-          } catch (votingError) {
-            console.error("❌ Error fetching voting data:", votingError);
-            if (isMounted) {
-              const errorMessage = votingError instanceof Error ? votingError.message : 'Unknown voting error';
-              setError(`Failed to fetch voting data: ${errorMessage}`);
-              setIsLoading(false);
-            }
-            return;
+            console.log("📈 Built leaderboard from active evermarks:", leaderboardData.length, "entries");
           }
         }
         
@@ -207,79 +184,72 @@ export function useLeaderboard(weekNumber?: number) {
         // Get complete Evermark metadata
         console.log("🎨 Enhancing", leaderboardData.length, "entries with complete metadata...");
         const enhancedEntries = await Promise.all(
-          leaderboardData.map(async (evermark: any) => {
+          leaderboardData.map(async (item: any, index: number) => {
             try {
-              console.log("🔍 Processing evermark:", evermark.tokenId.toString());
+              // Handle different data structures
+              const evermarkId = item.evermarkId || item.tokenId || item.evermarkId;
+              const votes = item.votes || BigInt(0);
+              const rank = item.rank || index + 1;
+              
+              console.log("🔍 Processing evermark:", evermarkId.toString());
               
               // Check if evermark exists
               const exists = await readContract({
                 contract: evermarkContract,
                 method: "exists",
-                params: [evermark.tokenId],
+                params: [evermarkId],
               });
               
               if (!exists) {
-                console.log(`⚠️ Evermark ${evermark.tokenId} does not exist`);
+                console.log(`⚠️ Evermark ${evermarkId} does not exist`);
                 return null;
               }
               
-              // Get metadata using correct deployed contract method names
-              console.log("📖 Fetching metadata for evermark:", evermark.tokenId.toString());
-              const [title, author, metadataURI] = await readContract({
+              // ✅ FIXED: Use correct method name from ABI
+              const evermarkData = await readContract({
                 contract: evermarkContract,
-                method: "getEvermarkMetadata", // ✅ NFT contract uses "evermark" method names
-                params: [evermark.tokenId],
+                method: "evermarkData",
+                params: [evermarkId],
               });
               
-              console.log("📝 Evermark metadata:", { title, author, metadataURI });
+              // ✅ FIXED: Extract fields from evermarkData tuple
+              const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
               
-              // Get creator address
-              const creator = await readContract({
-                contract: evermarkContract,
-                method: "getEvermarkCreator", // ✅ NFT contract uses "evermark" method names
-                params: [evermark.tokenId],
-              });
-              
-              // Get creation time
-              const creationTime = await readContract({
-                contract: evermarkContract,
-                method: "getEvermarkCreationTime", // ✅ NFT contract uses "evermark" method names
-                params: [evermark.tokenId],
-              });
+              console.log("📝 Evermark metadata:", { title, creator, metadataURI });
               
               // Fetch IPFS metadata for description, image, etc.
               console.log("🌐 Fetching IPFS metadata for:", metadataURI);
               const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
               
-              console.log(`✅ Enhanced evermark ${evermark.tokenId}:`, { 
-                title, author, creator, 
+              console.log(`✅ Enhanced evermark ${evermarkId}:`, { 
+                title, creator, minter, 
                 hasDescription: !!description, 
                 hasImage: !!image,
-                votes: evermark.votes.toString()
+                votes: votes.toString()
               });
               
               return {
                 evermark: {
-                  id: evermark.tokenId.toString(),
-                  title: title || `Evermark #${evermark.tokenId}`,
-                  author: author || "Unknown",
-                  creator: creator,
+                  id: evermarkId.toString(),
+                  title: title || `Evermark #${evermarkId}`,
+                  author: creator || "Unknown",
+                  creator: minter,
                   description,
                   sourceUrl,
                   image,
                   metadataURI,
                   creationTime: Number(creationTime) * 1000, // Convert to milliseconds
                 },
-                votes: evermark.votes,
-                rank: Number(evermark.rank),
+                votes: votes,
+                rank: Number(rank),
               };
             } catch (err) {
-              console.error(`❌ Error fetching metadata for token ${evermark.tokenId}:`, err);
+              console.error(`❌ Error fetching metadata for token ${item.evermarkId || item.tokenId}:`, err);
               // Return basic entry even if metadata fails
               return {
                 evermark: {
-                  id: evermark.tokenId.toString(),
-                  title: `Evermark #${evermark.tokenId}`,
+                  id: (item.evermarkId || item.tokenId).toString(),
+                  title: `Evermark #${item.evermarkId || item.tokenId}`,
                   author: "Unknown",
                   creator: "0x0",
                   description: "",
@@ -288,8 +258,8 @@ export function useLeaderboard(weekNumber?: number) {
                   metadataURI: "",
                   creationTime: Date.now(),
                 },
-                votes: evermark.votes,
-                rank: Number(evermark.rank),
+                votes: item.votes || BigInt(0),
+                rank: item.rank || 1,
               };
             }
           })
@@ -352,8 +322,8 @@ export function useLeaderboardManagement() {
   
   const { mutate: sendTransaction } = useSendTransaction();
   
-  // Function to finalize weekly leaderboard (admin only)
-  const finalizeWeeklyLeaderboard = useCallback(async (weekNumber: number) => {
+  // ✅ FIXED: Use correct method names for leaderboard management
+  const updateLeaderboard = useCallback(async (cycle: number, evermarkId: number) => {
     setIsProcessing(true);
     setError(null);
     setSuccess(null);
@@ -361,18 +331,45 @@ export function useLeaderboardManagement() {
     try {
       const transaction = prepareContractCall({
         contract: leaderboardContract,
-        method: "finalizeWeeklyLeaderboard", // This might stay the same since it's about the leaderboard itself
-        params: [BigInt(weekNumber)],
+        method: "updateEvermarkInLeaderboard",
+        params: [BigInt(cycle), BigInt(evermarkId)],
       });
       
       await sendTransaction(transaction as any);
       
-      const successMsg = `Successfully finalized leaderboard for week ${weekNumber}`;
+      const successMsg = `Successfully updated leaderboard for Evermark ${evermarkId} in cycle ${cycle}`;
       setSuccess(successMsg);
       return { success: true, message: successMsg };
     } catch (err: any) {
-      console.error("Error finalizing leaderboard:", err);
-      const errorMsg = err instanceof Error ? err.message : "Failed to finalize leaderboard";
+      console.error("Error updating leaderboard:", err);
+      const errorMsg = err instanceof Error ? err.message : "Failed to update leaderboard";
+      setError(errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [leaderboardContract, sendTransaction]);
+  
+  const batchUpdateLeaderboard = useCallback(async (cycle: number, evermarkIds: number[]) => {
+    setIsProcessing(true);
+    setError(null);
+    setSuccess(null);
+    
+    try {
+      const transaction = prepareContractCall({
+        contract: leaderboardContract,
+        method: "batchUpdateLeaderboard",
+        params: [BigInt(cycle), evermarkIds.map(id => BigInt(id))],
+      });
+      
+      await sendTransaction(transaction as any);
+      
+      const successMsg = `Successfully batch updated leaderboard for ${evermarkIds.length} evermarks in cycle ${cycle}`;
+      setSuccess(successMsg);
+      return { success: true, message: successMsg };
+    } catch (err: any) {
+      console.error("Error batch updating leaderboard:", err);
+      const errorMsg = err instanceof Error ? err.message : "Failed to batch update leaderboard";
       setError(errorMsg);
       return { success: false, error: errorMsg };
     } finally {
@@ -381,7 +378,8 @@ export function useLeaderboardManagement() {
   }, [leaderboardContract, sendTransaction]);
   
   return {
-    finalizeWeeklyLeaderboard,
+    updateLeaderboard,
+    batchUpdateLeaderboard,
     isProcessing,
     error,
     success,
