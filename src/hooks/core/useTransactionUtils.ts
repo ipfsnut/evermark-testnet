@@ -1,6 +1,7 @@
-// src/hooks/core/useTransactionUtils.ts - Enhanced unified transaction handling
+// src/hooks/core/useTransactionUtils.ts - Fixed ThirdWeb v5 implementation
 import { useState, useCallback, useMemo } from "react";
-import { getContract, prepareContractCall } from "thirdweb";
+import { getContract, prepareContractCall, prepareTransaction } from "thirdweb";
+import { useSendTransaction } from "thirdweb/react";
 import { encodeFunctionData } from "viem";
 import { client } from "../../lib/thirdweb";
 import { CHAIN } from "../../lib/contracts";
@@ -41,8 +42,8 @@ export interface EstimateGasResult {
 }
 
 /**
- * Enhanced unified transaction utilities for all contract interactions
- * Supports both Farcaster frames and desktop wallets with improved error handling
+ * Enhanced unified transaction utilities optimized for ThirdWeb v5
+ * Supports both Farcaster frames and desktop wallets with proper error handling
  */
 export function useTransactionUtils() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -51,13 +52,20 @@ export function useTransactionUtils() {
   const [lastTransactionHash, setLastTransactionHash] = useState<string>();
   
   const { requireConnection, address } = useWalletAuth();
-  const { sendTransaction, walletType } = useWalletConnection();
+  const { sendTransaction: legacySendTransaction, walletType } = useWalletConnection();
   const { parseError, isUserRejection } = useContractErrors();
+  
+  // ThirdWeb v5 transaction hook - this is the main hook we'll use
+  const { 
+    mutate: sendTransactionMutate, 
+    mutateAsync: sendTransactionAsync, 
+    isPending: isThirdWebPending 
+  } = useSendTransaction();
 
   /**
-   * Enhanced transaction preparation with gas estimation
+   * Prepare a contract call using ThirdWeb v5 patterns
    */
-  const prepareTransaction = useCallback((
+  const prepareContractCallV5 = useCallback((
     contractAddress: string,
     abi: any[],
     functionName: string,
@@ -68,6 +76,80 @@ export function useTransactionUtils() {
       throw new Error("Invalid transaction parameters");
     }
 
+    try {
+      const contract = getContract({
+        client,
+        chain: CHAIN,
+        address: contractAddress,
+        abi,
+      });
+      
+      const callOptions: any = {
+        contract,
+        method: functionName,
+        params,
+      };
+
+      // Add optional parameters
+      if (options.value) {
+        callOptions.value = BigInt(options.value);
+      }
+      
+      // Note: ThirdWeb v5 handles gas estimation automatically
+      // We don't need to manually set gas unless specifically required
+      
+      return prepareContractCall(callOptions);
+    } catch (error) {
+      console.error("❌ Failed to prepare contract call:", error);
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Prepare transaction for Farcaster compatibility (fallback)
+   */
+  const prepareFarcasterTransaction = useCallback((
+    contractAddress: string,
+    abi: any[],
+    functionName: string,
+    params: any[],
+    options: TransactionOptions = {}
+  ) => {
+    try {
+      const data = encodeFunctionData({
+        abi,
+        functionName,
+        args: params,
+      });
+      
+      const transaction: any = {
+        to: contractAddress as `0x${string}`,
+        data,
+      };
+
+      // Add optional transaction parameters
+      if (options.value) transaction.value = BigInt(options.value);
+      if (options.gasLimit) transaction.gas = options.gasLimit;
+      if (options.maxFeePerGas) transaction.maxFeePerGas = options.maxFeePerGas;
+      if (options.maxPriorityFeePerGas) transaction.maxPriorityFeePerGas = options.maxPriorityFeePerGas;
+      
+      return transaction;
+    } catch (error) {
+      console.error("❌ Failed to prepare Farcaster transaction:", error);
+      throw error;
+    }
+  }, []);
+
+  /**
+   * Enhanced transaction preparation with proper ThirdWeb v5 support
+   */
+  const prepareTransaction = useCallback((
+    contractAddress: string,
+    abi: any[],
+    functionName: string,
+    params: any[],
+    options: TransactionOptions = {}
+  ) => {
     console.log("🔧 Preparing transaction:", {
       contractAddress: contractAddress.slice(0, 10) + "...",
       functionName,
@@ -76,62 +158,23 @@ export function useTransactionUtils() {
       walletType,
     });
 
-    try {
-      if (walletType === 'farcaster') {
-        // Use Viem for Farcaster (Wagmi)
-        const data = encodeFunctionData({
-          abi,
-          functionName,
-          args: params,
-        });
-        
-        const transaction: any = {
-          to: contractAddress as `0x${string}`,
-          data,
-        };
-
-        // Add optional transaction parameters
-        if (options.value) transaction.value = BigInt(options.value);
-        if (options.gasLimit) transaction.gas = options.gasLimit;
-        if (options.maxFeePerGas) transaction.maxFeePerGas = options.maxFeePerGas;
-        if (options.maxPriorityFeePerGas) transaction.maxPriorityFeePerGas = options.maxPriorityFeePerGas;
-        
-        return transaction;
-      } else {
-        // Use Thirdweb for desktop
-        const contract = getContract({
-          client,
-          chain: CHAIN,
-          address: contractAddress,
-          abi,
-        });
-        
-        const callOptions: any = {
-          method: functionName,
-          params,
-        };
-
-        // Add optional parameters
-        if (options.value) callOptions.value = BigInt(options.value);
-        if (options.gasLimit) callOptions.gas = options.gasLimit;
-        
-        return prepareContractCall(contract, callOptions);
-      }
-    } catch (error) {
-      console.error("❌ Transaction preparation failed:", error);
-      throw error;
+    // Always prefer ThirdWeb v5 method unless specifically Farcaster
+    if (walletType === 'farcaster') {
+      return prepareFarcasterTransaction(contractAddress, abi, functionName, params, options);
+    } else {
+      return prepareContractCallV5(contractAddress, abi, functionName, params, options);
     }
-  }, [walletType]);
+  }, [walletType, legacySendTransaction, prepareContractCallV5, prepareFarcasterTransaction]);
 
   /**
-   * Estimate gas for a transaction
+   * Enhanced gas estimation for ThirdWeb v5
    */
   const estimateGas = useCallback(async (
-    contractAddress: string,
-    abi: any[],
-    functionName: string,
-    params: any[],
-    options: TransactionOptions = {}
+    _contractAddress: string, // Prefixed with _ to indicate intentionally unused
+    _abi: any[],
+    _functionName: string,
+    _params: any[],
+    _options: TransactionOptions = {}
   ): Promise<EstimateGasResult> => {
     try {
       // Connection check
@@ -140,8 +183,7 @@ export function useTransactionUtils() {
         throw new Error(connectionResult.error || "Wallet not connected");
       }
 
-      // For now, return conservative estimates
-      // In a full implementation, you'd use the wallet's gas estimation
+      // ThirdWeb v5 handles gas estimation internally, so we provide conservative estimates
       const gasLimit = BigInt(300000); // Conservative default
       const maxFeePerGas = BigInt(30000000000); // 30 gwei
       const maxPriorityFeePerGas = BigInt(2000000000); // 2 gwei
@@ -167,7 +209,7 @@ export function useTransactionUtils() {
   }, [requireConnection]);
 
   /**
-   * Execute a transaction with comprehensive error handling and state management
+   * Execute a transaction with proper ThirdWeb v5 patterns
    */
   const executeTransaction = useCallback(async (
     contractAddress: string,
@@ -201,26 +243,49 @@ export function useTransactionUtils() {
         options
       );
 
-      console.log('📡 Sending transaction via unified provider...');
+      console.log('📡 Sending transaction...');
       
-      // Execute the transaction
-      const result = await sendTransaction(transaction);
-      
-      if (result.success && result.transactionHash) {
-        console.log("✅ Transaction successful:", result.transactionHash);
+      // Execute the transaction based on wallet type
+      if (walletType === 'farcaster') {
+        // Use legacy method for Farcaster compatibility
+        const result = await legacySendTransaction(transaction);
         
-        const message = options.successMessage || `Successfully executed ${functionName}`;
-        setSuccess(message);
-        setLastTransactionHash(result.transactionHash);
-        
-        return {
-          success: true,
-          transactionHash: result.transactionHash,
-          message,
-          receipt: result.receipt
-        };
+        if (result.success && result.transactionHash) {
+          console.log("✅ Transaction successful (Farcaster):", result.transactionHash);
+          
+          const message = options.successMessage || `Successfully executed ${functionName}`;
+          setSuccess(message);
+          setLastTransactionHash(result.transactionHash);
+          
+          return {
+            success: true,
+            transactionHash: result.transactionHash,
+            message,
+            // Note: Farcaster legacy method doesn't return receipt
+          };
+        } else {
+          throw new Error(result.error || 'Transaction failed');
+        }
       } else {
-        throw new Error(result.error || 'Transaction failed');
+        // Use ThirdWeb v5 for other wallets
+        const result = await sendTransactionAsync(transaction);
+        
+        if (result.transactionHash) {
+          console.log("✅ Transaction successful (ThirdWeb v5):", result.transactionHash);
+          
+          const message = options.successMessage || `Successfully executed ${functionName}`;
+          setSuccess(message);
+          setLastTransactionHash(result.transactionHash);
+          
+          return {
+            success: true,
+            transactionHash: result.transactionHash,
+            message,
+            receipt: result
+          };
+        } else {
+          throw new Error('Transaction failed - no hash returned');
+        }
       }
       
     } catch (err: any) {
@@ -245,10 +310,18 @@ export function useTransactionUtils() {
     } finally {
       setIsProcessing(false);
     }
-  }, [requireConnection, sendTransaction, prepareTransaction, parseError, address]);
+  }, [
+    requireConnection, 
+    sendTransactionAsync, 
+    legacySendTransaction, 
+    prepareTransaction, 
+    parseError, 
+    address, 
+    walletType
+  ]);
 
   /**
-   * Execute multiple transactions in batch
+   * Execute multiple transactions in sequence with enhanced error handling
    */
   const executeBatchTransactions = useCallback(async (
     transactions: Array<{
@@ -362,6 +435,47 @@ export function useTransactionUtils() {
   }, [executeTransaction, isUserRejection, parseError, address]);
 
   /**
+   * Send a pre-prepared transaction (useful for advanced use cases)
+   */
+  const sendPreparedTransaction = useCallback(async (
+    preparedTransaction: any,
+    successMessage?: string
+  ): Promise<TransactionResult> => {
+    setIsProcessing(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const result = await sendTransactionAsync(preparedTransaction);
+      
+      if (result.transactionHash) {
+        const message = successMessage || "Transaction successful";
+        setSuccess(message);
+        setLastTransactionHash(result.transactionHash);
+        
+        return {
+          success: true,
+          transactionHash: result.transactionHash,
+          message,
+          receipt: result
+        };
+      } else {
+        throw new Error('Transaction failed - no hash returned');
+      }
+    } catch (error: any) {
+      const parsedError = parseError(error);
+      setError(parsedError.message);
+      
+      return {
+        success: false,
+        error: parsedError.message
+      };
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [sendTransactionAsync, parseError]);
+
+  /**
    * Clear error and success messages
    */
   const clearMessages = useCallback(() => {
@@ -380,17 +494,7 @@ export function useTransactionUtils() {
   }, []);
 
   /**
-   * Get current transaction state
-   */
-  const transactionState: TransactionState = useMemo(() => ({
-    isProcessing,
-    error,
-    success,
-    lastTransactionHash
-  }), [isProcessing, error, success, lastTransactionHash]);
-
-  /**
-   * Enhanced transaction status checker
+   * Check transaction status (mock implementation)
    */
   const checkTransactionStatus = useCallback(async (txHash: string) => {
     try {
@@ -411,16 +515,28 @@ export function useTransactionUtils() {
     }
   }, []);
 
+  /**
+   * Get current transaction state
+   */
+  const transactionState: TransactionState = useMemo(() => ({
+    isProcessing: isProcessing || isThirdWebPending,
+    error,
+    success,
+    lastTransactionHash
+  }), [isProcessing, isThirdWebPending, error, success, lastTransactionHash]);
+
   return {
     // Core transaction functions
     executeTransaction,
     executeBatchTransactions,
     retryTransaction,
     prepareTransaction,
+    prepareContractCallV5,
+    sendPreparedTransaction,
     estimateGas,
     
     // State management
-    isProcessing,
+    isProcessing: isProcessing || isThirdWebPending,
     error,
     success,
     lastTransactionHash,
@@ -437,6 +553,11 @@ export function useTransactionUtils() {
     
     // Enhanced capabilities
     canExecuteTransactions: !!address,
+    
+    // ThirdWeb v5 specific
+    sendTransactionAsync,
+    sendTransactionMutate,
+    isThirdWebV5Available: !!sendTransactionAsync,
     
     // Legacy compatibility
     parseTransactionError: parseError,

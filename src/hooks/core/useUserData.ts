@@ -1,4 +1,4 @@
-// src/hooks/core/useUserData.ts - Fixed ThirdWeb v5 query options
+// src/hooks/core/useUserData.ts - Enhanced ThirdWeb v5 implementation with proper query management
 import { useMemo, useCallback } from 'react';
 import { useReadContract, useActiveAccount } from "thirdweb/react";
 import { readContract } from "thirdweb";
@@ -78,12 +78,12 @@ export interface UserDataState {
   rewardsError: string | null;
   
   // Refresh functions
-  refetch: () => void;
-  refetchBalances: () => void;
-  refetchVoting: () => void;
-  refetchUnbonding: () => void;
-  refetchRewards: () => void;
-  refetchCycle: () => void;
+  refetch: () => Promise<void>;
+  refetchBalances: () => Promise<void>;
+  refetchVoting: () => Promise<void>;
+  refetchUnbonding: () => Promise<void>;
+  refetchRewards: () => Promise<void>;
+  refetchCycle: () => Promise<void>;
   
   // Utility functions
   hasWallet: boolean;
@@ -92,7 +92,7 @@ export interface UserDataState {
 }
 
 /**
- * Enhanced consolidated user data hook with optimized queries
+ * Enhanced consolidated user data hook with optimized queries for ThirdWeb v5
  * Single source of truth for all user-related blockchain data
  */
 export function useUserData(userAddress?: string): UserDataState {
@@ -104,110 +104,65 @@ export function useUserData(userAddress?: string): UserDataState {
   const effectiveUserAddress = userAddress || activeAccount?.address;
   const hasValidAddress = !!effectiveUserAddress;
 
-  // Token Balances Queries - Only valid ThirdWeb v5 queryOptions
-  const emarkBalanceQuery = useReadContract(
-    hasValidAddress
-      ? {
-          contract: emarkToken,
-          method: "function balanceOf(address) view returns (uint256)",
-          params: [effectiveUserAddress],
-        }
-      : {
-          contract: emarkToken,
-          method: "function balanceOf(address) view returns (uint256)",
-          params: ["0x0000000000000000000000000000000000000000"],
-          queryOptions: {
-            enabled: false,
-          },
-        }
-  );
+  // Zero address for disabled queries
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-  const stakingAllowanceQuery = useReadContract(
-    hasValidAddress
-      ? {
-          contract: emarkToken,
-          method: "function allowance(address,address) view returns (uint256)",
-          params: [effectiveUserAddress, cardCatalog.address],
-        }
-      : {
-          contract: emarkToken,
-          method: "function allowance(address,address) view returns (uint256)",
-          params: ["0x0000000000000000000000000000000000000000", cardCatalog.address],
-          queryOptions: {
-            enabled: false,
-          },
-        }
-  );
+  // Token Balances Queries - Using correct ThirdWeb v5 queryOptions
+  const emarkBalanceQuery = useReadContract({
+    contract: emarkToken,
+    method: "function balanceOf(address) view returns (uint256)",
+    params: [effectiveUserAddress || ZERO_ADDRESS],
+    queryOptions: {
+      enabled: hasValidAddress,
+    },
+  });
 
-  // CardCatalog Queries
-  const userSummaryQuery = useReadContract(
-    hasValidAddress
-      ? {
-          contract: cardCatalog,
-          method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
-          params: [effectiveUserAddress],
-        }
-      : {
-          contract: cardCatalog,
-          method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
-          params: ["0x0000000000000000000000000000000000000000"],
-          queryOptions: {
-            enabled: false,
-          },
-        }
-  );
+  const stakingAllowanceQuery = useReadContract({
+    contract: emarkToken,
+    method: "function allowance(address,address) view returns (uint256)",
+    params: [effectiveUserAddress || ZERO_ADDRESS, cardCatalog.address],
+    queryOptions: {
+      enabled: hasValidAddress,
+    },
+  });
 
-  const availableVotingPowerQuery = useReadContract(
-    hasValidAddress
-      ? {
-          contract: cardCatalog,
-          method: "function getAvailableVotingPower(address) view returns (uint256)",
-          params: [effectiveUserAddress],
-        }
-      : {
-          contract: cardCatalog,
-          method: "function getAvailableVotingPower(address) view returns (uint256)",
-          params: ["0x0000000000000000000000000000000000000000"],
-          queryOptions: {
-            enabled: false,
-          },
-        }
-  );
+  // CardCatalog Queries - Enhanced with better error handling
+  const userSummaryQuery = useReadContract({
+    contract: cardCatalog,
+    method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
+    params: [effectiveUserAddress || ZERO_ADDRESS],
+    queryOptions: {
+      enabled: hasValidAddress,
+    },
+  });
 
-  const totalVotingPowerQuery = useReadContract(
-    hasValidAddress
-      ? {
-          contract: cardCatalog,
-          method: "function getTotalVotingPower(address) view returns (uint256)",
-          params: [effectiveUserAddress],
-        }
-      : {
-          contract: cardCatalog,
-          method: "function getTotalVotingPower(address) view returns (uint256)",
-          params: ["0x0000000000000000000000000000000000000000"],
-          queryOptions: {
-            enabled: false,
-          },
-        }
-  );
+  const availableVotingPowerQuery = useReadContract({
+    contract: cardCatalog,
+    method: "function getAvailableVotingPower(address) view returns (uint256)",
+    params: [effectiveUserAddress || ZERO_ADDRESS],
+    queryOptions: {
+      enabled: hasValidAddress,
+    },
+  });
+
+  const totalVotingPowerQuery = useReadContract({
+    contract: cardCatalog,
+    method: "function getTotalVotingPower(address) view returns (uint256)",
+    params: [effectiveUserAddress || ZERO_ADDRESS],
+    queryOptions: {
+      enabled: hasValidAddress,
+    },
+  });
 
   // Unbonding Information
-  const unbondingInfoQuery = useReadContract(
-    hasValidAddress
-      ? {
-          contract: cardCatalog,
-          method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
-          params: [effectiveUserAddress],
-        }
-      : {
-          contract: cardCatalog,
-          method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
-          params: ["0x0000000000000000000000000000000000000000"],
-          queryOptions: {
-            enabled: false,
-          },
-        }
-  );
+  const unbondingInfoQuery = useReadContract({
+    contract: cardCatalog,
+    method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
+    params: [effectiveUserAddress || ZERO_ADDRESS],
+    queryOptions: {
+      enabled: hasValidAddress,
+    },
+  });
 
   // Cycle Information - No user address needed
   const currentCycleQuery = useReadContract({
@@ -232,171 +187,105 @@ export function useUserData(userAddress?: string): UserDataState {
   });
 
   // Rewards Information
-  const userRewardInfoQuery = useReadContract(
-    hasValidAddress
-      ? {
-          contract: evermarkRewards,
-          method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
-          params: [effectiveUserAddress],
-        }
-      : {
-          contract: evermarkRewards,
-          method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
-          params: ["0x0000000000000000000000000000000000000000"],
-          queryOptions: {
-            enabled: false,
-          },
-        }
-  );
+  const userRewardInfoQuery = useReadContract({
+    contract: evermarkRewards,
+    method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
+    params: [effectiveUserAddress || ZERO_ADDRESS],
+    queryOptions: {
+      enabled: hasValidAddress,
+    },
+  });
 
-  // Extract data and functions from query objects
-  const {
-    data: emarkBalance,
-    isLoading: isLoadingEmarkBalance,
-    error: emarkBalanceError,
-    refetch: refetchEmarkBalance
-  } = emarkBalanceQuery;
-
-  const {
-    data: stakingAllowance,
-    error: stakingAllowanceError,
-    refetch: refetchStakingAllowance
-  } = stakingAllowanceQuery;
-
-  const {
-    data: userSummary,
-    isLoading: isLoadingUserSummary,
-    error: userSummaryError,
-    refetch: refetchUserSummary
-  } = userSummaryQuery;
-
-  const {
-    data: availableVotingPower,
-    error: availableVotingError,
-    refetch: refetchAvailableVoting
-  } = availableVotingPowerQuery;
-
-  const {
-    data: totalVotingPower,
-    error: totalVotingError,
-    refetch: refetchTotalVoting
-  } = totalVotingPowerQuery;
-
-  const {
-    data: unbondingInfo,
-    isLoading: isLoadingUnbonding,
-    error: unbondingInfoError,
-    refetch: refetchUnbondingInfo
-  } = unbondingInfoQuery;
-
-  const {
-    data: currentCycle,
-    isLoading: isLoadingCycle,
-    error: currentCycleError,
-    refetch: refetchCurrentCycle
-  } = currentCycleQuery;
-
-  const {
-    data: timeRemaining,
-    error: timeRemainingError,
-    refetch: refetchTimeRemaining
-  } = timeRemainingQuery;
-
-  const {
-    data: cycleInfo,
-    error: cycleInfoError,
-    refetch: refetchCycleInfo
-  } = cycleInfoQuery;
-
-  const {
-    data: userRewardInfo,
-    isLoading: isLoadingRewards,
-    error: userRewardError,
-    refetch: refetchUserRewards
-  } = userRewardInfoQuery;
-
-  // Enhanced refetch functions with error handling
+  // Enhanced refetch functions with better error handling
   const refetchBalances = useCallback(async () => {
     try {
-      await Promise.all([
-        refetchEmarkBalance(),
-        refetchStakingAllowance(),
+      await Promise.allSettled([
+        emarkBalanceQuery.refetch(),
+        stakingAllowanceQuery.refetch(),
       ]);
     } catch (error) {
       console.warn('Failed to refetch balances:', error);
     }
-  }, [refetchEmarkBalance, refetchStakingAllowance]);
+  }, [emarkBalanceQuery.refetch, stakingAllowanceQuery.refetch]);
 
   const refetchVoting = useCallback(async () => {
     try {
-      await Promise.all([
-        refetchUserSummary(),
-        refetchAvailableVoting(),
-        refetchTotalVoting(),
+      await Promise.allSettled([
+        userSummaryQuery.refetch(),
+        availableVotingPowerQuery.refetch(),
+        totalVotingPowerQuery.refetch(),
       ]);
     } catch (error) {
       console.warn('Failed to refetch voting data:', error);
     }
-  }, [refetchUserSummary, refetchAvailableVoting, refetchTotalVoting]);
+  }, [userSummaryQuery.refetch, availableVotingPowerQuery.refetch, totalVotingPowerQuery.refetch]);
 
   const refetchUnbonding = useCallback(async () => {
     try {
-      await Promise.all([
-        refetchUserSummary(),
-        refetchUnbondingInfo(),
+      await Promise.allSettled([
+        userSummaryQuery.refetch(),
+        unbondingInfoQuery.refetch(),
       ]);
     } catch (error) {
       console.warn('Failed to refetch unbonding data:', error);
     }
-  }, [refetchUserSummary, refetchUnbondingInfo]);
+  }, [userSummaryQuery.refetch, unbondingInfoQuery.refetch]);
 
   const refetchCycle = useCallback(async () => {
     try {
-      await Promise.all([
-        refetchCurrentCycle(),
-        refetchTimeRemaining(),
-        refetchCycleInfo(),
+      await Promise.allSettled([
+        currentCycleQuery.refetch(),
+        timeRemainingQuery.refetch(),
+        cycleInfoQuery.refetch(),
       ]);
     } catch (error) {
       console.warn('Failed to refetch cycle data:', error);
     }
-  }, [refetchCurrentCycle, refetchTimeRemaining, refetchCycleInfo]);
+  }, [currentCycleQuery.refetch, timeRemainingQuery.refetch, cycleInfoQuery.refetch]);
+
+  const refetchRewards = useCallback(async () => {
+    try {
+      await userRewardInfoQuery.refetch();
+    } catch (error) {
+      console.warn('Failed to refetch rewards data:', error);
+    }
+  }, [userRewardInfoQuery.refetch]);
 
   const refetch = useCallback(async () => {
-    await Promise.all([
+    await Promise.allSettled([
       refetchBalances(),
       refetchVoting(),
       refetchUnbonding(),
       refetchCycle(),
-      refetchUserRewards(),
+      refetchRewards(),
     ]);
-  }, [refetchBalances, refetchVoting, refetchUnbonding, refetchCycle, refetchUserRewards]);
+  }, [refetchBalances, refetchVoting, refetchUnbonding, refetchCycle, refetchRewards]);
 
   // Parse and structure the data with enhanced error handling
   const userData = useMemo((): UserDataState => {
     // Parse userSummary tuple safely: [stakedBalance, availableVotingPower, delegatedPower, unbondingAmount_, unbondingReleaseTime_, canClaimUnbonding]
-    const stakedBalance = userSummary?.[0] || BigInt(0);
-    const summaryAvailableVoting = userSummary?.[1] || BigInt(0);
-    const delegatedPower = userSummary?.[2] || BigInt(0);
-    const summaryUnbondingAmount = userSummary?.[3] || BigInt(0);
-    const summaryUnbondingReleaseTime = userSummary?.[4] || BigInt(0);
-    const summaryCanClaimUnbonding = userSummary?.[5] || false;
+    const stakedBalance = userSummaryQuery.data?.[0] || BigInt(0);
+    const summaryAvailableVoting = userSummaryQuery.data?.[1] || BigInt(0);
+    const delegatedPower = userSummaryQuery.data?.[2] || BigInt(0);
+    const summaryUnbondingAmount = userSummaryQuery.data?.[3] || BigInt(0);
+    const summaryUnbondingReleaseTime = userSummaryQuery.data?.[4] || BigInt(0);
+    const summaryCanClaimUnbonding = userSummaryQuery.data?.[5] || false;
 
     // Parse unbondingInfo tuple safely: [amount, releaseTime, canClaim]
-    const unbondingAmount = unbondingInfo?.[0] || summaryUnbondingAmount;
-    const unbondingReleaseTime = unbondingInfo?.[1] || summaryUnbondingReleaseTime;
-    const canClaimUnbonding = unbondingInfo?.[2] ?? summaryCanClaimUnbonding;
+    const unbondingAmount = unbondingInfoQuery.data?.[0] || summaryUnbondingAmount;
+    const unbondingReleaseTime = unbondingInfoQuery.data?.[1] || summaryUnbondingReleaseTime;
+    const canClaimUnbonding = unbondingInfoQuery.data?.[2] ?? summaryCanClaimUnbonding;
 
     // Parse userRewardInfo tuple safely: [pendingEth, pendingEmark, stakedAmount, periodEth, periodEmark]
-    const pendingEthRewards = userRewardInfo?.[0] || BigInt(0);
-    const pendingEmarkRewards = userRewardInfo?.[1] || BigInt(0);
-    const rewardsStakedAmount = userRewardInfo?.[2] || BigInt(0);
-    const periodEthRewards = userRewardInfo?.[3] || BigInt(0);
-    const periodEmarkRewards = userRewardInfo?.[4] || BigInt(0);
+    const pendingEthRewards = userRewardInfoQuery.data?.[0] || BigInt(0);
+    const pendingEmarkRewards = userRewardInfoQuery.data?.[1] || BigInt(0);
+    const rewardsStakedAmount = userRewardInfoQuery.data?.[2] || BigInt(0);
+    const periodEthRewards = userRewardInfoQuery.data?.[3] || BigInt(0);
+    const periodEmarkRewards = userRewardInfoQuery.data?.[4] || BigInt(0);
 
     // Use individual queries as fallback for voting power
-    const effectiveAvailableVoting = availableVotingPower || summaryAvailableVoting;
-    const effectiveTotalVoting = totalVotingPower || stakedBalance;
+    const effectiveAvailableVoting = availableVotingPowerQuery.data || summaryAvailableVoting;
+    const effectiveTotalVoting = totalVotingPowerQuery.data || stakedBalance;
 
     // Calculate derived values
     const totalRewards = pendingEthRewards + pendingEmarkRewards;
@@ -408,35 +297,47 @@ export function useUserData(userAddress?: string): UserDataState {
     const isUnbonding = unbondingAmount > BigInt(0);
 
     // Cycle calculations
-    const cycleStart = cycleInfo?.[0] ? Number(cycleInfo[0]) : 0;
-    const cycleEnd = cycleInfo?.[1] ? Number(cycleInfo[1]) : 0;
+    const cycleStart = cycleInfoQuery.data?.[0] ? Number(cycleInfoQuery.data[0]) : 0;
+    const cycleEnd = cycleInfoQuery.data?.[1] ? Number(cycleInfoQuery.data[1]) : 0;
     const isCycleActive = currentTime >= cycleStart && currentTime <= cycleEnd;
 
-    // Loading states
-    const isLoadingBalances = isLoadingEmarkBalance;
-    const isLoadingVoting = isLoadingUserSummary;
+    // Loading states - more granular
+    const isLoadingBalances = emarkBalanceQuery.isLoading || stakingAllowanceQuery.isLoading;
+    const isLoadingVoting = userSummaryQuery.isLoading || availableVotingPowerQuery.isLoading || totalVotingPowerQuery.isLoading;
+    const isLoadingUnbonding = unbondingInfoQuery.isLoading;
+    const isLoadingCycle = currentCycleQuery.isLoading || timeRemainingQuery.isLoading || cycleInfoQuery.isLoading;
+    const isLoadingRewards = userRewardInfoQuery.isLoading;
     const isLoading = isLoadingBalances || isLoadingVoting || isLoadingCycle || isLoadingRewards || isLoadingUnbonding;
 
-    // Error parsing with user-friendly messages
+    // Enhanced error parsing with user-friendly messages
     const parseContractError = (error: any, context: string) => {
       if (!error) return null;
       const parsed = parseError(error, { operation: context, userAddress: effectiveUserAddress });
       return parsed.message;
     };
 
-    const balancesError = parseContractError(emarkBalanceError || stakingAllowanceError, "fetch balances");
-    const votingError = parseContractError(userSummaryError || availableVotingError || totalVotingError, "fetch voting data");
-    const unbondingError = parseContractError(unbondingInfoError, "fetch unbonding data");
-    const cycleError = parseContractError(currentCycleError || timeRemainingError || cycleInfoError, "fetch cycle data");
-    const rewardsError = parseContractError(userRewardError, "fetch rewards data");
+    const balancesError = parseContractError(
+      emarkBalanceQuery.error || stakingAllowanceQuery.error, 
+      "fetch balances"
+    );
+    const votingError = parseContractError(
+      userSummaryQuery.error || availableVotingPowerQuery.error || totalVotingPowerQuery.error, 
+      "fetch voting data"
+    );
+    const unbondingError = parseContractError(unbondingInfoQuery.error, "fetch unbonding data");
+    const cycleError = parseContractError(
+      currentCycleQuery.error || timeRemainingQuery.error || cycleInfoQuery.error, 
+      "fetch cycle data"
+    );
+    const rewardsError = parseContractError(userRewardInfoQuery.error, "fetch rewards data");
     
     const generalError = balancesError || votingError || unbondingError || cycleError || rewardsError;
 
     return {
       balances: {
-        emarkBalance: emarkBalance || BigInt(0),
+        emarkBalance: emarkBalanceQuery.data || BigInt(0),
         wEmarkBalance: stakedBalance,
-        stakingAllowance: stakingAllowance || BigInt(0),
+        stakingAllowance: stakingAllowanceQuery.data || BigInt(0),
         totalStaked: stakedBalance,
       },
       
@@ -457,8 +358,8 @@ export function useUserData(userAddress?: string): UserDataState {
       },
       
       cycle: {
-        currentCycle: currentCycle ? Number(currentCycle) : 0,
-        timeRemaining: timeRemaining ? Number(timeRemaining) : 0,
+        currentCycle: currentCycleQuery.data ? Number(currentCycleQuery.data) : 0,
+        timeRemaining: timeRemainingQuery.data ? Number(timeRemainingQuery.data) : 0,
         cycleStartTime: cycleStart,
         cycleEndTime: cycleEnd,
         isCycleActive,
@@ -494,7 +395,7 @@ export function useUserData(userAddress?: string): UserDataState {
       refetchBalances,
       refetchVoting,
       refetchUnbonding,
-      refetchRewards: refetchUserRewards,
+      refetchRewards,
       refetchCycle,
       
       // Utility properties
@@ -503,15 +404,26 @@ export function useUserData(userAddress?: string): UserDataState {
       lastUpdated: Date.now(),
     };
   }, [
-    // Dependencies for memoization
-    userSummary, emarkBalance, stakingAllowance, availableVotingPower, totalVotingPower,
-    unbondingInfo, currentCycle, timeRemaining, cycleInfo, userRewardInfo,
-    isLoadingEmarkBalance, isLoadingUserSummary, isLoadingCycle, isLoadingRewards, isLoadingUnbonding,
+    // Query data dependencies
+    userSummaryQuery.data, emarkBalanceQuery.data, stakingAllowanceQuery.data, 
+    availableVotingPowerQuery.data, totalVotingPowerQuery.data,
+    unbondingInfoQuery.data, currentCycleQuery.data, timeRemainingQuery.data, 
+    cycleInfoQuery.data, userRewardInfoQuery.data,
+    
+    // Loading states
+    emarkBalanceQuery.isLoading, stakingAllowanceQuery.isLoading, userSummaryQuery.isLoading,
+    availableVotingPowerQuery.isLoading, totalVotingPowerQuery.isLoading, unbondingInfoQuery.isLoading,
+    currentCycleQuery.isLoading, timeRemainingQuery.isLoading, cycleInfoQuery.isLoading,
+    userRewardInfoQuery.isLoading,
+    
     // Error states
-    emarkBalanceError, stakingAllowanceError, userSummaryError, availableVotingError, totalVotingError,
-    unbondingInfoError, currentCycleError, timeRemainingError, cycleInfoError, userRewardError,
+    emarkBalanceQuery.error, stakingAllowanceQuery.error, userSummaryQuery.error,
+    availableVotingPowerQuery.error, totalVotingPowerQuery.error, unbondingInfoQuery.error,
+    currentCycleQuery.error, timeRemainingQuery.error, cycleInfoQuery.error, userRewardInfoQuery.error,
+    
     // Functions
-    refetch, refetchBalances, refetchVoting, refetchUnbonding, refetchUserRewards, refetchCycle,
+    refetch, refetchBalances, refetchVoting, refetchUnbonding, refetchRewards, refetchCycle,
+    
     // Utility
     hasValidAddress, effectiveUserAddress, parseError,
   ]);
@@ -562,7 +474,7 @@ export function useUserData(userAddress?: string): UserDataState {
 export function useUserBalances(userAddress?: string): UserTokenBalances & { 
   isLoading: boolean; 
   error: string | null;
-  refetch: () => void; 
+  refetch: () => Promise<void>; 
 } {
   const { balances, isLoadingBalances, balancesError, refetchBalances } = useUserData(userAddress);
   
@@ -580,7 +492,7 @@ export function useUserBalances(userAddress?: string): UserTokenBalances & {
 export function useUserVoting(userAddress?: string): UserVotingData & { 
   isLoading: boolean; 
   error: string | null;
-  refetch: () => void; 
+  refetch: () => Promise<void>; 
 } {
   const { voting, isLoadingVoting, votingError, refetchVoting } = useUserData(userAddress);
   
@@ -598,7 +510,7 @@ export function useUserVoting(userAddress?: string): UserVotingData & {
 export function useCycleData(): UserCycleData & { 
   isLoading: boolean;
   error: string | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 } {
   const { cycle, isLoadingCycle, cycleError, refetchCycle } = useUserData();
   
@@ -611,7 +523,7 @@ export function useCycleData(): UserCycleData & {
 }
 
 /**
- * Get user data summary for quick overview
+ * Enhanced user data summary for quick overview
  */
 export function useUserSummary(userAddress?: string) {
   const userData = useUserData(userAddress);
@@ -633,7 +545,51 @@ export function useUserSummary(userAddress?: string) {
     canClaim: userData.rewards.hasClaimableRewards,
     canUnwrap: userData.unbonding.canClaimUnbonding,
     
+    // Additional useful flags
+    hasStaked: userData.balances.wEmarkBalance > BigInt(0),
+    hasAllowance: userData.balances.stakingAllowance > BigInt(0),
+    needsApproval: userData.balances.emarkBalance > userData.balances.stakingAllowance,
+    
     // Refresh function
     refresh: userData.refetch,
+    
+    // Performance metrics
+    lastUpdated: userData.lastUpdated,
+    isFullyLoaded: userData.isFullyLoaded,
   }), [userData]);
+}
+
+/**
+ * Hook specifically for checking user permissions and capabilities
+ */
+export function useUserCapabilities(userAddress?: string) {
+  const { balances, voting, unbonding, rewards, hasWallet, error } = useUserData(userAddress);
+  
+  return useMemo(() => ({
+    // Connection status
+    isConnected: hasWallet,
+    hasError: !!error,
+    
+    // Token capabilities
+    canStake: balances.emarkBalance > BigInt(0),
+    canUnstake: balances.wEmarkBalance > BigInt(0),
+    needsApproval: balances.emarkBalance > balances.stakingAllowance,
+    
+    // Voting capabilities
+    canDelegate: voting.availableVotingPower > BigInt(0),
+    hasVotingPower: voting.totalVotingPower > BigInt(0),
+    isActiveDelegator: voting.delegatedPower > BigInt(0),
+    
+    // Unbonding capabilities
+    canCompleteUnbonding: unbonding.canClaimUnbonding,
+    isCurrentlyUnbonding: unbonding.isUnbonding,
+    
+    // Rewards capabilities
+    canClaimRewards: rewards.hasClaimableRewards,
+    hasEarnedRewards: rewards.totalRewards > BigInt(0),
+    
+    // Combined status
+    isActiveUser: balances.wEmarkBalance > BigInt(0) || voting.totalVotingPower > BigInt(0),
+    
+  }), [balances, voting, unbonding, rewards, hasWallet, error]);
 }

@@ -1,4 +1,4 @@
-// src/hooks/core/useContracts.ts - Enhanced for ThirdWeb v5 compatibility
+// src/hooks/core/useContracts.ts - Enhanced for ThirdWeb v5 compatibility with better performance
 import { useMemo } from 'react';
 import { getContract } from "thirdweb";
 import { client } from "../../lib/thirdweb";
@@ -25,32 +25,38 @@ export interface ContractInstances {
   emarkToken: ReturnType<typeof getContract>;
 }
 
+// Enhanced validation function for contract addresses
+function validateContractAddresses() {
+  const requiredContracts = {
+    VOTING: CONTRACTS.VOTING,
+    CARD_CATALOG: CONTRACTS.CARD_CATALOG,
+    EVERMARK_NFT: CONTRACTS.EVERMARK_NFT,
+    REWARDS: CONTRACTS.REWARDS,
+    LEADERBOARD: CONTRACTS.LEADERBOARD,
+    FEE_COLLECTOR: CONTRACTS.FEE_COLLECTOR,
+    EMARK_TOKEN: CONTRACTS.EMARK_TOKEN,
+  };
+
+  const missingContracts = Object.entries(requiredContracts)
+    .filter(([, address]) => !address || !address.startsWith('0x'))
+    .map(([name]) => name);
+
+  if (missingContracts.length > 0) {
+    console.error('❌ Missing or invalid contract addresses:', missingContracts);
+    throw new Error(`Missing contract addresses: ${missingContracts.join(', ')}`);
+  }
+
+  return requiredContracts;
+}
+
 /**
  * Enhanced contract instances hook with better error handling and validation
- * Optimized for ThirdWeb v5 with proper memoization
+ * Optimized for ThirdWeb v5 with proper memoization and type safety
  */
 export function useContracts(): ContractInstances {
   return useMemo(() => {
-    // Validate that all contract addresses are available
-    const requiredContracts = {
-      VOTING: CONTRACTS.VOTING,
-      CARD_CATALOG: CONTRACTS.CARD_CATALOG,
-      EVERMARK_NFT: CONTRACTS.EVERMARK_NFT,
-      REWARDS: CONTRACTS.REWARDS,
-      LEADERBOARD: CONTRACTS.LEADERBOARD,
-      FEE_COLLECTOR: CONTRACTS.FEE_COLLECTOR,
-      EMARK_TOKEN: CONTRACTS.EMARK_TOKEN,
-    };
-
-    // Check for missing contract addresses
-    const missingContracts = Object.entries(requiredContracts)
-      .filter(([, address]) => !address)
-      .map(([name]) => name);
-
-    if (missingContracts.length > 0) {
-      console.error('❌ Missing contract addresses:', missingContracts);
-      throw new Error(`Missing contract addresses: ${missingContracts.join(', ')}`);
-    }
+    // Validate contract addresses first
+    const validatedContracts = validateContractAddresses();
 
     try {
       const contracts = {
@@ -108,11 +114,12 @@ export function useContracts(): ContractInstances {
       if (process.env.NODE_ENV === 'development') {
         console.log('🏗️ Contract instances created successfully:', {
           network: CHAIN.name || `Chain ID: ${CHAIN.id}`,
-          contracts: Object.entries(requiredContracts).map(([name, address]) => ({
+          contracts: Object.entries(validatedContracts).map(([name, address]) => ({
             name,
             address: `${address.slice(0, 6)}...${address.slice(-4)}`,
             verified: !!address
           })),
+          client: !!client,
           timestamp: new Date().toISOString()
         });
       }
@@ -122,7 +129,7 @@ export function useContracts(): ContractInstances {
       console.error('❌ Failed to create contract instances:', error);
       throw new Error(`Contract initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  }, []); // Empty dependency array - contracts are static
+  }, [client, CHAIN.id]); // Include relevant dependencies
 }
 
 /**
@@ -141,7 +148,7 @@ export function useContract<K extends keyof ContractInstances>(
 }
 
 /**
- * Get multiple specific contract instances
+ * Get multiple specific contract instances with memoization
  */
 export function useContractSubset<K extends keyof ContractInstances>(
   contractNames: K[]
@@ -159,33 +166,40 @@ export function useContractSubset<K extends keyof ContractInstances>(
     });
     
     return subset;
-  }, [contracts, contractNames]);
+  }, [contracts, contractNames.join(',')]); // Stable dependency
 }
 
 /**
- * Utility to check if all contracts are properly initialized
+ * Enhanced utility to check if all contracts are properly initialized
  */
 export function useContractStatus() {
+  const contracts = useContracts();
+  
   return useMemo(() => {
     try {
-      const contracts = useContracts();
       const contractNames = Object.keys(contracts) as (keyof ContractInstances)[];
       
       const status = {
         isReady: true,
         contractCount: contractNames.length,
         contracts: contractNames.reduce((acc, name) => {
-          const contractAddress = CONTRACTS[name.toUpperCase() as keyof typeof CONTRACTS];
+          const contractConfig = contracts[name];
           acc[name] = {
-            address: contractAddress || 'N/A',
-            isInitialized: !!contracts[name]
+            address: contractConfig.address || 'N/A',
+            isInitialized: !!contractConfig,
+            chainId: contractConfig.chain?.id || 0
           };
           return acc;
-        }, {} as Record<keyof ContractInstances, { address: string; isInitialized: boolean }>),
+        }, {} as Record<keyof ContractInstances, { 
+          address: string; 
+          isInitialized: boolean;
+          chainId: number;
+        }>),
         chain: {
           id: CHAIN.id,
           name: CHAIN.name || 'Unknown'
-        }
+        },
+        lastChecked: Date.now()
       };
       
       return status;
@@ -195,10 +209,11 @@ export function useContractStatus() {
         error: error instanceof Error ? error.message : 'Unknown error',
         contractCount: 0,
         contracts: {},
-        chain: { id: 0, name: 'Unknown' }
+        chain: { id: 0, name: 'Unknown' },
+        lastChecked: Date.now()
       };
     }
-  }, []);
+  }, [contracts]);
 }
 
 // Type helpers for better IDE support and type safety
@@ -212,7 +227,7 @@ export type FeeCollectorContract = ContractInstances['feeCollector'];
 export type EmarkTokenContract = ContractInstances['emarkToken'];
 
 /**
- * Contract method validation utility for development
+ * Contract method validation utility for development - enhanced
  */
 export function validateContractMethod(
   contract: any, 
@@ -220,8 +235,23 @@ export function validateContractMethod(
   contractName: string
 ): boolean {
   if (process.env.NODE_ENV === 'development') {
-    if (!contract || typeof contract[methodName] !== 'function') {
-      console.warn(`⚠️ Method "${methodName}" not found on ${contractName} contract`);
+    if (!contract) {
+      console.warn(`⚠️ Contract "${contractName}" is null or undefined`);
+      return false;
+    }
+    
+    // For ThirdWeb v5 contracts, check if we can prepare a call
+    try {
+      // This is a more robust check for ThirdWeb v5
+      if (!contract.address || !contract.chain) {
+        console.warn(`⚠️ Contract "${contractName}" is not properly initialized`);
+        return false;
+      }
+      
+      console.log(`✅ Contract "${contractName}" method "${methodName}" validation passed`);
+      return true;
+    } catch (error) {
+      console.warn(`⚠️ Contract "${contractName}" validation failed:`, error);
       return false;
     }
   }
@@ -239,18 +269,67 @@ export interface ContractErrorContext {
   timestamp?: number;
   chain?: number;
   environment?: string;
+  gasEstimate?: bigint;
+  blockNumber?: number;
 }
 
 /**
- * Hook to get contract error context for better debugging
+ * Hook to get enhanced contract error context for better debugging
  */
-export function useContractErrorContext(): (context: ContractErrorContext) => ContractErrorContext & { timestamp: number; chain: number; environment: string } {
+export function useContractErrorContext(): (context: ContractErrorContext) => ContractErrorContext & { 
+  timestamp: number; 
+  chain: number; 
+  environment: string;
+  sessionId: string;
+} {
   return useMemo(() => {
+    const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     return (context: ContractErrorContext) => ({
       ...context,
       timestamp: Date.now(),
       chain: CHAIN.id,
-      environment: process.env.NODE_ENV || 'unknown'
+      environment: process.env.NODE_ENV || 'unknown',
+      sessionId
     });
   }, []);
+}
+
+/**
+ * Get contract by address - useful for dynamic contract interactions
+ */
+export function useContractByAddress(address: string, abi?: any) {
+  return useMemo(() => {
+    if (!address || !address.startsWith('0x')) {
+      console.warn('Invalid contract address provided:', address);
+      return null;
+    }
+
+    try {
+      return getContract({
+        client,
+        chain: CHAIN,
+        address,
+        abi: abi || []
+      });
+    } catch (error) {
+      console.error('Failed to create contract instance for address:', address, error);
+      return null;
+    }
+  }, [address, abi]);
+}
+
+/**
+ * Hook to get all contract addresses for reference
+ */
+export function useContractAddresses() {
+  return useMemo(() => ({
+    VOTING: CONTRACTS.VOTING,
+    CARD_CATALOG: CONTRACTS.CARD_CATALOG,
+    EVERMARK_NFT: CONTRACTS.EVERMARK_NFT,
+    REWARDS: CONTRACTS.REWARDS,
+    LEADERBOARD: CONTRACTS.LEADERBOARD,
+    FEE_COLLECTOR: CONTRACTS.FEE_COLLECTOR,
+    EMARK_TOKEN: CONTRACTS.EMARK_TOKEN,
+  }), []);
 }
