@@ -1,4 +1,4 @@
-// src/hooks/core/useUserData.ts - Enhanced with better query optimization
+// src/hooks/core/useUserData.ts - Fixed ThirdWeb v5 query options
 import { useMemo, useCallback } from 'react';
 import { useReadContract, useActiveAccount } from "thirdweb/react";
 import { readContract } from "thirdweb";
@@ -104,131 +104,150 @@ export function useUserData(userAddress?: string): UserDataState {
   const effectiveUserAddress = userAddress || activeAccount?.address;
   const hasValidAddress = !!effectiveUserAddress;
 
-  // Shared query options for better performance
-  const baseQueryOptions = useMemo(() => ({
-    enabled: hasValidAddress,
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // 1 minute
-  }), [hasValidAddress]);
+  // Token Balances Queries - Only valid ThirdWeb v5 queryOptions
+  const emarkBalanceQuery = useReadContract(
+    hasValidAddress
+      ? {
+          contract: emarkToken,
+          method: "function balanceOf(address) view returns (uint256)",
+          params: [effectiveUserAddress],
+        }
+      : {
+          contract: emarkToken,
+          method: "function balanceOf(address) view returns (uint256)",
+          params: ["0x0000000000000000000000000000000000000000"],
+          queryOptions: {
+            enabled: false,
+          },
+        }
+  );
 
-  const fastQueryOptions = useMemo(() => ({
-    ...baseQueryOptions,
-    staleTime: 15000, // 15 seconds for frequently changing data
-    refetchInterval: 30000, // 30 seconds
-  }), [baseQueryOptions]);
+  const stakingAllowanceQuery = useReadContract(
+    hasValidAddress
+      ? {
+          contract: emarkToken,
+          method: "function allowance(address,address) view returns (uint256)",
+          params: [effectiveUserAddress, cardCatalog.address],
+        }
+      : {
+          contract: emarkToken,
+          method: "function allowance(address,address) view returns (uint256)",
+          params: ["0x0000000000000000000000000000000000000000", cardCatalog.address],
+          queryOptions: {
+            enabled: false,
+          },
+        }
+  );
 
-  // Token Balances Queries - Using correct ThirdWeb v5 syntax
-  const emarkBalanceQuery = useReadContract({
-    contract: emarkToken,
-    method: "function balanceOf(address) view returns (uint256)",
-    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
-    queryOptions: {
-      enabled: hasValidAddress,
-      staleTime: 30000,
-      refetchInterval: 60000,
-    },
-  });
+  // CardCatalog Queries
+  const userSummaryQuery = useReadContract(
+    hasValidAddress
+      ? {
+          contract: cardCatalog,
+          method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
+          params: [effectiveUserAddress],
+        }
+      : {
+          contract: cardCatalog,
+          method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
+          params: ["0x0000000000000000000000000000000000000000"],
+          queryOptions: {
+            enabled: false,
+          },
+        }
+  );
 
-  const stakingAllowanceQuery = useReadContract({
-    contract: emarkToken,
-    method: "function allowance(address,address) view returns (uint256)",
-    params: effectiveUserAddress ? [effectiveUserAddress, cardCatalog.address] : undefined,
-    queryOptions: {
-      enabled: hasValidAddress,
-      staleTime: 30000,
-      refetchInterval: 60000,
-    },
-  });
+  const availableVotingPowerQuery = useReadContract(
+    hasValidAddress
+      ? {
+          contract: cardCatalog,
+          method: "function getAvailableVotingPower(address) view returns (uint256)",
+          params: [effectiveUserAddress],
+        }
+      : {
+          contract: cardCatalog,
+          method: "function getAvailableVotingPower(address) view returns (uint256)",
+          params: ["0x0000000000000000000000000000000000000000"],
+          queryOptions: {
+            enabled: false,
+          },
+        }
+  );
 
-  // CardCatalog Queries - getUserSummary for efficiency
-  const userSummaryQuery = useReadContract({
-    contract: cardCatalog,
-    method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
-    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
-    queryOptions: {
-      enabled: hasValidAddress,
-      staleTime: 15000,
-      refetchInterval: 30000,
-    },
-  });
-
-  // Individual CardCatalog queries as fallbacks
-  const availableVotingPowerQuery = useReadContract({
-    contract: cardCatalog,
-    method: "function getAvailableVotingPower(address) view returns (uint256)",
-    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
-    queryOptions: {
-      enabled: hasValidAddress,
-      staleTime: 15000,
-      refetchInterval: 30000,
-    },
-  });
-
-  const totalVotingPowerQuery = useReadContract({
-    contract: cardCatalog,
-    method: "function getTotalVotingPower(address) view returns (uint256)",
-    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
-    queryOptions: {
-      enabled: hasValidAddress,
-      staleTime: 15000,
-      refetchInterval: 30000,
-    },
-  });
+  const totalVotingPowerQuery = useReadContract(
+    hasValidAddress
+      ? {
+          contract: cardCatalog,
+          method: "function getTotalVotingPower(address) view returns (uint256)",
+          params: [effectiveUserAddress],
+        }
+      : {
+          contract: cardCatalog,
+          method: "function getTotalVotingPower(address) view returns (uint256)",
+          params: ["0x0000000000000000000000000000000000000000"],
+          queryOptions: {
+            enabled: false,
+          },
+        }
+  );
 
   // Unbonding Information
-  const unbondingInfoQuery = useReadContract({
-    contract: cardCatalog,
-    method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
-    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
-    queryOptions: {
-      enabled: hasValidAddress,
-      staleTime: 30000,
-      refetchInterval: 60000,
-    },
-  });
+  const unbondingInfoQuery = useReadContract(
+    hasValidAddress
+      ? {
+          contract: cardCatalog,
+          method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
+          params: [effectiveUserAddress],
+        }
+      : {
+          contract: cardCatalog,
+          method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
+          params: ["0x0000000000000000000000000000000000000000"],
+          queryOptions: {
+            enabled: false,
+          },
+        }
+  );
 
-  // Cycle Information
+  // Cycle Information - No user address needed
   const currentCycleQuery = useReadContract({
     contract: voting,
     method: "function getCurrentCycle() view returns (uint256)",
     params: [],
-    queryOptions: {
-      staleTime: 60000,
-      refetchInterval: 120000,
-    },
   });
 
   const timeRemainingQuery = useReadContract({
     contract: voting,
     method: "function getTimeRemainingInCurrentCycle() view returns (uint256)",
     params: [],
-    queryOptions: {
-      staleTime: 30000,
-      refetchInterval: 60000,
-    },
   });
 
   const cycleInfoQuery = useReadContract({
     contract: voting,
     method: "function getCycleInfo(uint256) view returns (uint256,uint256,uint256,uint256,bool,uint256)",
-    params: currentCycleQuery.data ? [currentCycleQuery.data] : [BigInt(1)],
+    params: [currentCycleQuery.data || BigInt(1)],
     queryOptions: {
       enabled: !!currentCycleQuery.data,
-      staleTime: 60000,
     },
   });
 
   // Rewards Information
-  const userRewardInfoQuery = useReadContract({
-    contract: evermarkRewards,
-    method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
-    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
-    queryOptions: {
-      enabled: hasValidAddress,
-      staleTime: 30000,
-      refetchInterval: 60000,
-    },
-  });
+  const userRewardInfoQuery = useReadContract(
+    hasValidAddress
+      ? {
+          contract: evermarkRewards,
+          method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
+          params: [effectiveUserAddress],
+        }
+      : {
+          contract: evermarkRewards,
+          method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
+          params: ["0x0000000000000000000000000000000000000000"],
+          queryOptions: {
+            enabled: false,
+          },
+        }
+  );
 
   // Extract data and functions from query objects
   const {
@@ -401,7 +420,7 @@ export function useUserData(userAddress?: string): UserDataState {
     // Error parsing with user-friendly messages
     const parseContractError = (error: any, context: string) => {
       if (!error) return null;
-      const parsed = parseError(error, { operation: context, userAddress });
+      const parsed = parseError(error, { operation: context, userAddress: effectiveUserAddress });
       return parsed.message;
     };
 
@@ -494,13 +513,13 @@ export function useUserData(userAddress?: string): UserDataState {
     // Functions
     refetch, refetchBalances, refetchVoting, refetchUnbonding, refetchUserRewards, refetchCycle,
     // Utility
-    hasValidAddress, userAddress, parseError,
+    hasValidAddress, effectiveUserAddress, parseError,
   ]);
 
   // Enhanced debug logging for development
   if (process.env.NODE_ENV === 'development' && hasValidAddress) {
     console.log('📊 UserData state:', {
-      userAddress: userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` : null,
+      userAddress: effectiveUserAddress ? `${effectiveUserAddress.slice(0, 6)}...${effectiveUserAddress.slice(-4)}` : null,
       balances: {
         emark: userData.balances.emarkBalance.toString(),
         wEmark: userData.balances.wEmarkBalance.toString(),
