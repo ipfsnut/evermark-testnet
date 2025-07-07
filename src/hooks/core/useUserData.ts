@@ -1,6 +1,7 @@
-// src/hooks/core/useUserData.ts - Enhanced consolidated user queries with better error handling
+// src/hooks/core/useUserData.ts - Enhanced with better query optimization
 import { useMemo, useCallback } from 'react';
-import { useReadContract } from "thirdweb/react";
+import { useReadContract, useActiveAccount } from "thirdweb/react";
+import { readContract } from "thirdweb";
 import { useContracts } from './useContracts';
 import { useContractErrors } from './useContractErrors';
 
@@ -91,200 +92,265 @@ export interface UserDataState {
 }
 
 /**
- * Enhanced consolidated user data hook with better error handling and performance
+ * Enhanced consolidated user data hook with optimized queries
  * Single source of truth for all user-related blockchain data
  */
 export function useUserData(userAddress?: string): UserDataState {
   const { cardCatalog, emarkToken, voting, evermarkRewards } = useContracts();
   const { parseError } = useContractErrors();
+  const activeAccount = useActiveAccount();
   
-  // Normalize user address
-  const effectiveUserAddress = userAddress || "0x0000000000000000000000000000000000000000";
-  const hasValidAddress = !!userAddress;
+  // Use provided address or active account address
+  const effectiveUserAddress = userAddress || activeAccount?.address;
+  const hasValidAddress = !!effectiveUserAddress;
 
-  // Token Balances Queries - Fixed with correct ThirdWeb v5 syntax
-  const { 
-    data: emarkBalance, 
-    isLoading: isLoadingEmarkBalance, 
-    error: emarkBalanceError,
-    refetch: refetchEmarkBalance 
-  } = useReadContract({
-    contract: emarkToken,
-    method: "balanceOf",
-    params: [effectiveUserAddress] as const,
-    queryOptions: { 
-      enabled: hasValidAddress,
-      staleTime: 30000, // 30 seconds
-      refetchInterval: 60000, // 1 minute
-    },
-  });
+  // Shared query options for better performance
+  const baseQueryOptions = useMemo(() => ({
+    enabled: hasValidAddress,
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // 1 minute
+  }), [hasValidAddress]);
 
-  const { 
-    data: stakingAllowance, 
-    error: stakingAllowanceError,
-    refetch: refetchStakingAllowance 
-  } = useReadContract({
+  const fastQueryOptions = useMemo(() => ({
+    ...baseQueryOptions,
+    staleTime: 15000, // 15 seconds for frequently changing data
+    refetchInterval: 30000, // 30 seconds
+  }), [baseQueryOptions]);
+
+  // Token Balances Queries - Using correct ThirdWeb v5 syntax
+  const emarkBalanceQuery = useReadContract({
     contract: emarkToken,
-    method: "allowance",
-    params: [effectiveUserAddress, cardCatalog.address] as const,
-    queryOptions: { 
+    method: "function balanceOf(address) view returns (uint256)",
+    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
+    queryOptions: {
       enabled: hasValidAddress,
       staleTime: 30000,
+      refetchInterval: 60000,
     },
   });
 
-  // CardCatalog Queries - Fixed with correct ThirdWeb v5 syntax and method names
-  const { 
-    data: userSummary, 
-    isLoading: isLoadingUserSummary, 
-    error: userSummaryError,
-    refetch: refetchUserSummary 
-  } = useReadContract({
-    contract: cardCatalog,
-    method: "getUserSummary",
-    params: [effectiveUserAddress] as const,
-    queryOptions: { 
+  const stakingAllowanceQuery = useReadContract({
+    contract: emarkToken,
+    method: "function allowance(address,address) view returns (uint256)",
+    params: effectiveUserAddress ? [effectiveUserAddress, cardCatalog.address] : undefined,
+    queryOptions: {
       enabled: hasValidAddress,
-      staleTime: 15000, // 15 seconds for more frequent updates
-      refetchInterval: 30000, // 30 seconds
+      staleTime: 30000,
+      refetchInterval: 60000,
     },
   });
 
-  // Individual CardCatalog queries for fallback data
-  const { 
-    data: availableVotingPower, 
-    error: availableVotingError,
-    refetch: refetchAvailableVoting 
-  } = useReadContract({
+  // CardCatalog Queries - getUserSummary for efficiency
+  const userSummaryQuery = useReadContract({
     contract: cardCatalog,
-    method: "getAvailableVotingPower",
-    params: [effectiveUserAddress] as const,
-    queryOptions: { 
+    method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
+    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
+    queryOptions: {
       enabled: hasValidAddress,
       staleTime: 15000,
+      refetchInterval: 30000,
     },
   });
 
-  const { 
-    data: totalVotingPower, 
-    error: totalVotingError,
-    refetch: refetchTotalVoting 
-  } = useReadContract({
+  // Individual CardCatalog queries as fallbacks
+  const availableVotingPowerQuery = useReadContract({
     contract: cardCatalog,
-    method: "getTotalVotingPower",
-    params: [effectiveUserAddress] as const,
-    queryOptions: { 
+    method: "function getAvailableVotingPower(address) view returns (uint256)",
+    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
+    queryOptions: {
       enabled: hasValidAddress,
       staleTime: 15000,
+      refetchInterval: 30000,
+    },
+  });
+
+  const totalVotingPowerQuery = useReadContract({
+    contract: cardCatalog,
+    method: "function getTotalVotingPower(address) view returns (uint256)",
+    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
+    queryOptions: {
+      enabled: hasValidAddress,
+      staleTime: 15000,
+      refetchInterval: 30000,
     },
   });
 
   // Unbonding Information
-  const { 
-    data: unbondingInfo, 
-    isLoading: isLoadingUnbonding,
-    error: unbondingInfoError,
-    refetch: refetchUnbondingInfo 
-  } = useReadContract({
+  const unbondingInfoQuery = useReadContract({
     contract: cardCatalog,
-    method: "getUnbondingInfo",
-    params: [effectiveUserAddress] as const,
-    queryOptions: { 
+    method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
+    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
+    queryOptions: {
       enabled: hasValidAddress,
       staleTime: 30000,
+      refetchInterval: 60000,
     },
   });
 
-  // Cycle Information - Fixed with correct ThirdWeb v5 syntax
-  const { 
-    data: currentCycle, 
-    isLoading: isLoadingCycle, 
-    error: currentCycleError,
-    refetch: refetchCurrentCycle 
-  } = useReadContract({
+  // Cycle Information
+  const currentCycleQuery = useReadContract({
     contract: voting,
-    method: "getCurrentCycle",
-    params: [] as const,
+    method: "function getCurrentCycle() view returns (uint256)",
+    params: [],
     queryOptions: {
-      staleTime: 60000, // 1 minute
-      refetchInterval: 120000, // 2 minutes
+      staleTime: 60000,
+      refetchInterval: 120000,
     },
   });
 
-  const { 
-    data: timeRemaining, 
-    error: timeRemainingError,
-    refetch: refetchTimeRemaining 
-  } = useReadContract({
+  const timeRemainingQuery = useReadContract({
     contract: voting,
-    method: "getTimeRemainingInCurrentCycle",
-    params: [] as const,
+    method: "function getTimeRemainingInCurrentCycle() view returns (uint256)",
+    params: [],
     queryOptions: {
       staleTime: 30000,
       refetchInterval: 60000,
     },
   });
 
-  const { 
-    data: cycleInfo,
-    error: cycleInfoError,
-    refetch: refetchCycleInfo
-  } = useReadContract({
+  const cycleInfoQuery = useReadContract({
     contract: voting,
-    method: "getCycleInfo",
-    params: [currentCycle || BigInt(1)] as const,
+    method: "function getCycleInfo(uint256) view returns (uint256,uint256,uint256,uint256,bool,uint256)",
+    params: currentCycleQuery.data ? [currentCycleQuery.data] : [BigInt(1)],
     queryOptions: {
-      enabled: !!currentCycle,
+      enabled: !!currentCycleQuery.data,
       staleTime: 60000,
     },
   });
 
-  // Rewards Information - Fixed with correct ThirdWeb v5 syntax
-  const { 
-    data: userRewardInfo, 
-    isLoading: isLoadingRewards, 
-    error: userRewardError,
-    refetch: refetchUserRewards 
-  } = useReadContract({
+  // Rewards Information
+  const userRewardInfoQuery = useReadContract({
     contract: evermarkRewards,
-    method: "getUserRewardInfo",
-    params: [effectiveUserAddress] as const,
-    queryOptions: { 
+    method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
+    params: effectiveUserAddress ? [effectiveUserAddress] : undefined,
+    queryOptions: {
       enabled: hasValidAddress,
       staleTime: 30000,
       refetchInterval: 60000,
     },
   });
 
-  // Enhanced refetch functions
-  const refetchBalances = useCallback(() => {
-    refetchEmarkBalance();
-    refetchStakingAllowance();
+  // Extract data and functions from query objects
+  const {
+    data: emarkBalance,
+    isLoading: isLoadingEmarkBalance,
+    error: emarkBalanceError,
+    refetch: refetchEmarkBalance
+  } = emarkBalanceQuery;
+
+  const {
+    data: stakingAllowance,
+    error: stakingAllowanceError,
+    refetch: refetchStakingAllowance
+  } = stakingAllowanceQuery;
+
+  const {
+    data: userSummary,
+    isLoading: isLoadingUserSummary,
+    error: userSummaryError,
+    refetch: refetchUserSummary
+  } = userSummaryQuery;
+
+  const {
+    data: availableVotingPower,
+    error: availableVotingError,
+    refetch: refetchAvailableVoting
+  } = availableVotingPowerQuery;
+
+  const {
+    data: totalVotingPower,
+    error: totalVotingError,
+    refetch: refetchTotalVoting
+  } = totalVotingPowerQuery;
+
+  const {
+    data: unbondingInfo,
+    isLoading: isLoadingUnbonding,
+    error: unbondingInfoError,
+    refetch: refetchUnbondingInfo
+  } = unbondingInfoQuery;
+
+  const {
+    data: currentCycle,
+    isLoading: isLoadingCycle,
+    error: currentCycleError,
+    refetch: refetchCurrentCycle
+  } = currentCycleQuery;
+
+  const {
+    data: timeRemaining,
+    error: timeRemainingError,
+    refetch: refetchTimeRemaining
+  } = timeRemainingQuery;
+
+  const {
+    data: cycleInfo,
+    error: cycleInfoError,
+    refetch: refetchCycleInfo
+  } = cycleInfoQuery;
+
+  const {
+    data: userRewardInfo,
+    isLoading: isLoadingRewards,
+    error: userRewardError,
+    refetch: refetchUserRewards
+  } = userRewardInfoQuery;
+
+  // Enhanced refetch functions with error handling
+  const refetchBalances = useCallback(async () => {
+    try {
+      await Promise.all([
+        refetchEmarkBalance(),
+        refetchStakingAllowance(),
+      ]);
+    } catch (error) {
+      console.warn('Failed to refetch balances:', error);
+    }
   }, [refetchEmarkBalance, refetchStakingAllowance]);
 
-  const refetchVoting = useCallback(() => {
-    refetchUserSummary();
-    refetchAvailableVoting();
-    refetchTotalVoting();
+  const refetchVoting = useCallback(async () => {
+    try {
+      await Promise.all([
+        refetchUserSummary(),
+        refetchAvailableVoting(),
+        refetchTotalVoting(),
+      ]);
+    } catch (error) {
+      console.warn('Failed to refetch voting data:', error);
+    }
   }, [refetchUserSummary, refetchAvailableVoting, refetchTotalVoting]);
 
-  const refetchUnbonding = useCallback(() => {
-    refetchUserSummary();
-    refetchUnbondingInfo();
+  const refetchUnbonding = useCallback(async () => {
+    try {
+      await Promise.all([
+        refetchUserSummary(),
+        refetchUnbondingInfo(),
+      ]);
+    } catch (error) {
+      console.warn('Failed to refetch unbonding data:', error);
+    }
   }, [refetchUserSummary, refetchUnbondingInfo]);
 
-  const refetchCycle = useCallback(() => {
-    refetchCurrentCycle();
-    refetchTimeRemaining();
-    refetchCycleInfo();
+  const refetchCycle = useCallback(async () => {
+    try {
+      await Promise.all([
+        refetchCurrentCycle(),
+        refetchTimeRemaining(),
+        refetchCycleInfo(),
+      ]);
+    } catch (error) {
+      console.warn('Failed to refetch cycle data:', error);
+    }
   }, [refetchCurrentCycle, refetchTimeRemaining, refetchCycleInfo]);
 
-  const refetch = useCallback(() => {
-    refetchBalances();
-    refetchVoting();
-    refetchUnbonding();
-    refetchCycle();
-    refetchUserRewards();
+  const refetch = useCallback(async () => {
+    await Promise.all([
+      refetchBalances(),
+      refetchVoting(),
+      refetchUnbonding(),
+      refetchCycle(),
+      refetchUserRewards(),
+    ]);
   }, [refetchBalances, refetchVoting, refetchUnbonding, refetchCycle, refetchUserRewards]);
 
   // Parse and structure the data with enhanced error handling
@@ -419,46 +485,19 @@ export function useUserData(userAddress?: string): UserDataState {
     };
   }, [
     // Dependencies for memoization
-    userSummary,
-    emarkBalance,
-    stakingAllowance,
-    availableVotingPower,
-    totalVotingPower,
-    unbondingInfo,
-    currentCycle,
-    timeRemaining,
-    cycleInfo,
-    userRewardInfo,
-    isLoadingEmarkBalance,
-    isLoadingUserSummary,
-    isLoadingCycle,
-    isLoadingRewards,
-    isLoadingUnbonding,
+    userSummary, emarkBalance, stakingAllowance, availableVotingPower, totalVotingPower,
+    unbondingInfo, currentCycle, timeRemaining, cycleInfo, userRewardInfo,
+    isLoadingEmarkBalance, isLoadingUserSummary, isLoadingCycle, isLoadingRewards, isLoadingUnbonding,
     // Error states
-    emarkBalanceError,
-    stakingAllowanceError,
-    userSummaryError,
-    availableVotingError,
-    totalVotingError,
-    unbondingInfoError,
-    currentCycleError,
-    timeRemainingError,
-    cycleInfoError,
-    userRewardError,
-    // Refetch functions
-    refetch,
-    refetchBalances,
-    refetchVoting,
-    refetchUnbonding,
-    refetchUserRewards,
-    refetchCycle,
+    emarkBalanceError, stakingAllowanceError, userSummaryError, availableVotingError, totalVotingError,
+    unbondingInfoError, currentCycleError, timeRemainingError, cycleInfoError, userRewardError,
+    // Functions
+    refetch, refetchBalances, refetchVoting, refetchUnbonding, refetchUserRewards, refetchCycle,
     // Utility
-    hasValidAddress,
-    userAddress,
-    parseError,
+    hasValidAddress, userAddress, parseError,
   ]);
 
-  // Enhanced debug logging
+  // Enhanced debug logging for development
   if (process.env.NODE_ENV === 'development' && hasValidAddress) {
     console.log('📊 UserData state:', {
       userAddress: userAddress ? `${userAddress.slice(0, 6)}...${userAddress.slice(-4)}` : null,

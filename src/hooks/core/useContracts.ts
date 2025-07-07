@@ -1,10 +1,10 @@
-// src/hooks/core/useContracts.ts - Rewritten for upgraded smart contracts
+// src/hooks/core/useContracts.ts - Enhanced for ThirdWeb v5 compatibility
 import { useMemo } from 'react';
 import { getContract } from "thirdweb";
 import { client } from "../../lib/thirdweb";
 import { CHAIN, CONTRACTS } from "../../lib/contracts";
 
-// Import all ABIs - updated to match your current structure
+// Import all ABIs with proper typing
 import { 
   VOTING_ABI, 
   CARD_CATALOG_ABI, 
@@ -27,7 +27,7 @@ export interface ContractInstances {
 
 /**
  * Enhanced contract instances hook with better error handling and validation
- * Single source of truth for all contract instances
+ * Optimized for ThirdWeb v5 with proper memoization
  */
 export function useContracts(): ContractInstances {
   return useMemo(() => {
@@ -44,7 +44,7 @@ export function useContracts(): ContractInstances {
 
     // Check for missing contract addresses
     const missingContracts = Object.entries(requiredContracts)
-      .filter(([name, address]) => !address)
+      .filter(([, address]) => !address)
       .map(([name]) => name);
 
     if (missingContracts.length > 0) {
@@ -104,7 +104,7 @@ export function useContracts(): ContractInstances {
         }),
       };
 
-      // Enhanced debug logging
+      // Enhanced debug logging for development
       if (process.env.NODE_ENV === 'development') {
         console.log('🏗️ Contract instances created successfully:', {
           network: CHAIN.name || `Chain ID: ${CHAIN.id}`,
@@ -127,8 +127,6 @@ export function useContracts(): ContractInstances {
 
 /**
  * Get a specific contract instance with type safety
- * @param contractName - Name of the contract to retrieve
- * @returns Typed contract instance
  */
 export function useContract<K extends keyof ContractInstances>(
   contractName: K
@@ -144,8 +142,6 @@ export function useContract<K extends keyof ContractInstances>(
 
 /**
  * Get multiple specific contract instances
- * @param contractNames - Array of contract names to retrieve
- * @returns Object with requested contract instances
  */
 export function useContractSubset<K extends keyof ContractInstances>(
   contractNames: K[]
@@ -168,7 +164,6 @@ export function useContractSubset<K extends keyof ContractInstances>(
 
 /**
  * Utility to check if all contracts are properly initialized
- * @returns Object with contract status information
  */
 export function useContractStatus() {
   return useMemo(() => {
@@ -180,8 +175,9 @@ export function useContractStatus() {
         isReady: true,
         contractCount: contractNames.length,
         contracts: contractNames.reduce((acc, name) => {
+          const contractAddress = CONTRACTS[name.toUpperCase() as keyof typeof CONTRACTS];
           acc[name] = {
-            address: CONTRACTS[name.toUpperCase() as keyof typeof CONTRACTS] || 'N/A',
+            address: contractAddress || 'N/A',
             isInitialized: !!contracts[name]
           };
           return acc;
@@ -216,8 +212,7 @@ export type FeeCollectorContract = ContractInstances['feeCollector'];
 export type EmarkTokenContract = ContractInstances['emarkToken'];
 
 /**
- * Contract method validation utility
- * Helps ensure methods exist on contracts during development
+ * Contract method validation utility for development
  */
 export function validateContractMethod(
   contract: any, 
@@ -241,18 +236,21 @@ export interface ContractErrorContext {
   methodName: string;
   parameters?: any[];
   userAddress?: string;
+  timestamp?: number;
+  chain?: number;
+  environment?: string;
 }
 
 /**
  * Hook to get contract error context for better debugging
  */
-export function useContractErrorContext(): (context: ContractErrorContext) => ContractErrorContext {
+export function useContractErrorContext(): (context: ContractErrorContext) => ContractErrorContext & { timestamp: number; chain: number; environment: string } {
   return useMemo(() => {
     return (context: ContractErrorContext) => ({
       ...context,
       timestamp: Date.now(),
       chain: CHAIN.id,
-      environment: process.env.NODE_ENV
+      environment: process.env.NODE_ENV || 'unknown'
     });
   }, []);
 }
