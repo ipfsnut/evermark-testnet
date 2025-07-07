@@ -1,5 +1,5 @@
-// src/hooks/core/useMetadataUtils.ts - Shared IPFS and metadata utilities
-import { useCallback } from 'react';
+// src/hooks/core/useMetadataUtils.ts - Fixed implementation with complete functionality
+import { useCallback, useMemo } from 'react';
 import { readContract } from "thirdweb";
 import { useContracts } from './useContracts';
 
@@ -7,6 +7,8 @@ export interface IPFSMetadata {
   description: string;
   sourceUrl: string;
   image: string;
+  name?: string;
+  attributes?: any[];
 }
 
 export interface EvermarkData {
@@ -19,11 +21,14 @@ export interface EvermarkData {
   image: string;
   metadataURI: string;
   creationTime: number;
+  minter: string;
+  referrer?: string;
 }
 
 export interface ValidationResult {
   isValid: boolean;
   errors: string[];
+  warnings?: string[];
 }
 
 export interface EvermarkMetadata {
@@ -47,69 +52,179 @@ export interface EvermarkMetadata {
   pages?: string;
 }
 
+export interface CastData {
+  title: string;
+  author: string;
+  content: string;
+  timestamp: string;
+  castHash?: string;
+  username?: string;
+  authorFid?: number;
+  embeds?: any[];
+  mentions?: any[];
+  parentHash?: string;
+  rootParentHash?: string;
+  canonicalUrl: string;
+  error?: string;
+}
+
 /**
- * Shared metadata and IPFS utilities
- * Eliminates duplicate metadata fetching and validation logic
+ * Enhanced metadata and IPFS utilities with complete implementations
+ * Handles all Evermark metadata operations including IPFS fetching and validation
  */
 export function useMetadataUtils() {
   const { evermarkNFT } = useContracts();
 
   /**
-   * Fetch IPFS metadata with proper error handling and caching
+   * Fetch IPFS metadata with enhanced error handling and caching
    */
   const fetchIPFSMetadata = useCallback(async (metadataURI: string): Promise<IPFSMetadata> => {
-    const defaultReturn: IPFSMetadata = { description: "", sourceUrl: "", image: "" };
+    const defaultReturn: IPFSMetadata = { 
+      description: "", 
+      sourceUrl: "", 
+      image: "",
+      name: "",
+      attributes: []
+    };
     
     if (!metadataURI || !metadataURI.startsWith('ipfs://')) {
+      console.warn('Invalid IPFS URI:', metadataURI);
       return defaultReturn;
     }
 
     try {
       const ipfsHash = metadataURI.replace('ipfs://', '');
       
-      // Basic validation - IPFS hashes should be at least 40 characters
-      if (ipfsHash.length < 40) {
-        console.log('Invalid IPFS hash format:', ipfsHash);
+      // Enhanced validation - IPFS hashes should be valid format
+      if (ipfsHash.length < 40 || !/^[a-zA-Z0-9]+$/.test(ipfsHash)) {
+        console.warn('Invalid IPFS hash format:', ipfsHash);
         return defaultReturn;
       }
       
-      const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
+      // Try multiple gateways for better reliability
+      const gateways = [
+        `https://gateway.pinata.cloud/ipfs/${ipfsHash}`,
+        `https://ipfs.io/ipfs/${ipfsHash}`,
+        `https://cloudflare-ipfs.com/ipfs/${ipfsHash}`,
+      ];
       
-      // Add timeout and proper error handling
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
-      console.log('Fetching IPFS metadata from:', ipfsGatewayUrl);
-      
-      const response = await fetch(ipfsGatewayUrl, { 
-        signal: controller.signal,
-        cache: 'force-cache', // Use browser cache to reduce requests
-        headers: {
-          'Accept': 'application/json',
+      for (const gatewayUrl of gateways) {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+          
+          console.log('Fetching IPFS metadata from:', gatewayUrl);
+          
+          const response = await fetch(gatewayUrl, { 
+            signal: controller.signal,
+            cache: 'force-cache',
+            headers: {
+              'Accept': 'application/json',
+            }
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            console.warn(`IPFS fetch failed with status ${response.status} for gateway: ${gatewayUrl}`);
+            continue; // Try next gateway
+          }
+          
+          const ipfsData = await response.json();
+          console.log('IPFS data fetched successfully:', ipfsData);
+          
+          // Process and normalize the data
+          const processedData: IPFSMetadata = {
+            description: ipfsData.description || "",
+            sourceUrl: ipfsData.external_url || ipfsData.sourceUrl || "",
+            image: ipfsData.image 
+              ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
+              : "",
+            name: ipfsData.name || "",
+            attributes: Array.isArray(ipfsData.attributes) ? ipfsData.attributes : []
+          };
+          
+          return processedData;
+          
+        } catch (gatewayError) {
+          console.warn(`Gateway ${gatewayUrl} failed:`, gatewayError);
+          continue; // Try next gateway
         }
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.warn(`IPFS fetch failed with status ${response.status} for hash: ${ipfsHash}`);
-        return defaultReturn;
       }
       
-      const ipfsData = await response.json();
-      console.log('IPFS data fetched successfully:', ipfsData);
+      // All gateways failed
+      console.error('All IPFS gateways failed for hash:', ipfsHash);
+      return defaultReturn;
       
-      return {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorName = error instanceof Error ? error.name : 'UnknownError';
+      
+      if (errorName !== 'AbortError') {
+        console.error("Error fetching IPFS metadata:", errorMessage);
+      }
+      return defaultReturn;
+    }
+  }, []);
+
+  /**
+   * FIXED: Complete Evermark data fetching implementation
+   */
+  const fetchEvermarkData = useCallback(async (tokenId: bigint): Promise<EvermarkData | null> => {
+    try {
+      // Check if token exists
+      const exists = await readContract({
+        contract: evermarkNFT,
+        method: "exists",
+        params: [tokenId],
+      });
+
+      if (!exists) {
+        console.log(`Evermark ${tokenId} does not exist`);
+        return null;
+      }
+
+      // Get evermark data from contract - using correct method name
+      const evermarkData = await readContract({
+        contract: evermarkNFT,
+        method: "evermarkData",
+        params: [tokenId],
+      });
+
+      if (!evermarkData || !Array.isArray(evermarkData)) {
+        console.error('Invalid evermarkData response:', evermarkData);
+        return null;
+      }
+
+      // Extract fields from evermarkData tuple: [title, creator, metadataURI, creationTime, minter, referrer]
+      const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
+
+      // Validate required fields
+      if (!title || !metadataURI) {
+        console.error('Missing required evermark data fields');
+        return null;
+      }
+
+      // Fetch IPFS metadata
+      const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
+
+      // Return complete evermark data
+      const result: EvermarkData = {
         id: tokenId.toString(),
         title: title || `Evermark #${tokenId}`,
         author: creator || "Unknown",
-        creator: minter,
+        creator: minter || "0x0", // The wallet that minted
         description,
         sourceUrl,
         image,
         metadataURI,
         creationTime: Number(creationTime) * 1000, // Convert to milliseconds
+        minter: minter || "0x0",
+        referrer: referrer || undefined
       };
+
+      return result;
+
     } catch (error) {
       console.error(`Error fetching Evermark data for token ${tokenId}:`, error);
       return null;
@@ -117,17 +232,44 @@ export function useMetadataUtils() {
   }, [evermarkNFT, fetchIPFSMetadata]);
 
   /**
-   * Batch fetch multiple Evermark data
+   * Batch fetch multiple Evermark data with concurrency control
    */
-  const fetchEvermarkDataBatch = useCallback(async (tokenIds: bigint[]): Promise<(EvermarkData | null)[]> => {
-    const promises = tokenIds.map(tokenId => fetchEvermarkData(tokenId));
-    return Promise.all(promises);
+  const fetchEvermarkDataBatch = useCallback(async (
+    tokenIds: bigint[], 
+    maxConcurrency: number = 5
+  ): Promise<(EvermarkData | null)[]> => {
+    const results: (EvermarkData | null)[] = [];
+    
+    // Process in batches to avoid overwhelming the network
+    for (let i = 0; i < tokenIds.length; i += maxConcurrency) {
+      const batch = tokenIds.slice(i, i + maxConcurrency);
+      const batchPromises = batch.map(tokenId => fetchEvermarkData(tokenId));
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+      
+      // Small delay between batches
+      if (i + maxConcurrency < tokenIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return results;
   }, [fetchEvermarkData]);
 
   /**
-   * Upload file to Pinata IPFS
+   * Upload file to Pinata IPFS with enhanced error handling
    */
   const uploadToPinata = useCallback(async (file: File): Promise<string> => {
+    if (!file) {
+      throw new Error('No file provided');
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new Error('File size exceeds 10MB limit');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
@@ -135,23 +277,30 @@ export function useMetadataUtils() {
       name: `evermark-${file.name}-${Date.now()}`,
       keyvalues: { 
         type: file.type.startsWith('image/') ? 'evermark-image' : 'evermark-metadata',
-        timestamp: Date.now().toString()
+        timestamp: Date.now().toString(),
+        originalName: file.name
       }
     });
     formData.append('pinataMetadata', pinataMetadata);
 
-    const pinataOptions = JSON.stringify({ cidVersion: 0 });
+    const pinataOptions = JSON.stringify({ 
+      cidVersion: 0,
+      wrapWithDirectory: false
+    });
     formData.append('pinataOptions', pinataOptions);
 
     try {
       const response = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}` },
+        headers: { 
+          'Authorization': `Bearer ${import.meta.env.VITE_PINATA_JWT}` 
+        },
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error(`Pinata upload failed: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`Pinata upload failed (${response.status}): ${errorText}`);
       }
 
       const result = await response.json();
@@ -166,15 +315,28 @@ export function useMetadataUtils() {
   }, []);
 
   /**
-   * Validate Evermark metadata
+   * Enhanced metadata validation with detailed feedback
    */
   const validateMetadata = useCallback((metadata: EvermarkMetadata): ValidationResult => {
     const errors: string[] = [];
+    const warnings: string[] = [];
     
-    // Required fields
-    if (!metadata.title?.trim()) errors.push("Title is required");
-    if (!metadata.description?.trim()) errors.push("Description is required");
-    if (!metadata.author?.trim()) errors.push("Author is required");
+    // Required fields validation
+    if (!metadata.title?.trim()) {
+      errors.push("Title is required");
+    } else if (metadata.title.length > 100) {
+      errors.push("Title must be 100 characters or less");
+    }
+    
+    if (!metadata.description?.trim()) {
+      errors.push("Description is required");
+    } else if (metadata.description.length > 1000) {
+      errors.push("Description must be 1000 characters or less");
+    }
+    
+    if (!metadata.author?.trim()) {
+      errors.push("Author is required");
+    }
     
     // Content-type specific validation
     if (metadata.contentType === 'DOI' && metadata.doi) {
@@ -197,65 +359,88 @@ export function useMetadataUtils() {
         errors.push("Invalid URL format");
       }
     }
-    
-    // Title length validation
-    if (metadata.title && metadata.title.length > 100) {
-      errors.push("Title must be 100 characters or less");
+
+    // Image file validation
+    if (metadata.imageFile) {
+      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(metadata.imageFile.type)) {
+        errors.push("Image must be JPEG, PNG, GIF, or WebP format");
+      }
+      
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (metadata.imageFile.size > maxSize) {
+        errors.push("Image must be less than 5MB");
+      }
+    }
+
+    // Warnings for best practices
+    if (metadata.title && metadata.title.length < 10) {
+      warnings.push("Consider using a more descriptive title (at least 10 characters)");
     }
     
-    // Description length validation
-    if (metadata.description && metadata.description.length > 1000) {
-      errors.push("Description must be 1000 characters or less");
+    if (metadata.description && metadata.description.length < 50) {
+      warnings.push("Consider adding more detail to the description");
     }
     
-    return { isValid: errors.length === 0, errors };
+    return { 
+      isValid: errors.length === 0, 
+      errors,
+      warnings 
+    };
   }, []);
 
   /**
    * Check if input is a Farcaster cast URL or hash
    */
   const isFarcasterInput = useCallback((input: string): boolean => {
+    if (!input) return false;
+    
     return (
       input.includes('farcaster.xyz') ||
       input.includes('warpcast.com') ||
       input.includes('farcaster') ||
-      (input.startsWith('0x') && input.length >= 10)
+      (input.startsWith('0x') && input.length >= 10 && input.length <= 66)
     );
   }, []);
 
   /**
-   * Extract cast hash from Farcaster input
+   * Extract cast hash from Farcaster input with enhanced parsing
    */
   const extractCastHash = useCallback((input: string): string | null => {
     console.log("🔍 Extracting cast hash from input:", input);
     
+    if (!input) return null;
+    
+    // Direct hash input
     if (input.startsWith('0x') && input.length >= 10) {
       console.log("✅ Input is already a hash:", input);
       return input;
     }
     
+    // Farcaster.xyz URL
     if (input.includes('farcaster.xyz')) {
-      const urlParts = input.split('/');
-      const hash = urlParts[urlParts.length - 1];
-      if (hash.startsWith('0x')) {
+      const match = input.match(/farcaster\.xyz\/[^\/]+\/([0-9a-fA-F]+)/);
+      if (match && match[1]) {
+        const hash = `0x${match[1]}`;
         console.log("✅ Extracted hash from farcaster.xyz URL:", hash);
         return hash;
       }
     }
     
+    // Warpcast URL
     if (input.includes('warpcast.com')) {
-      const urlParts = input.split('/');
-      const hash = urlParts[urlParts.length - 1];
-      if (hash.startsWith('0x')) {
-        console.log("✅ Extracted hash from warpcast URL:", hash);
-        return hash;
+      const match = input.match(/warpcast\.com\/[^\/]+\/(0x[0-9a-fA-F]+)/);
+      if (match && match[1]) {
+        console.log("✅ Extracted hash from warpcast URL:", match[1]);
+        return match[1];
       }
     }
     
-    const hashMatch = input.match(/0x[a-fA-F0-9]+/);
+    // Generic hash extraction
+    const hashMatch = input.match(/(0x[a-fA-F0-9]{8,})/);
     if (hashMatch) {
-      console.log("✅ Found hash in string:", hashMatch[0]);
-      return hashMatch[0];
+      console.log("✅ Found hash in string:", hashMatch[1]);
+      return hashMatch[1];
     }
     
     console.log("❌ No valid hash found in input");
@@ -263,9 +448,9 @@ export function useMetadataUtils() {
   }, []);
 
   /**
-   * Fetch Farcaster cast data from Pinata
+   * Fetch Farcaster cast data from Pinata with enhanced error handling
    */
-  const fetchCastDataFromPinata = useCallback(async (input: string): Promise<any> => {
+  const fetchCastDataFromPinata = useCallback(async (input: string): Promise<CastData> => {
     try {
       console.log("🎯 Processing Farcaster input:", input);
       
@@ -329,12 +514,12 @@ export function useMetadataUtils() {
   }, [extractCastHash]);
 
   /**
-   * Build comprehensive metadata for Evermark creation
+   * Build comprehensive metadata for Evermark creation with enhanced structure
    */
   const buildComprehensiveMetadata = useCallback(async (
     metadata: EvermarkMetadata,
     imageUrl?: string,
-    castData?: any,
+    castData?: CastData,
     creatorAddress?: string
   ) => {
     const comprehensiveMetadata = {
@@ -343,18 +528,20 @@ export function useMetadataUtils() {
       image: imageUrl || "",
       external_url: metadata.sourceUrl,
       
-      // Core attributes
+      // Enhanced attributes with better categorization
       attributes: [
         { trait_type: "Author", value: metadata.author },
         { trait_type: "Source URL", value: metadata.sourceUrl },
         { trait_type: "Content Type", value: metadata.contentType || 'Custom' },
         { trait_type: "Created", value: new Date().toISOString() },
+        { trait_type: "Version", value: "2.1" },
         ...(creatorAddress ? [{ trait_type: "Creator Address", value: creatorAddress }] : []),
       ],
 
-      // Enhanced metadata
+      // Enhanced Evermark-specific metadata
       evermark: {
-        version: "2.0",
+        version: "2.1",
+        schema: "https://evermark.xyz/schema/v2.1",
         sourceUrl: metadata.sourceUrl,
         author: metadata.author,
         contentType: metadata.contentType || 'Custom',
@@ -373,7 +560,7 @@ export function useMetadataUtils() {
         ...(metadata.issue && { issue: metadata.issue }),
         ...(metadata.pages && { pages: metadata.pages }),
         
-        // Cast data if available
+        // Enhanced cast data if available
         ...(castData && !castData.error && { 
           farcasterData: {
             castHash: castData.castHash,
@@ -389,6 +576,11 @@ export function useMetadataUtils() {
             rootParentHash: castData.rootParentHash,
           }
         }),
+        
+        // Metadata creation info
+        createdAt: new Date().toISOString(),
+        createdBy: creatorAddress,
+        platform: "Evermark",
       }
     };
 
@@ -401,19 +593,99 @@ export function useMetadataUtils() {
     }
     if (castData && !castData.error) {
       comprehensiveMetadata.attributes.push(
-        { trait_type: "Farcaster Author", value: castData.username },
-        { trait_type: "Cast Hash", value: castData.castHash },
-        { trait_type: "Author FID", value: castData.authorFid.toString() }
+        { trait_type: "Farcaster Author", value: castData.username || 'unknown' },
+        { trait_type: "Cast Hash", value: castData.castHash || '' },
+        { trait_type: "Author FID", value: (castData.authorFid || 0).toString() }
       );
+    }
+
+    // Add custom fields as attributes
+    if (metadata.customFields && metadata.customFields.length > 0) {
+      metadata.customFields.forEach(field => {
+        if (field.key && field.value) {
+          comprehensiveMetadata.attributes.push({
+            trait_type: `Custom: ${field.key}`,
+            value: field.value
+          });
+        }
+      });
+    }
+
+    // Add tags as attributes
+    if (metadata.tags && metadata.tags.length > 0) {
+      comprehensiveMetadata.attributes.push({
+        trait_type: "Tags",
+        value: metadata.tags.join(", ")
+      });
     }
 
     return comprehensiveMetadata;
   }, []);
 
-  return {
+  /**
+   * Upload JSON metadata to IPFS
+   */
+  const uploadMetadataToIPFS = useCallback(async (metadata: any): Promise<string> => {
+    const metadataBlob = new Blob([JSON.stringify(metadata, null, 2)], {
+      type: 'application/json'
+    });
+    const metadataFile = new File([metadataBlob], 'metadata.json', { 
+      type: 'application/json' 
+    });
+
+    return await uploadToPinata(metadataFile);
+  }, [uploadToPinata]);
+
+  /**
+   * Get IPFS gateway URLs for a hash
+   */
+  const getIPFSGatewayUrls = useCallback((ipfsHash: string): string[] => {
+    if (!ipfsHash) return [];
+    
+    const hash = ipfsHash.replace('ipfs://', '');
+    return [
+      `https://gateway.pinata.cloud/ipfs/${hash}`,
+      `https://ipfs.io/ipfs/${hash}`,
+      `https://cloudflare-ipfs.com/ipfs/${hash}`,
+    ];
+  }, []);
+
+  /**
+   * Validate IPFS hash format
+   */
+  const isValidIPFSHash = useCallback((hash: string): boolean => {
+    if (!hash) return false;
+    
+    const cleanHash = hash.replace('ipfs://', '');
+    
+    // Basic validation for IPFS hash formats (CIDv0 and CIDv1)
+    return /^[a-zA-Z0-9]{46,}$/.test(cleanHash) || /^[a-zA-Z2-7]{59}$/.test(cleanHash);
+  }, []);
+
+  /**
+   * Get metadata summary for display
+   */
+  const getMetadataSummary = useCallback((metadata: EvermarkMetadata) => {
+    return {
+      title: metadata.title,
+      author: metadata.author,
+      contentType: metadata.contentType || 'Custom',
+      hasImage: !!metadata.imageFile,
+      hasCustomFields: (metadata.customFields?.length || 0) > 0,
+      hasTags: (metadata.tags?.length || 0) > 0,
+      wordCount: metadata.description.split(/\s+/).length,
+      estimatedSize: new Blob([JSON.stringify(metadata)]).size,
+    };
+  }, []);
+
+  // Memoized return object for better performance
+  return useMemo(() => ({
     // IPFS functions
     fetchIPFSMetadata,
     uploadToPinata,
+    uploadMetadataToIPFS,
+    getIPFSGatewayUrls,
+    isValidIPFSHash,
     
     // Evermark data functions
     fetchEvermarkData,
@@ -421,6 +693,7 @@ export function useMetadataUtils() {
     
     // Validation functions
     validateMetadata,
+    getMetadataSummary,
     
     // Farcaster functions
     isFarcasterInput,
@@ -429,54 +702,19 @@ export function useMetadataUtils() {
     
     // Metadata building
     buildComprehensiveMetadata,
-  };
+  }), [
+    fetchIPFSMetadata,
+    uploadToPinata,
+    uploadMetadataToIPFS,
+    getIPFSGatewayUrls,
+    isValidIPFSHash,
+    fetchEvermarkData,
+    fetchEvermarkDataBatch,
+    validateMetadata,
+    getMetadataSummary,
+    isFarcasterInput,
+    extractCastHash,
+    fetchCastDataFromPinata,
+    buildComprehensiveMetadata,
+  ]);
 }
-        description: ipfsData.description || "",
-        sourceUrl: ipfsData.external_url || "",
-        image: ipfsData.image 
-          ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
-          : ""
-      };
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const errorName = error instanceof Error ? error.name : 'UnknownError';
-      
-      // Don't spam console with errors for expected failures
-      if (errorName !== 'AbortError') {
-        console.warn("Error fetching IPFS metadata:", errorMessage);
-      }
-      return defaultReturn;
-    }
-  }, []);
-
-  /**
-   * Fetch complete Evermark data including IPFS metadata
-   */
-  const fetchEvermarkData = useCallback(async (tokenId: bigint): Promise<EvermarkData | null> => {
-    try {
-      // Check if token exists
-      const exists = await readContract({
-        contract: evermarkNFT,
-        method: "exists",
-        params: [tokenId],
-      });
-
-      if (!exists) {
-        console.log(`Evermark ${tokenId} does not exist`);
-        return null;
-      }
-
-      // Get evermark data from contract
-      const evermarkData = await readContract({
-        contract: evermarkNFT,
-        method: "evermarkData",
-        params: [tokenId],
-      });
-
-      // Extract fields from evermarkData tuple
-      const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
-
-      // Fetch IPFS metadata
-      const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
-
-      return {
