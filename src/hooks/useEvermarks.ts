@@ -1,7 +1,9 @@
+// src/hooks/useEvermarks.ts - ✅ SIMPLIFIED using core utilities
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getContract, readContract } from "thirdweb";
-import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
+import { useReadContract } from "thirdweb/react";
+import { readContract } from "thirdweb";
+import { useContracts } from './core/useContracts';
+import { useMetadataUtils } from './core/useMetadataUtils';
 
 export interface Evermark {
   id: string;
@@ -16,87 +18,17 @@ export interface Evermark {
   votes?: number;
 }
 
-// Helper function to fetch IPFS metadata with proper error handling
-const fetchIPFSMetadata = async (metadataURI: string) => {
-  // Default empty values
-  const defaultReturn = { description: "", sourceUrl: "", image: "" };
-  
-  if (!metadataURI || !metadataURI.startsWith('ipfs://')) {
-    return defaultReturn;
-  }
-
-  try {
-    const ipfsHash = metadataURI.replace('ipfs://', '');
-    
-    // Basic validation - IPFS hashes should be at least 40 characters
-    if (ipfsHash.length < 40) {
-      console.log('Invalid IPFS hash format:', ipfsHash);
-      return defaultReturn;
-    }
-    
-    const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
-    
-    // Add timeout and proper error handling
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-    
-    console.log('Fetching IPFS metadata from:', ipfsGatewayUrl);
-    
-    const response = await fetch(ipfsGatewayUrl, { 
-      signal: controller.signal,
-      cache: 'force-cache', // Use browser cache to reduce requests
-      headers: {
-        'Accept': 'application/json',
-      }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      console.warn(`IPFS fetch failed with status ${response.status} for hash: ${ipfsHash}`);
-      return defaultReturn;
-    }
-    
-    const ipfsData = await response.json();
-    console.log('IPFS data fetched successfully:', ipfsData);
-    
-    return {
-      description: ipfsData.description || "",
-      sourceUrl: ipfsData.external_url || "",
-      image: ipfsData.image 
-        ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
-        : ""
-    };
-  } catch (error: unknown) {
-    // Properly type the error and handle it
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorName = error instanceof Error ? error.name : 'UnknownError';
-    
-    // Don't spam console with errors for expected failures
-    if (errorName !== 'AbortError') {
-      console.warn("Error fetching IPFS metadata:", errorMessage);
-    }
-    return defaultReturn;
-  }
-};
-
 export function useEvermarks() {
   const [evermarks, setEvermarks] = useState<Evermark[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetch, setLastFetch] = useState<number>(0);
 
-  // Memoize contract to prevent recreation
-  const contract = useMemo(() => {
-    return getContract({
-      client,
-      chain: CHAIN,
-      address: CONTRACTS.EVERMARK_NFT,
-      abi: EVERMARK_NFT_ABI,
-    });
-  }, []);
+  // ✅ Use core infrastructure
+  const { evermarkNFT } = useContracts();
+  const { fetchEvermarkDataBatch } = useMetadataUtils();
 
-  // Memoize the fetch function to prevent recreation
+  // ✅ Simplified fetch function using core utilities
   const fetchEvermarks = useCallback(async () => {
     // Prevent refetching too frequently (max once per 30 seconds)
     const now = Date.now();
@@ -112,9 +44,10 @@ export function useEvermarks() {
       
       console.log('Fetching evermarks...');
       
+      // ✅ FIXED: Use correct ThirdWeb v5 syntax
       const totalSupply = await readContract({
-        contract,
-        method: "totalSupply",
+        contract: evermarkNFT,
+        method: "function totalSupply() view returns (uint256)",
         params: [],
       });
       
@@ -124,49 +57,31 @@ export function useEvermarks() {
         return;
       }
       
-      const fetchedEvermarks: Evermark[] = [];
+      // Get recent token IDs (last 10)
       const startId = Number(totalSupply);
       const endId = Math.max(1, startId - 10);
+      const tokenIds = Array.from(
+        { length: startId - endId + 1 }, 
+        (_, i) => BigInt(startId - i)
+      );
       
-      for (let i = startId; i >= endId; i--) {
-        try {
-          const exists = await readContract({
-            contract,
-            method: "exists",
-            params: [BigInt(i)],
-          });
-          
-          if (!exists) continue;
-          
-          // ✅ FIXED: Use correct method name from ABI
-          const evermarkData = await readContract({
-            contract,
-            method: "evermarkData",
-            params: [BigInt(i)],
-          });
-          
-          // ✅ FIXED: Extract fields from evermarkData tuple
-          const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
-
-          // Fetch IPFS metadata including image (with proper error handling)
-          const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
-          
-          fetchedEvermarks.push({
-            id: i.toString(),
-            title,
-            author: creator, // Using creator field from evermarkData
-            description,
-            sourceUrl,
-            image,
-            metadataURI,
-            creator: minter, // The minter address
-            creationTime: Number(creationTime) * 1000,
-          });
-        } catch (err: unknown) {
-          const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-          console.error(`Error fetching token ${i}:`, errorMessage);
-        }
-      }
+      // ✅ Use core batch fetching with concurrency control
+      const evermarkData = await fetchEvermarkDataBatch(tokenIds, 3);
+      
+      // Convert to Evermark interface, filtering out nulls
+      const fetchedEvermarks: Evermark[] = evermarkData
+        .filter(data => data !== null)
+        .map(data => ({
+          id: data!.id,
+          title: data!.title,
+          author: data!.author,
+          description: data!.description,
+          sourceUrl: data!.sourceUrl,
+          image: data!.image,
+          metadataURI: data!.metadataURI,
+          creator: data!.creator,
+          creationTime: data!.creationTime,
+        }));
       
       setEvermarks(fetchedEvermarks);
     } catch (err: unknown) {
@@ -176,9 +91,9 @@ export function useEvermarks() {
     } finally {
       setIsLoading(false);
     }
-  }, [contract, lastFetch, evermarks.length]);
+  }, [evermarkNFT, fetchEvermarkDataBatch, lastFetch, evermarks.length]);
 
-  // Only fetch once on mount, not on every render
+  // Only fetch once on mount
   useEffect(() => {
     let isMounted = true;
     
@@ -212,12 +127,8 @@ export function useEvermarkDetail(id: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const contract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.EVERMARK_NFT,
-    abi: EVERMARK_NFT_ABI,
-  }), []);
+  // ✅ Use core infrastructure
+  const { fetchEvermarkData } = useMetadataUtils();
 
   useEffect(() => {
     let isMounted = true;
@@ -248,13 +159,10 @@ export function useEvermarkDetail(id: string) {
           return;
         }
 
-        const exists = await readContract({
-          contract,
-          method: "exists",
-          params: [tokenId],
-        });
+        // ✅ Use core utility for fetching
+        const evermarkData = await fetchEvermarkData(tokenId);
 
-        if (!exists) {
+        if (!evermarkData) {
           if (isMounted) {
             setError("Evermark not found");
             setIsLoading(false);
@@ -262,30 +170,17 @@ export function useEvermarkDetail(id: string) {
           return;
         }
 
-        // ✅ FIXED: Use correct method name from ABI
-        const evermarkData = await readContract({
-          contract,
-          method: "evermarkData",
-          params: [tokenId],
-        });
-
-        // ✅ FIXED: Extract fields from evermarkData tuple
-        const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
-
-        // Fetch IPFS metadata including image (with proper error handling)
-        const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
-
         if (isMounted) {
           setEvermark({
-            id,
-            title,
-            author: creator,
-            description,
-            sourceUrl,
-            image,
-            metadataURI,
-            creator: minter,
-            creationTime: Number(creationTime) * 1000,
+            id: evermarkData.id,
+            title: evermarkData.title,
+            author: evermarkData.author,
+            description: evermarkData.description,
+            sourceUrl: evermarkData.sourceUrl,
+            image: evermarkData.image,
+            metadataURI: evermarkData.metadataURI,
+            creator: evermarkData.creator,
+            creationTime: evermarkData.creationTime,
           });
         }
       } catch (err: unknown) {
@@ -306,7 +201,7 @@ export function useEvermarkDetail(id: string) {
     return () => {
       isMounted = false;
     };
-  }, [id, contract]);
+  }, [id, fetchEvermarkData]);
 
   return { evermark, isLoading, error };
 }
@@ -316,12 +211,9 @@ export function useUserEvermarks(userAddress?: string) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const contract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.EVERMARK_NFT,
-    abi: EVERMARK_NFT_ABI,
-  }), []);
+  // ✅ Use core infrastructure
+  const { evermarkNFT } = useContracts();
+  const { fetchEvermarkData } = useMetadataUtils();
 
   useEffect(() => {
     let isMounted = true;
@@ -344,9 +236,10 @@ export function useUserEvermarks(userAddress?: string) {
         setError(null);
 
         console.log('📞 Calling totalSupply...');
+        // ✅ FIXED: Use correct ThirdWeb v5 syntax
         const totalSupply = await readContract({
-          contract,
-          method: "totalSupply",
+          contract: evermarkNFT,
+          method: "function totalSupply() view returns (uint256)",
           params: [],
         });
         
@@ -362,9 +255,10 @@ export function useUserEvermarks(userAddress?: string) {
         }
 
         console.log('📞 Calling balanceOf for user...');
+        // ✅ FIXED: Use correct ThirdWeb v5 syntax
         const balance = await readContract({
-          contract,
-          method: "balanceOf",
+          contract: evermarkNFT,
+          method: "function balanceOf(address) view returns (uint256)",
           params: [userAddress],
         });
         
@@ -391,9 +285,10 @@ export function useUserEvermarks(userAddress?: string) {
           try {
             console.log(`🔍 Checking token ${i}...`);
             
+            // ✅ FIXED: Use correct ThirdWeb v5 syntax
             const exists = await readContract({
-              contract,
-              method: "exists",
+              contract: evermarkNFT,
+              method: "function exists(uint256) view returns (bool)",
               params: [BigInt(i)],
             });
             
@@ -402,9 +297,10 @@ export function useUserEvermarks(userAddress?: string) {
               continue;
             }
             
+            // ✅ FIXED: Use correct ThirdWeb v5 syntax
             const owner = await readContract({
-              contract,
-              method: "ownerOf",
+              contract: evermarkNFT,
+              method: "function ownerOf(uint256) view returns (address)",
               params: [BigInt(i)],
             });
             
@@ -415,34 +311,25 @@ export function useUserEvermarks(userAddress?: string) {
 
             console.log(`✅ Token ${i} is owned by user, fetching metadata...`);
 
-            // ✅ FIXED: Use correct method name from ABI
-            const evermarkData = await readContract({
-              contract,
-              method: "evermarkData",
-              params: [BigInt(i)],
-            });
+            // ✅ Use core utility for fetching complete data
+            const evermarkData = await fetchEvermarkData(BigInt(i));
 
-            // ✅ FIXED: Extract fields from evermarkData tuple
-            const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
+            if (evermarkData) {
+              const evermark: Evermark = {
+                id: evermarkData.id,
+                title: evermarkData.title,
+                author: evermarkData.author,
+                description: evermarkData.description,
+                sourceUrl: evermarkData.sourceUrl,
+                image: evermarkData.image,
+                metadataURI: evermarkData.metadataURI,
+                creator: evermarkData.creator,
+                creationTime: evermarkData.creationTime,
+              };
 
-            console.log(`📖 Token ${i} metadata:`, { title, creator, metadataURI });
-
-            const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
-
-            const evermark: Evermark = {
-              id: i.toString(),
-              title: title || `Evermark #${i}`,
-              author: creator || "Unknown",
-              description,
-              sourceUrl,
-              image,
-              metadataURI,
-              creator: minter,
-              creationTime: Number(creationTime) * 1000,
-            };
-
-            userTokens.push(evermark);
-            console.log(`✅ Added token ${i} to userTokens. Total so far: ${userTokens.length}`);
+              userTokens.push(evermark);
+              console.log(`✅ Added token ${i} to userTokens. Total so far: ${userTokens.length}`);
+            }
             
           } catch (tokenError) {
             console.warn(`⚠️ Error fetching token ${i}:`, tokenError);
@@ -478,7 +365,7 @@ export function useUserEvermarks(userAddress?: string) {
       console.log('🧹 useUserEvermarks cleanup for:', userAddress);
       isMounted = false;
     };
-  }, [userAddress, contract]); // Removed dependencies that might cause unnecessary re-runs
+  }, [userAddress, evermarkNFT, fetchEvermarkData]);
 
   // 🐛 DEBUG: Log state changes
   useEffect(() => {

@@ -1,7 +1,9 @@
-// src/hooks/domain/useEvermarkCreation.ts - ✅ INTEGRATED with core hooks
+// src/hooks/useEvermarkCreation.ts - ✅ FIXED with proper imports
 import { useState, useRef, useCallback } from "react";
 import { useReadContract } from "thirdweb/react"; 
-import { CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
+import { getContract } from "thirdweb";
+import { client } from "../lib/thirdweb";
+import { CHAIN, CONTRACTS, EVERMARK_NFT_ABI } from "../lib/contracts";
 import { useTransactionUtils } from './core/useTransactionUtils';
 import { useMetadataUtils } from './core/useMetadataUtils';
 import { useWalletAuth } from "../providers/WalletProvider";
@@ -38,19 +40,23 @@ export function useEvermarkCreation() {
     buildComprehensiveMetadata, 
     validateMetadata,
     isFarcasterInput,
-    fetchCastDataFromPinata 
+    fetchCastDataFromPinata,
+    uploadMetadataToIPFS
   } = useMetadataUtils();
   const { address, requireConnection } = useWalletAuth();
 
+  // ✅ Create contract for fee query
+  const evermarkContract = getContract({
+    client,
+    chain: CHAIN,
+    address: CONTRACTS.EVERMARK_NFT,
+    abi: EVERMARK_NFT_ABI,
+  });
+
   // ✅ Get minting fee using existing core pattern
   const { data: mintingFee, isLoading: isLoadingFee, error: feeError } = useReadContract({
-    contract: {
-      client,
-      chain: CHAIN,
-      address: CONTRACTS.EVERMARK_NFT,
-      abi: EVERMARK_NFT_ABI,
-    },
-    method: "MINTING_FEE",
+    contract: evermarkContract,
+    method: "function MINTING_FEE() view returns (uint256)",
     params: [],
     queryOptions: {
       enabled: !!CONTRACTS.EVERMARK_NFT,
@@ -59,7 +65,7 @@ export function useEvermarkCreation() {
   });
 
   // ✅ SIMPLIFIED: Create Evermark using core utilities
-  const createEvermark = useCallback(async (metadata: EvermarkMetadata): Promise<CreateEvermarkResult> => {
+  const createEvermark = useCallback(async (metadata: any): Promise<CreateEvermarkResult> => {
     // ✅ Better fee validation using core patterns
     if (isLoadingFee) {
       throw new Error("Loading minting fee from contract...");
@@ -121,13 +127,7 @@ export function useEvermarkCreation() {
       // Step 4: Upload metadata using core utility
       setCurrentStep("Uploading metadata to IPFS...");
       setUploadProgress(85);
-      const metadataBlob = new Blob([JSON.stringify(comprehensiveMetadata, null, 2)], {
-        type: 'application/json'
-      });
-      const metadataFile = new File([metadataBlob], 'metadata.json', { 
-        type: 'application/json' 
-      });
-      const metadataURI = await uploadToPinata(metadataFile);
+      const metadataURI = await uploadMetadataToIPFS(comprehensiveMetadata);
 
       // Step 5: Execute mint transaction using core utility
       setCurrentStep("Creating Evermark NFT...");
@@ -187,7 +187,8 @@ export function useEvermarkCreation() {
     buildComprehensiveMetadata,
     validateMetadata,
     isFarcasterInput,
-    fetchCastDataFromPinata
+    fetchCastDataFromPinata,
+    uploadMetadataToIPFS
   ]);
 
   const cancelCreation = useCallback(() => {
@@ -201,7 +202,6 @@ export function useEvermarkCreation() {
   const validateFarcasterInput = useCallback((input: string) => {
     return {
       isValid: isFarcasterInput(input),
-      // Add more validation if needed
     };
   }, [isFarcasterInput]);
 
@@ -235,13 +235,3 @@ export function useEvermarkCreation() {
     userAddress: address,
   };
 }
-
-// ✅ ELIMINATED: 400+ lines of duplicate code including:
-// - Custom transaction state management and preparation
-// - Duplicate IPFS upload logic (now in core/useMetadataUtils)
-// - Manual Farcaster cast fetching (now in core/useMetadataUtils)
-// - Duplicate metadata building logic (now in core/useMetadataUtils)
-// - Custom error handling and parsing
-// - Manual wallet connection checks
-// - Duplicate contract instance creation
-// - Custom validation logic (now in core/useMetadataUtils)

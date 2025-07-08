@@ -1,8 +1,11 @@
-import { useReadContract, useSendTransaction } from "thirdweb/react";
-import { getContract, readContract, prepareContractCall } from "thirdweb";
-import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, LEADERBOARD_ABI, VOTING_ABI, EVERMARK_NFT_ABI } from "../lib/contracts";
+// src/hooks/useLeaderboard.ts - ✅ SIMPLIFIED using core infrastructure
+import { useReadContract } from "thirdweb/react";
+import { readContract } from "thirdweb";
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useContracts } from './core/useContracts';
+import { useMetadataUtils } from './core/useMetadataUtils';
+import { useTransactionUtils } from './core/useTransactionUtils';
+import { LEADERBOARD_ABI, CONTRACTS } from "../lib/contracts";
 
 export interface LeaderboardEntry {
   evermark: {
@@ -20,81 +23,19 @@ export interface LeaderboardEntry {
   rank: number;
 }
 
-// Helper function to fetch IPFS metadata
-const fetchIPFSMetadata = async (metadataURI: string) => {
-  const defaultReturn = { description: "", sourceUrl: "", image: "" };
-  
-  if (!metadataURI || !metadataURI.startsWith('ipfs://')) {
-    return defaultReturn;
-  }
-
-  try {
-    const ipfsHash = metadataURI.replace('ipfs://', '');
-    if (ipfsHash.length < 40) {
-      return defaultReturn;
-    }
-    
-    const ipfsGatewayUrl = `https://gateway.pinata.cloud/ipfs/${ipfsHash}`;
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    
-    const response = await fetch(ipfsGatewayUrl, { 
-      signal: controller.signal,
-      cache: 'force-cache',
-      headers: { 'Accept': 'application/json' }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    if (!response.ok) {
-      return defaultReturn;
-    }
-    
-    const ipfsData = await response.json();
-    
-    return {
-      description: ipfsData.description || "",
-      sourceUrl: ipfsData.external_url || "",
-      image: ipfsData.image 
-        ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
-        : ""
-    };
-  } catch (error) {
-    return defaultReturn;
-  }
-};
-
 export function useLeaderboard(weekNumber?: number) {
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // Create contracts with useMemo to prevent recreation
-  const votingContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.VOTING,
-    abi: VOTING_ABI,
-  }), []);
-  
-  const leaderboardContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.LEADERBOARD,
-    abi: LEADERBOARD_ABI,
-  }), []);
-  
-  const evermarkContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.EVERMARK_NFT,
-    abi: EVERMARK_NFT_ABI,
-  }), []);
+  // ✅ Use core infrastructure
+  const { voting, leaderboard, evermarkNFT } = useContracts();
+  const { fetchEvermarkData } = useMetadataUtils();
   
   // Get current cycle from voting contract
   const { data: currentCycle, isLoading: isLoadingCycle } = useReadContract({
-    contract: votingContract,
-    method: "getCurrentCycle",
+    contract: voting,
+    method: "function getCurrentCycle() view returns (uint256)",
     params: [],
   });
   
@@ -115,13 +56,13 @@ export function useLeaderboard(weekNumber?: number) {
         
         console.log(`🔍 Fetching leaderboard for week ${targetWeek}...`);
         
-        // ✅ FIXED: Try the correct leaderboard methods first
+        // ✅ Try the correct leaderboard methods first
         let leaderboardData;
         try {
-          // ✅ Method 1: Try getting from LiveLeaderboard contract
+          // Method 1: Try getting from LiveLeaderboard contract
           leaderboardData = await readContract({
-            contract: leaderboardContract,
-            method: "getLeaderboard",
+            contract: leaderboard,
+            method: "function getLeaderboard(uint256,uint256,uint256) view returns (tuple[])",
             params: [BigInt(targetWeek), BigInt(1), BigInt(10)], // cycle, startRank, count
           });
           console.log("✅ Found leaderboard data from LiveLeaderboard:", leaderboardData);
@@ -129,20 +70,20 @@ export function useLeaderboard(weekNumber?: number) {
           console.log("⚠️ LiveLeaderboard not available, trying voting contract...");
           
           try {
-            // ✅ Method 2: Try getting from Voting contract using correct method
+            // Method 2: Try getting from Voting contract using correct method
             leaderboardData = await readContract({
-              contract: votingContract,
-              method: "getLeaderboard",
+              contract: voting,
+              method: "function getLeaderboard(uint256) view returns (tuple[])",
               params: [BigInt(targetWeek)],
             });
             console.log("✅ Found leaderboard data from Voting contract:", leaderboardData);
           } catch (votingError) {
             console.log("⚠️ No finalized leaderboard data, building from active evermarks...");
             
-            // ✅ Method 3: Get active evermarks and build leaderboard
+            // Method 3: Get active evermarks and build leaderboard
             const activeEvermarksData = await readContract({
-              contract: votingContract,
-              method: "getActiveEvermarksInCycle",
+              contract: voting,
+              method: "function getActiveEvermarksInCycle(uint256) view returns (uint256[],uint256[])",
               params: [BigInt(targetWeek)],
             });
             
@@ -181,7 +122,7 @@ export function useLeaderboard(weekNumber?: number) {
           return;
         }
         
-        // Get complete Evermark metadata
+        // ✅ Get complete Evermark metadata using core utility
         console.log("🎨 Enhancing", leaderboardData.length, "entries with complete metadata...");
         const enhancedEntries = await Promise.all(
           leaderboardData.map(async (item: any, index: number) => {
@@ -193,52 +134,34 @@ export function useLeaderboard(weekNumber?: number) {
               
               console.log("🔍 Processing evermark:", evermarkId.toString());
               
-              // Check if evermark exists
-              const exists = await readContract({
-                contract: evermarkContract,
-                method: "exists",
-                params: [evermarkId],
-              });
+              // ✅ Use core utility for fetching complete data
+              const evermarkData = await fetchEvermarkData(evermarkId);
               
-              if (!exists) {
-                console.log(`⚠️ Evermark ${evermarkId} does not exist`);
+              if (!evermarkData) {
+                console.log(`⚠️ Evermark ${evermarkId} not found`);
                 return null;
               }
               
-              // ✅ FIXED: Use correct method name from ABI
-              const evermarkData = await readContract({
-                contract: evermarkContract,
-                method: "evermarkData",
-                params: [evermarkId],
-              });
-              
-              // ✅ FIXED: Extract fields from evermarkData tuple
-              const [title, creator, metadataURI, creationTime, minter, referrer] = evermarkData;
-              
-              console.log("📝 Evermark metadata:", { title, creator, metadataURI });
-              
-              // Fetch IPFS metadata for description, image, etc.
-              console.log("🌐 Fetching IPFS metadata for:", metadataURI);
-              const { description, sourceUrl, image } = await fetchIPFSMetadata(metadataURI);
-              
               console.log(`✅ Enhanced evermark ${evermarkId}:`, { 
-                title, creator, minter, 
-                hasDescription: !!description, 
-                hasImage: !!image,
+                title: evermarkData.title, 
+                author: evermarkData.author, 
+                creator: evermarkData.creator,
+                hasDescription: !!evermarkData.description, 
+                hasImage: !!evermarkData.image,
                 votes: votes.toString()
               });
               
               return {
                 evermark: {
-                  id: evermarkId.toString(),
-                  title: title || `Evermark #${evermarkId}`,
-                  author: creator || "Unknown",
-                  creator: minter,
-                  description,
-                  sourceUrl,
-                  image,
-                  metadataURI,
-                  creationTime: Number(creationTime) * 1000, // Convert to milliseconds
+                  id: evermarkData.id,
+                  title: evermarkData.title,
+                  author: evermarkData.author,
+                  creator: evermarkData.creator,
+                  description: evermarkData.description,
+                  sourceUrl: evermarkData.sourceUrl,
+                  image: evermarkData.image,
+                  metadataURI: evermarkData.metadataURI,
+                  creationTime: evermarkData.creationTime,
                 },
                 votes: votes,
                 rank: Number(rank),
@@ -289,7 +212,7 @@ export function useLeaderboard(weekNumber?: number) {
     return () => {
       isMounted = false;
     };
-  }, [targetWeek, isLoadingCycle, votingContract, leaderboardContract, evermarkContract]);
+  }, [targetWeek, isLoadingCycle, voting, leaderboard, fetchEvermarkData]);
   
   // Check if leaderboard is finalized
   const isFinalized = useMemo(() => {
@@ -313,33 +236,30 @@ export function useLeaderboardManagement() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  const leaderboardContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.LEADERBOARD,
-    abi: LEADERBOARD_ABI,
-  }), []);
+  // ✅ Use core infrastructure properly
+  const { executeTransaction } = useTransactionUtils();
   
-  const { mutate: sendTransaction } = useSendTransaction();
-  
-  // ✅ FIXED: Use correct method names for leaderboard management
+  // ✅ FIXED: Use contract address and imported ABI
   const updateLeaderboard = useCallback(async (cycle: number, evermarkId: number) => {
     setIsProcessing(true);
     setError(null);
     setSuccess(null);
     
     try {
-      const transaction = prepareContractCall({
-        contract: leaderboardContract,
-        method: "updateEvermarkInLeaderboard",
-        params: [BigInt(cycle), BigInt(evermarkId)],
-      });
+      const result = await executeTransaction(
+        CONTRACTS.LEADERBOARD,
+        LEADERBOARD_ABI,
+        "updateEvermarkInLeaderboard",
+        [BigInt(cycle), BigInt(evermarkId)]
+      );
       
-      await sendTransaction(transaction as any);
-      
-      const successMsg = `Successfully updated leaderboard for Evermark ${evermarkId} in cycle ${cycle}`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+      if (result.success) {
+        const successMsg = `Successfully updated leaderboard for Evermark ${evermarkId} in cycle ${cycle}`;
+        setSuccess(successMsg);
+        return { success: true, message: successMsg };
+      } else {
+        throw new Error(result.error || 'Update failed');
+      }
     } catch (err: any) {
       console.error("Error updating leaderboard:", err);
       const errorMsg = err instanceof Error ? err.message : "Failed to update leaderboard";
@@ -348,7 +268,7 @@ export function useLeaderboardManagement() {
     } finally {
       setIsProcessing(false);
     }
-  }, [leaderboardContract, sendTransaction]);
+  }, [executeTransaction]);
   
   const batchUpdateLeaderboard = useCallback(async (cycle: number, evermarkIds: number[]) => {
     setIsProcessing(true);
@@ -356,17 +276,20 @@ export function useLeaderboardManagement() {
     setSuccess(null);
     
     try {
-      const transaction = prepareContractCall({
-        contract: leaderboardContract,
-        method: "batchUpdateLeaderboard",
-        params: [BigInt(cycle), evermarkIds.map(id => BigInt(id))],
-      });
+      const result = await executeTransaction(
+        CONTRACTS.LEADERBOARD,
+        LEADERBOARD_ABI,
+        "batchUpdateLeaderboard",
+        [BigInt(cycle), evermarkIds.map(id => BigInt(id))]
+      );
       
-      await sendTransaction(transaction as any);
-      
-      const successMsg = `Successfully batch updated leaderboard for ${evermarkIds.length} evermarks in cycle ${cycle}`;
-      setSuccess(successMsg);
-      return { success: true, message: successMsg };
+      if (result.success) {
+        const successMsg = `Successfully batch updated leaderboard for ${evermarkIds.length} evermarks in cycle ${cycle}`;
+        setSuccess(successMsg);
+        return { success: true, message: successMsg };
+      } else {
+        throw new Error(result.error || 'Batch update failed');
+      }
     } catch (err: any) {
       console.error("Error batch updating leaderboard:", err);
       const errorMsg = err instanceof Error ? err.message : "Failed to batch update leaderboard";
@@ -375,7 +298,7 @@ export function useLeaderboardManagement() {
     } finally {
       setIsProcessing(false);
     }
-  }, [leaderboardContract, sendTransaction]);
+  }, [executeTransaction]);
   
   return {
     updateLeaderboard,
