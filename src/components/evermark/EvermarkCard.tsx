@@ -1,21 +1,25 @@
-// src/components/evermark/EvermarkCard.tsx - ✅ ENHANCED with mobile optimization
+// src/components/evermark/EvermarkCard.tsx - ✅ ENHANCED with UniversalImage and improved styling
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { BookmarkIcon, UserIcon, CalendarIcon, ImageIcon, MessageCircleIcon, EyeIcon } from 'lucide-react';
+import { BookmarkIcon, UserIcon, CalendarIcon, MessageCircleIcon, EyeIcon, ExternalLinkIcon } from 'lucide-react';
 import { Evermark } from '../../hooks/useEvermarks';
 import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
 import { cn, useIsMobile, touchFriendly, textSizes, spacing } from '../../utils/responsive';
 import { ShareButton } from '../sharing/ShareButton';
 import { QuickBookshelfButton } from '../bookshelf/FloatingBookshelfWidget';
 import { useProfile } from '../../hooks/useProfile';
+import { UniversalImage, EvermarkImage } from '../layout/UniversalImage';
 
 interface EvermarkCardProps {
   evermark: Evermark;
-  isCompact?: boolean;
+  variant?: 'default' | 'compact' | 'featured' | 'minimal';
   showDescription?: boolean;
   showImage?: boolean;
   showActions?: boolean;
   showViews?: boolean;
+  showMetadata?: boolean;
+  priority?: boolean; // For above-the-fold images
+  className?: string;
 }
 
 // Enhanced metadata fetching with caching
@@ -74,15 +78,16 @@ const fetchIPFSMetadata = async (metadataURI: string) => {
 
 export function EvermarkCard({ 
   evermark, 
-  isCompact = false, 
+  variant = 'default',
   showDescription = true,
   showImage = true,
   showActions = true,
-  showViews = true
+  showViews = true,
+  showMetadata = true,
+  priority = false,
+  className = ''
 }: EvermarkCardProps) {
   const { id, title, author, description, creationTime } = evermark;
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
   const [metadata, setMetadata] = useState<any>(null);
   const [metadataLoading, setMetadataLoading] = useState(true);
   
@@ -133,104 +138,134 @@ export function EvermarkCard({
     return rtf.format(Math.round(daysDiff / 30), 'month');
   };
 
-  const handleImageLoad = () => setImageLoading(false);
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoading(false);
+  // Variant-specific configurations
+  const variantConfig = {
+    default: {
+      container: 'flex flex-col h-full',
+      imageAspect: 'video' as const,
+      imageHeight: 'h-48 sm:h-56',
+      showFullMetadata: true,
+      padding: 'p-4 sm:p-5',
+    },
+    compact: {
+      container: 'flex flex-row h-24 sm:h-28',
+      imageAspect: 'square' as const,
+      imageHeight: 'w-20 h-20 sm:w-24 sm:h-24',
+      showFullMetadata: false,
+      padding: 'p-3 sm:p-4',
+    },
+    featured: {
+      container: 'flex flex-col h-full',
+      imageAspect: 'wide' as const,
+      imageHeight: 'h-64 sm:h-72 lg:h-80',
+      showFullMetadata: true,
+      padding: 'p-6 sm:p-8',
+    },
+    minimal: {
+      container: 'flex flex-col h-full',
+      imageAspect: 'photo' as const,
+      imageHeight: 'h-40 sm:h-48',
+      showFullMetadata: false,
+      padding: 'p-3 sm:p-4',
+    },
   };
-  
-  // ✅ MOBILE-OPTIMIZED: Compact view for mobile/list layouts
-  if (isCompact || isMobile) {
+
+  const config = variantConfig[variant];
+
+  // ✅ COMPACT VIEW for mobile/list layouts
+  if (variant === 'compact' || (isMobile && variant === 'default')) {
     return (
-      <div className={cn("bg-white rounded-lg shadow-sm border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all duration-200 overflow-hidden group", touchFriendly.card)}>
-        <div className="flex">
-          {/* Image section - responsive width */}
+      <div className={cn(
+        "bg-white rounded-lg shadow-sm border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all duration-200 overflow-hidden group",
+        touchFriendly.card,
+        className
+      )}>
+        <div className={config.container}>
+          {/* Image section */}
           {showImage && (
-            <div className="w-20 sm:w-24 md:w-28 h-20 sm:h-24 md:h-28 bg-gray-100 flex-shrink-0 relative">
-              {displayImage && !imageError ? (
-                <div className="relative w-full h-full">
-                  {imageLoading && (
-                    <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-l-lg"></div>
-                  )}
-                  <img
-                    src={displayImage}
-                    alt={displayTitle}
-                    className="w-full h-full object-cover rounded-l-lg group-hover:scale-105 transition-transform duration-300"
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-full bg-gray-100 flex items-center justify-center rounded-l-lg">
-                  {isFarcasterCast() ? (
-                    <MessageCircleIcon className="h-5 w-5 sm:h-6 sm:w-6 text-purple-400" />
-                  ) : (
-                    <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
-                  )}
-                </div>
-              )}
+            <div className={cn("flex-shrink-0 relative", config.imageHeight)}>
+              <EvermarkImage
+                src={displayImage}
+                alt={displayTitle}
+                aspectRatio={config.imageAspect}
+                rounded="none"
+                priority={priority}
+                className="group-hover:scale-105 transition-transform duration-300"
+                containerClassName="rounded-l-lg"
+              />
               
               {/* Platform badge */}
               {isFarcasterCast() && (
-                <div className="absolute top-1 right-1 bg-purple-600 text-white px-1.5 py-0.5 rounded text-xs font-medium">
-                  🎯
+                <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center shadow-sm">
+                  <MessageCircleIcon className="h-3 w-3 mr-1" />
+                  Cast
                 </div>
               )}
             </div>
           )}
           
-          {/* Content section - responsive padding */}
-          <div className={cn("flex-1 min-w-0", spacing.responsive['sm-md-lg'])}>
-            <div className="flex items-center justify-between mb-1 sm:mb-2">
-              <Link 
-                to={`/evermark/${id}`}
-                className={cn(
-                  "font-medium text-gray-900 hover:text-purple-600 transition-colors truncate pr-2 flex-1",
-                  textSizes.responsive['sm-base-lg']
-                )}
-                title={displayTitle}
-              >
-                {displayTitle}
-              </Link>
-              
-              <div className="flex items-center space-x-2 flex-shrink-0">
-                {/* View count */}
-                {showViews && viewStats && (
-                  <div className="flex items-center text-xs text-gray-500">
-                    <EyeIcon className="h-3 w-3 mr-1" />
-                    <span>{formatViewCount(viewStats.totalViews)}</span>
-                  </div>
-                )}
+          {/* Content section */}
+          <div className={cn("flex-1 min-w-0 flex flex-col justify-between", config.padding)}>
+            <div className="flex-1">
+              <div className="flex items-start justify-between mb-2">
+                <Link 
+                  to={`/evermark/${id}`}
+                  className={cn(
+                    "font-semibold text-gray-900 hover:text-purple-600 transition-colors line-clamp-2 flex-1 pr-2",
+                    textSizes.responsive['sm-base-lg']
+                  )}
+                  title={displayTitle}
+                >
+                  {displayTitle}
+                </Link>
                 
                 {/* Actions */}
                 {showActions && (
-                  <div className="flex items-center space-x-1">
+                  <div className="flex items-center space-x-1 flex-shrink-0">
                     <QuickBookshelfButton 
                       evermarkId={id} 
                       userAddress={primaryAddress}
                       size="sm"
+                      variant="icon"
                     />
                     <ShareButton 
                       evermarkId={id}
                       title={displayTitle}
                       description={displayDescription}
                       author={author}
+                      variant="icon"
+                      size="sm"
                     />
                   </div>
                 )}
               </div>
+              
+              {/* Metadata */}
+              {showMetadata && (
+                <div className="flex items-center text-xs text-gray-600 mb-1 space-x-3">
+                  <div className="flex items-center min-w-0">
+                    <UserIcon className="h-3 w-3 mr-1 flex-shrink-0" />
+                    <span className="truncate">{author}</span>
+                  </div>
+                  <div className="flex items-center flex-shrink-0">
+                    <CalendarIcon className="h-3 w-3 mr-1" />
+                    <span>{getRelativeTime(creationTime)}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Views */}
+              {showViews && viewStats && viewStats.totalViews > 0 && (
+                <div className="flex items-center text-xs text-gray-500">
+                  <EyeIcon className="h-3 w-3 mr-1" />
+                  <span>{formatViewCount(viewStats.totalViews)} views</span>
+                </div>
+              )}
             </div>
             
-            <div className="flex items-center text-xs sm:text-sm text-gray-600 mb-1">
-              <UserIcon className="h-3 w-3 mr-1 flex-shrink-0" />
-              <span className="truncate mr-2">{author}</span>
-              <span className="text-gray-400">•</span>
-              <span className="ml-1 flex-shrink-0">{getRelativeTime(creationTime)}</span>
-            </div>
-            
-            {/* Show cast content preview for Farcaster */}
+            {/* Farcaster cast preview */}
             {showDescription && isFarcasterCast() && metadata?.farcaster_data?.content && (
-              <div className="mt-1 text-xs text-gray-600 italic line-clamp-2">
+              <div className="mt-2 text-xs text-gray-600 italic line-clamp-2 bg-purple-50 rounded px-2 py-1">
                 "{metadata.farcaster_data.content}"
               </div>
             )}
@@ -240,129 +275,151 @@ export function EvermarkCard({
     );
   }
   
-  // ✅ MOBILE-OPTIMIZED: Full card view for desktop/grid layouts
+  // ✅ FULL CARD VIEW for desktop/grid layouts
   return (
     <div className={cn(
-      "bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-all duration-200 hover:shadow-md hover:border-purple-300 group",
-      touchFriendly.card
+      "bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden transition-all duration-200 hover:shadow-lg hover:border-purple-300 group h-full flex flex-col",
+      touchFriendly.card,
+      className
     )}>
-      {/* Image section - responsive height */}
+      {/* Image section */}
       {showImage && (
-        <div className="w-full h-32 sm:h-40 md:h-48 bg-gray-100 relative overflow-hidden">
-          {displayImage && !imageError ? (
-            <>
-              {imageLoading && (
-                <div className="w-full h-full bg-gray-200 animate-pulse"></div>
-              )}
-              <img
-                src={displayImage}
-                alt={displayTitle}
-                className={cn(
-                  "w-full h-full object-cover transition-transform duration-300 group-hover:scale-105",
-                  imageLoading ? 'hidden' : 'block'
-                )}
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            </>
-          ) : (
-            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-              {isFarcasterCast() ? (
-                <MessageCircleIcon className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-purple-400" />
-              ) : (
-                <ImageIcon className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-gray-400" />
-              )}
-            </div>
-          )}
+        <div className={cn("relative", config.imageHeight)}>
+          <EvermarkImage
+            src={displayImage}
+            alt={displayTitle}
+            aspectRatio={config.imageAspect}
+            rounded="none"
+            priority={priority}
+            overlay={showActions}
+            overlayContent={
+              showActions ? (
+                <div className="flex space-x-2">
+                  <QuickBookshelfButton 
+                    evermarkId={id} 
+                    userAddress={primaryAddress}
+                    variant="icon"
+                  />
+                  <ShareButton 
+                    evermarkId={id}
+                    title={displayTitle}
+                    description={displayDescription}
+                    author={author}
+                    variant="icon"
+                  />
+                </div>
+              ) : undefined
+            }
+            className="group-hover:scale-105 transition-transform duration-300"
+          />
           
           {/* Platform badge */}
           {isFarcasterCast() && (
-            <div className="absolute top-2 right-2 bg-purple-600 text-white px-2 py-1 rounded-full text-xs font-medium flex items-center">
-              <MessageCircleIcon className="h-3 w-3 mr-1" />
+            <div className="absolute top-3 right-3 bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium flex items-center shadow-lg">
+              <MessageCircleIcon className="h-4 w-4 mr-1" />
               Farcaster
             </div>
           )}
           
-          {/* Action overlay on hover */}
-          {showActions && (
-            <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex space-x-2">
-              <QuickBookshelfButton 
-                evermarkId={id} 
-                userAddress={primaryAddress}
-              />
+          {/* Views badge */}
+          {showViews && viewStats && viewStats.totalViews > 0 && (
+            <div className="absolute bottom-3 left-3 bg-black/60 text-white px-2 py-1 rounded text-xs font-medium flex items-center">
+              <EyeIcon className="h-3 w-3 mr-1" />
+              {formatViewCount(viewStats.totalViews)}
             </div>
           )}
         </div>
       )}
       
-      {/* Content section - responsive padding */}
-      <div className={spacing.responsive['md-lg-xl']}>
+      {/* Content section */}
+      <div className={cn("flex-1 flex flex-col", config.padding)}>
+        {/* Header */}
         <div className="flex items-start justify-between mb-3">
-          <h3 className={cn(
-            "font-serif font-semibold text-gray-900 mb-2 flex-1",
-            textSizes.responsive['lg-xl-2xl']
-          )}>
-            <Link 
-              to={`/evermark/${id}`} 
-              className="hover:text-purple-600 transition-colors"
-            >
-              {displayTitle}
-            </Link>
-          </h3>
-          <div className="bg-purple-100 rounded-full p-2 ml-3 flex-shrink-0">
-            <BookmarkIcon className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+          <div className="flex-1 min-w-0">
+            <h3 className={cn(
+              "font-serif font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors",
+              textSizes.responsive['lg-xl-2xl']
+            )}>
+              <Link to={`/evermark/${id}`}>
+                {displayTitle}
+              </Link>
+            </h3>
           </div>
-        </div>
-        
-        <div className="flex items-center text-sm text-gray-600 mb-3 flex-wrap gap-2 sm:gap-4">
-          <div className="flex items-center">
-            <UserIcon className="h-4 w-4 mr-1" />
-            <span>{author}</span>
-          </div>
-          <div className="flex items-center">
-            <CalendarIcon className="h-4 w-4 mr-1" />
-            <span>{getRelativeTime(creationTime)}</span>
-          </div>
-          {showViews && viewStats && viewStats.totalViews > 0 && (
-            <div className="flex items-center">
-              <EyeIcon className="h-4 w-4 mr-1" />
-              <span>{formatViewCount(viewStats.totalViews)} views</span>
+          
+          {!showImage && (
+            <div className="bg-purple-100 rounded-full p-2 ml-3 flex-shrink-0">
+              <BookmarkIcon className="h-5 w-5 text-purple-600" />
             </div>
           )}
         </div>
         
-        {/* Description or cast content - responsive visibility */}
+        {/* Metadata */}
+        {showMetadata && config.showFullMetadata && (
+          <div className="flex items-center text-sm text-gray-600 mb-3 flex-wrap gap-x-4 gap-y-1">
+            <div className="flex items-center">
+              <UserIcon className="h-4 w-4 mr-1" />
+              <span className="font-medium">{author}</span>
+            </div>
+            <div className="flex items-center">
+              <CalendarIcon className="h-4 w-4 mr-1" />
+              <span>{getRelativeTime(creationTime)}</span>
+            </div>
+            {showViews && viewStats && viewStats.totalViews > 0 && (
+              <div className="flex items-center">
+                <EyeIcon className="h-4 w-4 mr-1" />
+                <span>{formatViewCount(viewStats.totalViews)} views</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Description or cast content */}
         {showDescription && displayDescription && (
-          <div className="mb-4">
+          <div className="flex-1 mb-4">
             {isFarcasterCast() ? (
               <div className="bg-purple-50 rounded-lg p-3 border-l-4 border-purple-400">
-                <p className="text-gray-700 line-clamp-3 italic text-sm sm:text-base">
+                <p className="text-gray-700 line-clamp-3 italic text-sm">
                   "{displayDescription}"
                 </p>
+                {metadata?.farcaster_data?.author && (
+                  <p className="text-xs text-purple-600 mt-2 font-medium">
+                    — @{metadata.farcaster_data.author}
+                  </p>
+                )}
               </div>
             ) : (
-              <p className="text-gray-700 line-clamp-3 text-sm sm:text-base">
+              <p className="text-gray-700 line-clamp-3 text-sm leading-relaxed">
                 {displayDescription}
               </p>
             )}
           </div>
         )}
         
-        <div className="flex justify-between items-center">
+        {/* Footer */}
+        <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-100">
           <Link 
             to={`/evermark/${id}`}
-            className="text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors"
+            className="inline-flex items-center text-sm font-medium text-purple-600 hover:text-purple-700 transition-colors"
           >
             View Details
+            <ExternalLinkIcon className="h-3 w-3 ml-1" />
           </Link>
           
-          {showActions && (
+          {showActions && !showImage && (
             <div className="flex items-center space-x-2">
+              <QuickBookshelfButton 
+                evermarkId={id} 
+                userAddress={primaryAddress}
+                size="sm"
+                variant="icon"
+              />
               <ShareButton 
                 evermarkId={id}
                 title={displayTitle}
                 description={displayDescription}
                 author={author}
+                variant="icon"
+                size="sm"
               />
             </div>
           )}

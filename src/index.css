@@ -1,9 +1,11 @@
+/* src/index.css - Enhanced mobile-first styling for Evermark */
+
 /* Tailwind CSS Directives */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Base styles and custom properties */
+/* Mobile-first base styles and custom properties */
 @layer base {
   :root {
     /* Color scheme */
@@ -11,84 +13,280 @@
     --color-primary-dark: 109, 40, 217; /* Purple-700 */
     --color-primary-light: 139, 92, 246; /* Purple-500 */
     
-    /* Font settings */
-    font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+    /* Mobile-optimized font settings */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
     font-synthesis: none;
     font-weight: 400;
-    line-height: 1.5;
+    line-height: 1.6; /* Better for mobile reading */
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-text-size-adjust: 100%;
+    
+    /* Touch optimization */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
+  /* Mobile-first responsive HTML */
   html {
     @apply text-gray-900 bg-gray-50;
     scroll-behavior: smooth;
+    /* Prevent horizontal scroll on mobile */
+    overflow-x: hidden;
   }
   
   body {
     @apply bg-gray-50 text-gray-900 min-h-screen;
+    /* Prevent text inflation on mobile */
+    -webkit-text-size-adjust: 100%;
+    /* Better mobile performance */
+    overscroll-behavior-y: contain;
+    /* Prevent pull-to-refresh on some browsers */
+    overscroll-behavior-x: none;
   }
   
+  /* Mobile-optimized headings */
   h1, h2, h3, h4, h5, h6 {
     @apply font-medium;
+    /* Better line height for mobile */
+    line-height: 1.3;
+    /* Prevent awkward breaks */
+    text-wrap: balance;
   }
   
   h1 {
-    @apply text-3xl;
+    @apply text-2xl sm:text-3xl lg:text-4xl;
   }
   
   h2 {
-    @apply text-2xl;
+    @apply text-xl sm:text-2xl lg:text-3xl;
   }
   
   h3 {
-    @apply text-xl;
+    @apply text-lg sm:text-xl lg:text-2xl;
   }
   
+  h4 {
+    @apply text-base sm:text-lg;
+  }
+  
+  /* Mobile-friendly links */
   a {
     @apply text-purple-600 hover:text-purple-700 transition-colors;
+    /* Better touch targets */
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* Better mobile form elements */
+  input, textarea, select {
+    /* Prevent zoom on iOS */
+    font-size: 16px;
+    /* Better touch targets */
+    min-height: 44px;
+  }
+
+  @media (min-width: 640px) {
+    input, textarea, select {
+      font-size: 14px;
+    }
   }
 }
 
-/* Custom component classes */
+/* Mobile-optimized component classes */
 @layer components {
+  /* Enhanced button system */
   .btn {
-    @apply px-4 py-2 rounded-lg font-medium transition-colors;
+    @apply inline-flex items-center justify-center px-4 py-3 rounded-lg font-medium transition-all duration-200;
+    /* Ensure minimum touch target */
+    min-height: 48px;
+    min-width: 48px;
+    /* Improve touch feedback */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  
+  .btn:active {
+    transform: scale(0.95);
   }
   
   .btn-primary {
-    @apply bg-purple-600 text-white hover:bg-purple-700;
+    @apply bg-purple-600 text-white hover:bg-purple-700 focus:ring-purple-500;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 text-gray-800 hover:bg-gray-300;
+    @apply bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-500;
+  }
+
+  .btn-sm {
+    @apply px-3 py-2 text-sm;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .btn-lg {
+    @apply px-6 py-4 text-lg;
+    min-height: 56px;
   }
   
+  /* Enhanced card system */
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6;
+    /* Better mobile performance */
+    transform: translateZ(0);
+    /* Smooth hover transitions */
+    transition: all 0.2s ease-out;
+  }
+
+  .card:hover {
+    @apply shadow-md;
+    transform: translateY(-1px) translateZ(0);
+  }
+
+  .card-compact {
+    @apply p-3 sm:p-4;
+  }
+
+  .card-spacious {
+    @apply p-6 sm:p-8;
   }
   
+  /* Mobile-optimized input system */
   .input {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent;
+    @apply w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent;
+    /* Ensure proper sizing on mobile */
+    min-height: 48px;
+    font-size: 16px; /* Prevent zoom on iOS */
+    /* Better mobile interaction */
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  @media (min-width: 640px) {
+    .input {
+      @apply py-2;
+      min-height: 44px;
+      font-size: 14px;
+    }
   }
   
   .label {
     @apply block text-sm font-medium text-gray-700 mb-2;
+    /* Better touch targets for mobile */
+    min-height: 20px;
+  }
+
+  /* Image optimization classes */
+  .image-container {
+    @apply relative overflow-hidden bg-gray-100;
+    /* Better mobile performance */
+    transform: translateZ(0);
+  }
+
+  .image-optimized {
+    @apply w-full h-full object-cover transition-transform duration-300;
+    /* Prevent image dragging on mobile */
+    -webkit-user-drag: none;
+    user-select: none;
+  }
+
+  .image-optimized:hover {
+    transform: scale(1.05);
+  }
+
+  /* Evermark-specific image sizes */
+  .evermark-image-thumbnail {
+    @apply w-full h-32 sm:h-40;
+  }
+
+  .evermark-image-card {
+    @apply w-full h-48 sm:h-56 lg:h-64;
+  }
+
+  .evermark-image-hero {
+    @apply w-full h-64 sm:h-80 lg:h-96;
+  }
+
+  .evermark-avatar {
+    @apply w-10 h-10 sm:w-12 sm:h-12 rounded-full;
+  }
+
+  /* Mobile navigation improvements */
+  .nav-mobile {
+    @apply overflow-x-auto;
+    /* Hide scrollbar but keep functionality */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .nav-mobile::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-tab {
+    @apply px-4 py-3 text-sm font-medium whitespace-nowrap;
+    /* Better touch targets */
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* Loading states */
+  .skeleton {
+    @apply bg-gray-200 animate-pulse rounded;
+  }
+
+  .skeleton-text {
+    @apply h-4 bg-gray-200 animate-pulse rounded;
+  }
+
+  .skeleton-avatar {
+    @apply w-12 h-12 bg-gray-200 animate-pulse rounded-full;
+  }
+
+  /* Grid improvements for mobile */
+  .grid-mobile-friendly {
+    @apply grid gap-4 sm:gap-6;
+    /* Ensure minimum card width on mobile */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  @media (max-width: 640px) {
+    .grid-mobile-friendly {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  /* List improvements for mobile */
+  .list-mobile {
+    @apply space-y-0 divide-y divide-gray-200;
+  }
+
+  .list-item-mobile {
+    @apply flex items-center p-4 hover:bg-gray-50 transition-colors;
+    /* Better touch targets */
+    min-height: 64px;
   }
 }
 
-/* Focus styles for accessibility */
+/* Enhanced utility classes */
 @layer utilities {
+  /* Focus improvements for accessibility */
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2;
   }
   
+  /* Text utilities */
   .text-balance {
     text-wrap: balance;
   }
+
+  .text-pretty {
+    text-wrap: pretty;
+  }
   
+  /* Animation utilities */
   .animate-fadeIn {
     animation: fadeIn 0.5s ease-in-out;
   }
@@ -96,18 +294,371 @@
   .animate-slideIn {
     animation: slideIn 0.5s ease-out;
   }
+
+  .animate-scaleIn {
+    animation: scaleIn 0.3s ease-out;
+  }
+
+  /* Touch-friendly utilities */
+  .touch-friendly {
+    /* Better touch targets */
+    min-height: 44px;
+    min-width: 44px;
+    /* Improve touch interaction */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .touch-active:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease-out;
+  }
+
+  /* Mobile-specific utilities */
+  .mobile-full-width {
+    @apply w-full;
+  }
+
+  @media (min-width: 640px) {
+    .mobile-full-width {
+      @apply w-auto;
+    }
+  }
+
+  .mobile-stack {
+    @apply flex flex-col space-y-3;
+  }
+
+  @media (min-width: 640px) {
+    .mobile-stack {
+      @apply flex-row space-y-0 space-x-3;
+    }
+  }
+
+  /* Image aspect ratio utilities */
+  .aspect-evermark {
+    aspect-ratio: 4 / 3;
+  }
+
+  .aspect-evermark-wide {
+    aspect-ratio: 16 / 9;
+  }
+
+  .aspect-evermark-square {
+    aspect-ratio: 1 / 1;
+  }
+
+  /* Safe area utilities for mobile devices */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-right {
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Line clamping for mobile */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Hide scrollbars but keep functionality */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
-::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 rounded-full hover:bg-gray-500;
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Improved scrollbar styling for desktop */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-500;
+  }
+}
+
+/* Mobile-specific optimizations */
+@media (max-width: 767px) {
+  /* Reduce animations on mobile for better performance */
+  *, *::before, *::after {
+    animation-duration: 0.3s !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.2s !important;
+    transition-delay: 0s !important;
+  }
+
+  /* Better mobile spacing */
+  .container {
+    @apply px-4;
+  }
+
+  /* Ensure cards don't get too small on mobile */
+  .card {
+    min-width: 280px;
+  }
+
+  /* Better mobile typography */
+  p {
+    line-height: 1.6;
+  }
+
+  /* Improved mobile buttons */
+  button, .btn {
+    letter-spacing: 0.025em;
+  }
+}
+
+/* High DPI display optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .image-optimized {
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+}
+
+/* Dark mode preparation (if you want to add it later) */
+@media (prefers-color-scheme: dark) {
+  /* Add dark mode styles here if needed */
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .card {
+    @apply shadow-none border border-gray-300;
+  }
+}
+
+/* Add these critical mobile fixes to your existing index.css */
+
+/* CRITICAL MOBILE FIXES - Add after your existing Tailwind directives */
+
+@layer base {
+  /* Prevent horizontal scroll on mobile */
+  html, body {
+    overflow-x: hidden;
+  }
+  
+  /* Better mobile form inputs (prevents zoom on iOS) */
+  input, textarea, select {
+    font-size: 16px;
+    -webkit-appearance: none;
+  }
+  
+  /* Better touch targets */
+  button, a {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+}
+
+@layer components {
+  /* Fix your existing button classes for mobile */
+  .btn {
+    @apply px-4 py-3 min-h-[48px] min-w-[48px] touch-manipulation;
+  }
+  
+  /* Fix your existing card classes for mobile */
+  .card {
+    @apply p-4 sm:p-6; /* Instead of fixed p-6 */
+  }
+  
+  /* Fix your existing input classes for mobile */
+  .input {
+    @apply px-3 py-3 min-h-[48px];
+    font-size: 16px; /* Prevent iOS zoom */
+  }
+}
+
+@layer utilities {
+  /* Mobile-first grid utilities */
+  .grid-mobile-safe {
+    @apply grid grid-cols-1 gap-4 sm:gap-6;
+  }
+  
+  .grid-mobile-2 {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6;
+  }
+  
+  .grid-mobile-3 {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6;
+  }
+  
+  .grid-mobile-4 {
+    @apply grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6;
+  }
+  
+  /* Mobile-first spacing utilities */
+  .space-mobile {
+    @apply space-y-4 sm:space-y-6;
+  }
+  
+  /* Mobile-first flex utilities */
+  .flex-mobile-stack {
+    @apply flex flex-col sm:flex-row gap-3 sm:gap-4;
+  }
+  
+  .flex-mobile-spread {
+    @apply flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4;
+  }
+  
+  /* Text utilities for mobile */
+  .text-mobile-title {
+    @apply text-xl sm:text-2xl lg:text-3xl;
+  }
+  
+  .text-mobile-subtitle {
+    @apply text-base sm:text-lg;
+  }
+  
+  /* Hide scrollbars but keep functionality */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Touch-friendly active states */
+  .touch-active:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease-out;
+  }
+}
+
+/* Mobile performance optimizations */
+@media (max-width: 767px) {
+  /* Reduce animations on mobile */
+  *, *::before, *::after {
+    animation-duration: 0.2s !important;
+    transition-duration: 0.15s !important;
+  }
+  
+  /* Better mobile container */
+  .container {
+    @apply px-4;
+  }
+}
+
+/* Add to your main CSS file (src/index.css or similar) */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Additional image-related utilities */
+.image-blur-up {
+  filter: blur(4px);
+  transition: filter 0.3s ease;
+}
+
+.image-blur-up.loaded {
+  filter: blur(0);
+}
+
+/* Ensure images don't cause layout shift */
+.aspect-container {
+  position: relative;
+}
+
+.aspect-container img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
 }
