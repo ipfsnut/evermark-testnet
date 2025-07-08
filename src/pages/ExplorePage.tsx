@@ -1,4 +1,3 @@
-// src/pages/ExplorePage.tsx - Main feed page with pagination and filtering
 import React, { useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { 

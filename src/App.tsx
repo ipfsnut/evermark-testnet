@@ -206,7 +206,6 @@ function AppContent() {
   return (
     <ErrorBoundary>
       <Layout>
-        // Fixed routing order in App.tsx - Put ALL specific routes before catch-all routes
 
 <Routes>
   {/* SPECIFIC ROUTES FIRST - These must come before any dynamic routes */}
