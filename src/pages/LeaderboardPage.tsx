@@ -1,16 +1,29 @@
-// src/pages/LeaderboardPage.tsx - Enhanced with delegation integration
+// src/pages/LeaderboardPage.tsx - ✅ MOBILE-OPTIMIZED
 import React, { useState } from 'react';
 import { useLeaderboard } from '../hooks/useLeaderboard';
 import { useProfile } from '../hooks/useProfile';
 import { useDelegationHistory } from '../hooks/useDelegationHistory';
 import { VotingPanel } from '../components/voting/VotingPanel';
+import { EvermarkImage } from '../components/layout/UniversalImage';
 import { toEther } from 'thirdweb/utils';
+import { 
+  TrophyIcon, 
+  VoteIcon, 
+  UserIcon, 
+  CalendarIcon,
+  ExternalLinkIcon,
+  ChevronRightIcon,
+  ArrowLeftIcon,
+  InfoIcon
+} from 'lucide-react';
+import { cn, useIsMobile, textSizes, spacing, touchFriendly } from '../utils/responsive';
 
 type LeaderboardTab = 'current' | 'previous' | 'delegate';
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('current');
   const [selectedEvermarkId, setSelectedEvermarkId] = useState<string | null>(null);
+  const isMobile = useIsMobile();
   
   const { primaryAddress } = useProfile();
   const { delegationStats } = useDelegationHistory(primaryAddress);
@@ -22,148 +35,440 @@ export default function LeaderboardPage() {
   
   const activeLeaderboard = activeTab === 'current' ? currentWeek : previousWeek;
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">🏆 Leaderboard</h1>
-              <p className="text-gray-600 mt-1">
-                Weekly rankings of the most supported Evermarks
-              </p>
+  // Mobile-optimized rank styling
+  const getRankDisplay = (rank: number) => {
+    const baseClasses = "flex items-center justify-center font-bold rounded-full";
+    
+    if (isMobile) {
+      switch (rank) {
+        case 1:
+          return { 
+            container: `${baseClasses} w-12 h-12 bg-gradient-to-br from-yellow-400 to-yellow-600 text-white shadow-lg`,
+            icon: '🥇',
+            text: '1st'
+          };
+        case 2:
+          return { 
+            container: `${baseClasses} w-10 h-10 bg-gradient-to-br from-gray-300 to-gray-500 text-white shadow-md`,
+            icon: '🥈',
+            text: '2nd'
+          };
+        case 3:
+          return { 
+            container: `${baseClasses} w-10 h-10 bg-gradient-to-br from-orange-400 to-orange-600 text-white shadow-md`,
+            icon: '🥉',
+            text: '3rd'
+          };
+        default:
+          return { 
+            container: `${baseClasses} w-8 h-8 bg-gray-100 text-gray-600 border border-gray-300`,
+            icon: null,
+            text: `#${rank}`
+          };
+      }
+    } else {
+      // Desktop styling remains the same
+      return {
+        container: `${baseClasses} text-2xl ${
+          rank === 1 ? 'text-yellow-500' :
+          rank === 2 ? 'text-gray-400' :
+          rank === 3 ? 'text-orange-600' :
+          'text-gray-600'
+        }`,
+        icon: rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : null,
+        text: `#${rank}`
+      };
+    }
+  };
+
+  // Mobile-optimized leaderboard entry component
+  const LeaderboardEntry = ({ entry, index }: { entry: any; index: number }) => {
+    const rankDisplay = getRankDisplay(entry.rank);
+    const votes = parseFloat(toEther(entry.votes));
+
+    if (isMobile) {
+      return (
+        <div 
+          key={entry.evermark.id} 
+          className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
+        >
+          {/* Mobile: Image at top, full width */}
+          <div className="relative h-32">
+            <EvermarkImage
+              src={entry.evermark.image}
+              alt={entry.evermark.title}
+              aspectRatio="video"
+              rounded="none"
+              className="w-full h-full"
+            />
+            
+            {/* Rank badge overlay */}
+            <div className={cn(
+              "absolute top-3 left-3 flex items-center justify-center font-bold rounded-full w-10 h-10 shadow-lg",
+              entry.rank === 1 ? "bg-yellow-500 text-white" :
+              entry.rank === 2 ? "bg-gray-400 text-white" :
+              entry.rank === 3 ? "bg-orange-500 text-white" :
+              "bg-white text-gray-700 border-2 border-gray-300"
+            )}>
+              {entry.rank <= 3 ? (
+                <span className="text-sm">
+                  {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
+                </span>
+              ) : (
+                <span className="text-sm font-bold">#{entry.rank}</span>
+              )}
             </div>
             
-            {/* Quick Stats */}
-            <div className="text-right">
-              <div className="text-sm text-gray-600">Week {currentWeek.weekNumber}</div>
-              <div className="text-lg font-semibold">
-                {currentWeek.isFinalized ? '✅ Finalized' : '🔄 Active'}
+            {/* Vote count overlay */}
+            <div className="absolute top-3 right-3 bg-black/70 text-white px-2 py-1 rounded-full">
+              <div className="flex items-center text-xs font-medium">
+                <VoteIcon className="h-3 w-3 mr-1" />
+                {votes >= 1000000 ? `${(votes / 1000000).toFixed(1)}M` :
+                 votes >= 1000 ? `${(votes / 1000).toFixed(1)}K` : 
+                 votes.toFixed(0)}
               </div>
             </div>
           </div>
+          
+          {/* Content section */}
+          <div className="p-4">
+            <h3 className="font-semibold text-gray-900 text-base leading-tight mb-2 line-clamp-2">
+              <a 
+                href={`/evermark/${entry.evermark.id}`}
+                className="hover:text-purple-600 transition-colors"
+              >
+                {entry.evermark.title}
+              </a>
+            </h3>
+            
+            <div className="flex items-center text-sm text-gray-600 mb-3">
+              <UserIcon className="h-4 w-4 mr-1" />
+              <span className="truncate">{entry.evermark.author}</span>
+            </div>
+            
+            {/* Vote button */}
+            {primaryAddress && !activeLeaderboard.isFinalized && (
+              <button
+                onClick={() => {
+                  setSelectedEvermarkId(entry.evermark.id);
+                  setActiveTab('delegate');
+                }}
+                className="w-full bg-purple-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-purple-700 active:bg-purple-800"
+              >
+                <VoteIcon className="h-4 w-4 mr-2 inline" />
+                Delegate Votes
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
 
-          {/* User Delegation Summary */}
-          {primaryAddress && (
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold text-purple-900">Your Delegation Power</h3>
-                  <div className="flex items-center gap-4 mt-1 text-sm">
-                    <span className="text-purple-800">
-                      {delegationStats.delegationPercentage.toFixed(1)}% delegated
-                    </span>
-                    <span className="text-purple-800">
-                      {delegationStats.rewardMultiplier.toFixed(2)}x multiplier
-                    </span>
-                    <span className="text-purple-800">
-                      {delegationStats.weeklyDelegations} votes this week
-                    </span>
+    // Desktop layout (original)
+    return (
+      <div key={entry.evermark.id} className="p-6 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {/* Rank */}
+            <div className={rankDisplay.container}>
+              {rankDisplay.text}
+            </div>
+            
+            {/* Evermark Info */}
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                {entry.evermark.image && (
+                  <div className="w-12 h-12">
+                    <EvermarkImage
+                      src={entry.evermark.image}
+                      alt={entry.evermark.title}
+                      aspectRatio="square"
+                      rounded="md"
+                    />
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <a 
-                    href="/wrapping" 
-                    className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
-                  >
-                    Get wEMARK
-                  </a>
-                  <button
-                    onClick={() => setActiveTab('delegate')}
-                    className="bg-white text-purple-600 border border-purple-600 px-3 py-1 rounded text-sm hover:bg-purple-50"
-                  >
-                    Delegate Votes
-                  </button>
+                )}
+                <div>
+                  <h3 className="font-semibold text-gray-900">
+                    <a 
+                      href={`/evermark/${entry.evermark.id}`}
+                      className="hover:text-purple-600"
+                    >
+                      {entry.evermark.title}
+                    </a>
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    by {entry.evermark.author}
+                  </p>
                 </div>
               </div>
+            </div>
+          </div>
+          
+          {/* Votes and Action */}
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <div className="text-lg font-semibold text-purple-600">
+                {votes.toFixed(0)} votes
+              </div>
+              <div className="text-sm text-gray-500">
+                {votes.toFixed(4)} wEMARK
+              </div>
+            </div>
+            
+            {primaryAddress && !activeLeaderboard.isFinalized && (
+              <button
+                onClick={() => {
+                  setSelectedEvermarkId(entry.evermark.id);
+                  setActiveTab('delegate');
+                }}
+                className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+              >
+                Vote
+              </button>
+            )}
+          </div>
+        </div>
+        
+        {entry.evermark.description && (
+          <p className="text-sm text-gray-600 mt-3 ml-16">
+            {entry.evermark.description.length > 150 
+              ? `${entry.evermark.description.substring(0, 150)}...`
+              : entry.evermark.description
+            }
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* ✅ MOBILE-OPTIMIZED Header */}
+      <div className="bg-white border-b">
+        <div className={cn("container mx-auto", spacing.responsive['sm-md-lg'])}>
+          {/* Mobile: Stacked layout */}
+          {isMobile ? (
+            <div className="space-y-4">
+              <div className="text-center">
+                <h1 className="text-2xl font-bold text-gray-900">
+                  🏆 Leaderboard
+                </h1>
+                <p className="text-gray-600 mt-1 text-sm">
+                  Weekly rankings of top Evermarks
+                </p>
+              </div>
+              
+              <div className="flex items-center justify-center gap-4 text-sm">
+                <div className="bg-gray-100 px-3 py-1 rounded-full">
+                  Week {currentWeek.weekNumber}
+                </div>
+                <div className={`px-3 py-1 rounded-full font-medium ${
+                  currentWeek.isFinalized 
+                    ? 'bg-green-100 text-green-700' 
+                    : 'bg-orange-100 text-orange-700'
+                }`}>
+                  {currentWeek.isFinalized ? '✅ Final' : '🔄 Live'}
+                </div>
+              </div>
+            </div>
+          ) : (
+            // Desktop: Original layout
+            <div className="flex items-center justify-between mb-6 py-6">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">🏆 Leaderboard</h1>
+                <p className="text-gray-600 mt-1">
+                  Weekly rankings of the most supported Evermarks
+                </p>
+              </div>
+              
+              <div className="text-right">
+                <div className="text-sm text-gray-600">Week {currentWeek.weekNumber}</div>
+                <div className="text-lg font-semibold">
+                  {currentWeek.isFinalized ? '✅ Finalized' : '🔄 Active'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ✅ MOBILE-OPTIMIZED User Delegation Summary */}
+          {primaryAddress && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
+              {isMobile ? (
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-purple-900 text-center">Your Delegation Power</h3>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div>
+                      <div className="font-bold text-purple-800">
+                        {delegationStats.delegationPercentage.toFixed(1)}%
+                      </div>
+                      <div className="text-purple-600">Delegated</div>
+                    </div>
+                    <div>
+                      <div className="font-bold text-purple-800">
+                        {delegationStats.rewardMultiplier.toFixed(2)}x
+                      </div>
+                      <div className="text-purple-600">Multiplier</div>
+                    </div>
+                    <div>
+                      <div className="font-bold text-purple-800">
+                        {delegationStats.weeklyDelegations}
+                      </div>
+                      <div className="text-purple-600">This Week</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a 
+                      href="/wrapping" 
+                      className="flex-1 bg-purple-600 text-white px-3 py-2 rounded text-sm text-center hover:bg-purple-700"
+                    >
+                      Get wEMARK
+                    </a>
+                    <button
+                      onClick={() => setActiveTab('delegate')}
+                      className="flex-1 bg-white text-purple-600 border border-purple-600 px-3 py-2 rounded text-sm hover:bg-purple-50"
+                    >
+                      Delegate
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                // Desktop: Original layout
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-purple-900">Your Delegation Power</h3>
+                    <div className="flex items-center gap-4 mt-1 text-sm">
+                      <span className="text-purple-800">
+                        {delegationStats.delegationPercentage.toFixed(1)}% delegated
+                      </span>
+                      <span className="text-purple-800">
+                        {delegationStats.rewardMultiplier.toFixed(2)}x multiplier
+                      </span>
+                      <span className="text-purple-800">
+                        {delegationStats.weeklyDelegations} votes this week
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a 
+                      href="/wrapping" 
+                      className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+                    >
+                      Get wEMARK
+                    </a>
+                    <button
+                      onClick={() => setActiveTab('delegate')}
+                      className="bg-white text-purple-600 border border-purple-600 px-3 py-1 rounded text-sm hover:bg-purple-50"
+                    >
+                      Delegate Votes
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white border-b">
+      {/* ✅ MOBILE-OPTIMIZED Tab Navigation */}
+      <div className="bg-white border-b sticky top-0 z-10">
         <div className="container mx-auto px-4">
-          <div className="flex gap-8">
-            <button
-              onClick={() => setActiveTab('current')}
-              className={`py-4 px-2 border-b-2 font-medium text-sm ${
-                activeTab === 'current'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              📊 Current Week
-            </button>
-            <button
-              onClick={() => setActiveTab('previous')}
-              className={`py-4 px-2 border-b-2 font-medium text-sm ${
-                activeTab === 'previous'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              📈 Previous Week
-            </button>
-            <button
-              onClick={() => setActiveTab('delegate')}
-              className={`py-4 px-2 border-b-2 font-medium text-sm ${
-                activeTab === 'delegate'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              🗳️ Delegate Votes
-            </button>
+          <div className={cn(
+            "flex",
+            isMobile ? "justify-center" : "gap-8"
+          )}>
+            {[
+              { key: 'current', label: isMobile ? 'Current' : '📊 Current Week', icon: '📊' },
+              { key: 'previous', label: isMobile ? 'Previous' : '📈 Previous Week', icon: '📈' },
+              { key: 'delegate', label: isMobile ? 'Vote' : '🗳️ Delegate Votes', icon: '🗳️' }
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key as LeaderboardTab)}
+                className={cn(
+                  "py-4 px-3 border-b-2 font-medium text-sm transition-colors",
+                  touchFriendly.button,
+                  activeTab === tab.key
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700',
+                  isMobile && "flex-1 text-center"
+                )}
+              >
+                {isMobile && <span className="mr-1">{tab.icon}</span>}
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-8">
+      <div className={cn("container mx-auto", spacing.responsive['sm-md-lg'])}>
         {(activeTab === 'current' || activeTab === 'previous') && (
           <>
-            {/* Leaderboard Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-lg border p-6 text-center">
-                <div className="text-2xl font-bold text-blue-600">
+            {/* ✅ MOBILE-OPTIMIZED Stats Grid */}
+            <div className={cn(
+              "grid gap-4 mb-6",
+              isMobile ? "grid-cols-2" : "grid-cols-1 md:grid-cols-4"
+            )}>
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className={cn("font-bold text-blue-600", isMobile ? "text-lg" : "text-2xl")}>
                   {activeLeaderboard.entries.length}
                 </div>
-                <div className="text-sm text-gray-600">Total Entries</div>
+                <div className={cn("text-gray-600", isMobile ? "text-xs" : "text-sm")}>
+                  {isMobile ? "Entries" : "Total Entries"}
+                </div>
               </div>
-              <div className="bg-white rounded-lg border p-6 text-center">
-                <div className="text-2xl font-bold text-green-600">
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className={cn("font-bold text-green-600", isMobile ? "text-lg" : "text-2xl")}>
                   {activeLeaderboard.entries.length > 0 
                     ? parseFloat(toEther(activeLeaderboard.entries[0].votes)).toFixed(0)
                     : '0'
                   }
                 </div>
-                <div className="text-sm text-gray-600">Top Votes</div>
-              </div>
-              <div className="bg-white rounded-lg border p-6 text-center">
-                <div className="text-2xl font-bold text-purple-600">
-                  Week {activeLeaderboard.weekNumber}
+                <div className={cn("text-gray-600", isMobile ? "text-xs" : "text-sm")}>
+                  {isMobile ? "Top Votes" : "Top Votes"}
                 </div>
-                <div className="text-sm text-gray-600">Voting Cycle</div>
               </div>
-              <div className="bg-white rounded-lg border p-6 text-center">
-                <div className={`text-2xl font-bold ${
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className={cn("font-bold text-purple-600", isMobile ? "text-lg" : "text-2xl")}>
+                  {activeLeaderboard.weekNumber}
+                </div>
+                <div className={cn("text-gray-600", isMobile ? "text-xs" : "text-sm")}>
+                  {isMobile ? "Week" : "Voting Cycle"}
+                </div>
+              </div>
+              <div className="bg-white rounded-lg border p-4 text-center">
+                <div className={cn(`font-bold ${
                   activeLeaderboard.isFinalized ? 'text-green-600' : 'text-orange-600'
-                }`}>
+                }`, isMobile ? "text-lg" : "text-2xl")}>
                   {activeLeaderboard.isFinalized ? 'Final' : 'Live'}
                 </div>
-                <div className="text-sm text-gray-600">Status</div>
+                <div className={cn("text-gray-600", isMobile ? "text-xs" : "text-sm")}>
+                  Status
+                </div>
               </div>
             </div>
 
-            {/* Leaderboard Entries */}
-            <div className="bg-white rounded-lg border">
-              <div className="p-6 border-b">
-                <h2 className="text-xl font-semibold">
-                  {activeTab === 'current' ? 'Current' : 'Previous'} Week Rankings
-                </h2>
-              </div>
+            {/* ✅ MOBILE-OPTIMIZED Leaderboard Entries */}
+            <div className={cn(
+              isMobile ? "space-y-4" : "bg-white rounded-lg border overflow-hidden"
+            )}>
+              {!isMobile && (
+                <div className="p-6 border-b">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    {activeTab === 'current' ? 'Current' : 'Previous'} Week Rankings
+                  </h2>
+                </div>
+              )}
+              
+              {/* Mobile: Add a smaller section header */}
+              {isMobile && (
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900 text-center">
+                    {activeTab === 'current' ? 'Current Week' : 'Previous Week'} Rankings
+                  </h2>
+                </div>
+              )}
               
               {activeLeaderboard.isLoading ? (
                 <div className="p-8 text-center">
@@ -172,7 +477,7 @@ export default function LeaderboardPage() {
                 </div>
               ) : activeLeaderboard.error ? (
                 <div className="p-8 text-center">
-                  <p className="text-red-600 mb-4">Error loading leaderboard: {activeLeaderboard.error}</p>
+                  <p className="text-red-600 mb-4">Error: {activeLeaderboard.error}</p>
                   <button 
                     onClick={() => window.location.reload()}
                     className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
@@ -187,82 +492,11 @@ export default function LeaderboardPage() {
                   <p className="text-gray-600">Be the first to delegate votes this week!</p>
                 </div>
               ) : (
-                <div className="divide-y">
+                <div className={cn(
+                  isMobile ? "space-y-3" : "divide-y"
+                )}>
                   {activeLeaderboard.entries.map((entry, index) => (
-                    <div key={entry.evermark.id} className="p-6 hover:bg-gray-50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          {/* Rank */}
-                          <div className={`text-2xl font-bold ${
-                            entry.rank === 1 ? 'text-yellow-500' :
-                            entry.rank === 2 ? 'text-gray-400' :
-                            entry.rank === 3 ? 'text-orange-600' :
-                            'text-gray-600'
-                          }`}>
-                            #{entry.rank}
-                          </div>
-                          
-                          {/* Evermark Info */}
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3">
-                              {entry.evermark.image && (
-                                <img 
-                                  src={entry.evermark.image} 
-                                  alt={entry.evermark.title}
-                                  className="w-12 h-12 object-cover rounded"
-                                />
-                              )}
-                              <div>
-                                <h3 className="font-semibold text-gray-900">
-                                  <a 
-                                    href={`/evermark/${entry.evermark.id}`}
-                                    className="hover:text-purple-600"
-                                  >
-                                    {entry.evermark.title}
-                                  </a>
-                                </h3>
-                                <p className="text-sm text-gray-600">
-                                  by {entry.evermark.author}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Votes and Action */}
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-lg font-semibold text-purple-600">
-                              {parseFloat(toEther(entry.votes)).toFixed(0)} votes
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {parseFloat(toEther(entry.votes)).toFixed(4)} wEMARK
-                            </div>
-                          </div>
-                          
-                          {primaryAddress && !activeLeaderboard.isFinalized && (
-                            <button
-                              onClick={() => {
-                                setSelectedEvermarkId(entry.evermark.id);
-                                setActiveTab('delegate');
-                              }}
-                              className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
-                            >
-                              Vote
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {entry.evermark.description && (
-                        <p className="text-sm text-gray-600 mt-3 ml-16">
-                          {entry.evermark.description.length > 150 
-                            ? `${entry.evermark.description.substring(0, 150)}...`
-                            : entry.evermark.description
-                          }
-                        </p>
-                      )}
-                    </div>
+                    <LeaderboardEntry key={entry.evermark.id} entry={entry} index={index} />
                   ))}
                 </div>
               )}
@@ -270,7 +504,7 @@ export default function LeaderboardPage() {
           </>
         )}
 
-        {/* Delegation Tab */}
+        {/* Delegation Tab - unchanged as it's already responsive */}
         {activeTab === 'delegate' && (
           <div className="space-y-8">
             {!primaryAddress ? (
@@ -325,7 +559,10 @@ export default function LeaderboardPage() {
                     <p className="text-gray-600 mb-6">
                       Click "Vote" next to any Evermark above, or browse all Evermarks to find ones you want to support.
                     </p>
-                    <div className="flex gap-3 justify-center">
+                    <div className={cn(
+                      "flex gap-3 justify-center",
+                      isMobile && "flex-col"
+                    )}>
                       <button
                         onClick={() => setActiveTab('current')}
                         className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
@@ -334,7 +571,7 @@ export default function LeaderboardPage() {
                       </button>
                       <a 
                         href="/"
-                        className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                        className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 text-center"
                       >
                         Browse All Evermarks
                       </a>
