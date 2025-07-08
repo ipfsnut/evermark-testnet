@@ -28,6 +28,7 @@ import { CreateFromCast } from './components/sharing/CreateFromCast';
 
 // ✅ NEW: Public bookshelf component
 import { PublicBookshelfView } from './components/bookshelf/PublicBookshelfView';
+import ExplorePage from './pages/ExplorePage';
 
 // Farcaster context types
 interface FarcasterContext {
@@ -205,47 +206,50 @@ function AppContent() {
   return (
     <ErrorBoundary>
       <Layout>
-        <Routes>
-          {/* Core Routes - Specific routes MUST come before catch-all routes */}
-          <Route path="/" element={<EnhancedHomePage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/leaderboard" element={<LeaderboardPage />} />
-          <Route path="/my-evermarks" element={<MyEvermarksPage />} />
-          <Route path="/create" element={<EnhancedCreateEvermark />} />
-          <Route path="/evermark/:id" element={<EvermarkDetail />} />
-          <Route path="/about" element={<AboutPage />} />
-          
-          {/* ✅ UPDATED: Bookshelf now shows actual bookshelf page with delegation features */}
-          <Route path="/bookshelf" element={<BookshelfPage />} />
-          
-          {/* Wrapping route - MUST come before /:address */}
-          <Route path="/wrapping" element={<WrappingPage />} />
-          
-          {/* ✅ REMOVED: No more separate delegation route - integrated into bookshelf */}
-          
-          {/* Share functionality - Existing routes */}
-          <Route path="/share" element={<ShareHandler />} />
-          <Route path="/share/create" element={<CreateFromCast />} />
-          <Route path="/share/:id" element={<ShareRedirect />} />
-          <Route path="/share/evermark/:id" element={<ShareRedirect />} />
-          
-          {/* ✅ UPDATED: Redirect old delegation route to bookshelf */}
-          <Route path="/delegation" element={<Navigate to="/bookshelf" replace />} />
-          
-          {/* Temporary placeholder routes */}
-          <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
-          
-          {/* ✅ NEW: Public bookshelf routes - MUST come before /:address catch-all */}
-          <Route path="/bookshelf/:address" element={<PublicBookshelfView />} />
-          
-          {/* Public Profile Routes - THESE MUST COME AFTER ALL SPECIFIC ROUTES */}
-          <Route path="/:address" element={<PublicProfilePage />} />
-          <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
-          <Route path="/:address/bookshelf" element={<PublicBookshelfView />} />
-          
-          {/* Handle any sub-paths that might come from Mini App URLs */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        // Fixed routing order in App.tsx - Put ALL specific routes before catch-all routes
+
+<Routes>
+  {/* SPECIFIC ROUTES FIRST - These must come before any dynamic routes */}
+  <Route path="/" element={<EnhancedHomePage />} />
+  <Route path="/explore" element={<ExplorePage />} />
+  <Route path="/profile" element={<ProfilePage />} />
+  <Route path="/leaderboard" element={<LeaderboardPage />} />
+  <Route path="/my-evermarks" element={<MyEvermarksPage />} />
+  <Route path="/create" element={<EnhancedCreateEvermark />} />
+  <Route path="/evermark/:id" element={<EvermarkDetail />} />
+  <Route path="/about" element={<AboutPage />} />
+  
+  {/* Bookshelf routes */}
+  <Route path="/bookshelf" element={<BookshelfPage />} />
+  
+  {/* Wrapping route */}
+  <Route path="/wrapping" element={<WrappingPage />} />
+  
+  {/* Share functionality */}
+  <Route path="/share" element={<ShareHandler />} />
+  <Route path="/share/create" element={<CreateFromCast />} />
+  <Route path="/share/:id" element={<ShareRedirect />} />
+  <Route path="/share/evermark/:id" element={<ShareRedirect />} />
+  
+  {/* Redirects */}
+  <Route path="/delegation" element={<Navigate to="/bookshelf" replace />} />
+  
+  {/* Placeholder routes */}
+  <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
+  <Route path="/marketplace" element={<ComingSoonPage feature="Marketplace" />} />
+  
+  {/* Specific nested routes that start with fixed paths */}
+  <Route path="/bookshelf/:address" element={<PublicBookshelfView />} />
+  
+  {/* DYNAMIC ROUTES LAST - These catch remaining patterns */}
+  {/* These MUST come after all specific routes */}
+  <Route path="/:address" element={<PublicProfilePage />} />
+  <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
+  <Route path="/:address/bookshelf" element={<PublicBookshelfView />} />
+  
+  {/* Catch-all for unmatched routes - MUST be last */}
+  <Route path="*" element={<Navigate to="/" replace />} />
+</Routes>
       </Layout>
     </ErrorBoundary>
   );

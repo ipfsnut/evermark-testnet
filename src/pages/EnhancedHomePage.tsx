@@ -1,3 +1,4 @@
+// src/pages/EnhancedHomePage.tsx - Updated with real feed integration
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -12,188 +13,205 @@ import {
   PlayIcon,
   StarIcon,
   GoalIcon,
-  TrophyIcon
+  TrophyIcon,
+  GridIcon,
+  EyeIcon,
+  FilterIcon,
+  ClockIcon,
+  SortDesc
 } from 'lucide-react';
-import { useEvermarks } from '../hooks/useEvermarks';
+import { useTrendingEvermarks, useRecentEvermarks } from '../hooks/useEvermarkFeed';
 import { useWalletAuth } from '../providers/WalletProvider';
 import { formatDistanceToNow } from 'date-fns';
 import PageContainer from '../components/layout/PageContainer';
+import { EvermarkCard } from '../components/evermark/EvermarkCard';
 
-// Enhanced Evermark card for homepage
-const HomeEvermarkCard: React.FC<{ evermark: any }> = ({ evermark }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
+// Quick stats component
+const QuickStats: React.FC = () => {
+  const { recentEvermarks, isLoading } = useRecentEvermarks(100); // Get more for stats
+  
+  const stats = useMemo(() => {
+    if (isLoading || !recentEvermarks.length) {
+      return {
+        totalEvermarks: 0,
+        activeCreators: 0,
+        thisWeek: 0,
+        networkStatus: 'Loading...'
+      };
+    }
 
-  const handleImageLoad = () => setImageLoading(false);
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoading(false);
-  };
+    const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+    const thisWeekCount = recentEvermarks.filter(e => e.creationTime > weekAgo).length;
+    const uniqueCreators = new Set(recentEvermarks.map(e => e.creator).filter(Boolean)).size;
+
+    return {
+      totalEvermarks: recentEvermarks.length,
+      activeCreators: uniqueCreators,
+      thisWeek: thisWeekCount,
+      networkStatus: 'Live on Base'
+    };
+  }, [recentEvermarks, isLoading]);
 
   return (
-    <Link 
-      to={`/evermark/${evermark.id}`}
-      className="group block bg-white rounded-2xl border border-gray-200 
-                 hover:border-purple-300 hover:shadow-large
-                 transition-all duration-300 overflow-hidden
-                 transform hover:-translate-y-1"
-    >
-      {/* Image section with enhanced styling */}
-      <div className="relative w-full h-48 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
-        {evermark.image && !imageError ? (
-          <div className="relative w-full h-full">
-            {imageLoading && (
-              <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
-            )}
-            <img
-              src={evermark.image}
-              alt={evermark.title}
-              className="w-full h-full object-cover group-hover:scale-105 
-                         transition-transform duration-300"
-              onLoad={handleImageLoad}
-              onError={handleImageError}
-            />
-            {/* Gradient overlay for better text readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          </div>
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-purple-100 to-indigo-100 
-                          flex items-center justify-center">
-            <ImageIcon className="h-12 w-12 text-purple-400" />
-          </div>
-        )}
-        
-        {/* Play button overlay for interactive feel */}
-        <div className="absolute inset-0 flex items-center justify-center 
-                        opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full 
-                          flex items-center justify-center shadow-soft">
-            <PlayIcon className="h-5 w-5 text-purple-600 ml-0.5" />
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between mb-4">
+          <div className="p-3 bg-purple-100 rounded-xl">
+            <BookOpenIcon className="h-6 w-6 text-purple-600" />
           </div>
         </div>
-        
-        {/* Type indicator */}
-        <div className="absolute top-3 left-3">
-          <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-full 
-                           text-xs font-medium text-purple-600 border border-purple-200">
-            <Sparkles className="h-3 w-3 inline mr-1" />
-            Evermark
-          </span>
+        <div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Total Evermarks</p>
+          <p className="text-3xl font-bold text-gray-900 mb-2">{isLoading ? "..." : stats.totalEvermarks.toLocaleString()}</p>
+          <p className="text-sm text-gray-600">Permanent references</p>
         </div>
       </div>
       
-      {/* Enhanced content section */}
-      <div className="p-6">
-        <h3 className="font-semibold text-gray-900 text-lg mb-3 line-clamp-2 
-                       group-hover:text-purple-600 transition-colors">
-          {evermark.title}
-        </h3>
-        
-        <div className="flex items-center text-sm text-gray-600 mb-4">
-          <div className="flex items-center space-x-2">
-            <UserIcon className="h-4 w-4" />
-            <span className="font-medium">{evermark.author}</span>
+      <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between mb-4">
+          <div className="p-3 bg-green-100 rounded-xl">
+            <GoalIcon className="h-6 w-6 text-green-600" />
           </div>
-          <span className="mx-2 text-gray-400">•</span>
-          <span>{formatDistanceToNow(new Date(evermark.creationTime), { addSuffix: true })}</span>
         </div>
-        
-        {evermark.creator && (
-          <div className="flex items-center text-xs text-gray-500 mb-4">
-            <span>Created by </span>
-            <Link 
-              to={`/${evermark.creator}`}
-              className="ml-1 font-mono text-purple-600 hover:text-purple-800 
-                         transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {evermark.creator.slice(0, 6)}...{evermark.creator.slice(-4)}
-            </Link>
-          </div>
-        )}
-        
-        {evermark.description && (
-          <p className="text-gray-600 text-sm line-clamp-3 mb-4 leading-relaxed">
-            {evermark.description}
-          </p>
-        )}
-        
-        {/* Enhanced footer with actions */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-          <div className="flex items-center space-x-2">
-            {evermark.metadataURI && evermark.metadataURI.startsWith('ipfs://') && (
-              <a 
-                href={evermark.metadataURI.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/')}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-2 text-purple-600 hover:text-purple-800 hover:bg-purple-50 
-                           rounded-lg transition-colors"
-                onClick={(e) => e.stopPropagation()}
-                title="View metadata"
-              >
-                <ExternalLinkIcon className="h-4 w-4" />
-              </a>
-            )}
-          </div>
-          
-          <div className="flex items-center text-purple-600 font-medium text-sm">
-            <span>View Details</span>
-            <ChevronRightIcon className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
-          </div>
+        <div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Network</p>
+          <p className="text-2xl font-bold text-gray-900 mb-2">Base</p>
+          <p className="text-sm text-gray-600">Fast & low-cost</p>
         </div>
       </div>
-    </Link>
+      
+      <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between mb-4">
+          <div className="p-3 bg-amber-100 rounded-xl">
+            <StarIcon className="h-6 w-6 text-amber-600" />
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-600 mb-1">Active Creators</p>
+          <p className="text-3xl font-bold text-gray-900 mb-2">{isLoading ? "..." : stats.activeCreators.toLocaleString()}</p>
+          <p className="text-sm text-gray-600">Contributing</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl p-6 border border-gray-200 hover:shadow-md transition-shadow">
+        <div className="flex items-center justify-between mb-4">
+          <div className="p-3 bg-blue-100 rounded-xl">
+            <SortDesc className="h-6 w-6 text-blue-600" />
+          </div>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-gray-600 mb-1">This Week</p>
+          <p className="text-3xl font-bold text-gray-900 mb-2">{isLoading ? "..." : stats.thisWeek.toLocaleString()}</p>
+          <p className="text-sm text-gray-600">New Evermarks</p>
+        </div>
+      </div>
+    </div>
   );
 };
 
-// Enhanced stats card component
-const StatsCard: React.FC<{
+// Feed section with trending and recent
+const FeedSection: React.FC<{ 
+  title: string; 
+  evermarks: any[]; 
+  isLoading: boolean; 
+  viewAllLink: string;
   icon: React.ReactNode;
-  title: string;
-  value: string | number;
   description: string;
-  color: string;
-}> = ({ icon, title, value, description, color }) => (
-  <div className={`card-interactive p-6 ${color} border-l-4`}>
-    <div className="flex items-center justify-between mb-4">
-      <div className="p-3 bg-white rounded-xl shadow-soft">
+}> = ({ title, evermarks, isLoading, viewAllLink, icon, description }) => {
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            {icon}
+            <div className="ml-3">
+              <div className="h-6 bg-gray-200 rounded animate-pulse w-32"></div>
+              <div className="h-4 bg-gray-200 rounded animate-pulse w-48 mt-2"></div>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="w-full h-48 bg-gray-200 animate-pulse" />
+              <div className="p-4 space-y-3">
+                <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3" />
+                <div className="h-3 bg-gray-200 rounded animate-pulse w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (evermarks.length === 0) {
+    return (
+      <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
         {icon}
+        <h3 className="text-lg font-medium text-gray-900 mb-2 mt-4">No Evermarks Yet</h3>
+        <p className="text-gray-600 mb-4">{description}</p>
+        <Link
+          to="/create"
+          className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          <PlusIcon className="w-4 h-4 mr-2" />
+          Create First Evermark
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          {icon}
+          <div className="ml-3">
+            <h2 className="text-2xl font-serif font-bold text-gray-900">{title}</h2>
+            <p className="text-gray-600">{description}</p>
+          </div>
+        </div>
+        
+        {evermarks.length >= 6 && (
+          <Link 
+            to={viewAllLink}
+            className="inline-flex items-center text-purple-600 hover:text-purple-700 font-medium group"
+          >
+            View All
+            <ChevronRightIcon className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+          </Link>
+        )}
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {evermarks.slice(0, 6).map(evermark => (
+          <EvermarkCard 
+            key={evermark.id} 
+            evermark={evermark}
+            showDescription={true}
+            showActions={true}
+          />
+        ))}
       </div>
     </div>
-    <div>
-      <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-      <p className="text-3xl font-bold text-gray-900 mb-2">{value}</p>
-      <p className="text-sm text-gray-600">{description}</p>
-    </div>
-  </div>
-);
+  );
+};
 
 const EnhancedHomePage: React.FC = () => {
   const { isConnected, address, requireConnection } = useWalletAuth();
-  const { evermarks, isLoading } = useEvermarks();
+  const { trendingEvermarks, isLoading: isLoadingTrending } = useTrendingEvermarks(6);
+  const { recentEvermarks, isLoading: isLoadingRecent } = useRecentEvermarks(6);
 
-  console.log("🔍 HomePage wallet detection (SIMPLIFIED):", {
+  console.log("🔍 HomePage feed integration:", {
     isConnected,
     address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null,
-    evermarksCount: evermarks.length
+    trendingCount: trendingEvermarks.length,
+    recentCount: recentEvermarks.length,
+    isLoadingTrending,
+    isLoadingRecent
   });
-
-  // Enhanced stats calculation
-  const stats = useMemo(() => ({
-    totalEvermarks: evermarks.length,
-    currentCycle: 1,
-    activeCreators: new Set(evermarks.map(e => e.creator).filter(Boolean)).size,
-    networkStatus: 'Live on Base'
-  }), [evermarks]);
-
-  // Featured and recent evermarks
-  const featuredEvermarks = useMemo(() => {
-    return evermarks.slice(0, 3);
-  }, [evermarks]);
-
-  const recentEvermarks = useMemo(() => {
-    return evermarks.slice(0, 6);
-  }, [evermarks]);
 
   return (
     <PageContainer fullWidth>
@@ -209,7 +227,7 @@ const EnhancedHomePage: React.FC = () => {
                           bg-gradient-to-tr from-pink-200/30 to-purple-200/30 
                           rounded-full blur-3xl" />
           
-          <div className="relative card-content py-16 md:py-24 text-center">
+          <div className="relative max-w-7xl mx-auto px-4 py-16 md:py-24 text-center">
             {/* Logo with enhanced styling */}
             <div className="flex justify-center mb-8">
               <div className="relative">
@@ -238,9 +256,15 @@ const EnhancedHomePage: React.FC = () => {
               </p>
               
               <div className="flex flex-wrap gap-2 justify-center text-sm">
-                <span className="badge badge-primary">🔗 Permanent Links</span>
-                <span className="badge badge-success">💰 Dual-Token Rewards</span>
-                <span className="badge badge-warning">🗳️ Community Voting</span>
+                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">
+                  🔗 Permanent Links
+                </span>
+                <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+                  💰 Dual-Token Rewards
+                </span>
+                <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full font-medium">
+                  🗳️ Community Voting
+                </span>
               </div>
             </div>
             
@@ -250,23 +274,29 @@ const EnhancedHomePage: React.FC = () => {
                 <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                   <Link
                     to="/create"
-                    className="btn btn-primary group"
+                    className="inline-flex items-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium group"
                   >
                     <PlusIcon className="w-5 h-5 mr-2 group-hover:rotate-90 transition-transform" />
                     Create Evermark
                   </Link>
                   <Link
+                    to="/explore"
+                    className="inline-flex items-center px-6 py-3 bg-white text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 transition-colors font-medium"
+                  >
+                    <GridIcon className="w-5 h-5 mr-2" />
+                    Explore All
+                  </Link>
+                  <Link
                     to="/my-evermarks"
-                    className="btn btn-secondary"
+                    className="inline-flex items-center px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
                   >
                     <BookOpenIcon className="w-5 h-5 mr-2" />
-                    View Collection
+                    My Collection
                   </Link>
                 </div>
               ) : (
                 <div className="max-w-md mx-auto">
-                  <div className="card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 
-                                  border-blue-200">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
                     <h3 className="text-lg font-semibold text-blue-900 mb-3">
                       🚀 Get Started
                     </h3>
@@ -276,7 +306,7 @@ const EnhancedHomePage: React.FC = () => {
                     </p>
                     <button
                       onClick={requireConnection}
-                      className="btn btn-primary w-full"
+                      className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                     >
                       Connect Wallet
                     </button>
@@ -287,150 +317,57 @@ const EnhancedHomePage: React.FC = () => {
           </div>
         </div>
 
-        {/* Enhanced Stats Section */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatsCard
-            icon={<BookOpenIcon className="h-6 w-6 text-purple-600" />}
-            title="Total Evermarks"
-            value={isLoading ? "..." : stats.totalEvermarks.toLocaleString()}
-            description="Permanent content references"
-            color="border-l-purple-500"
-          />
-          
-          <StatsCard
-            icon={<GoalIcon className="h-6 w-6 text-green-600" />}
-            title="Network"
-            value="Base Mainnet"
-            description="Fast & low-cost transactions"
-            color="border-l-green-500"
-          />
-          
-          <StatsCard
-            icon={<StarIcon className="h-6 w-6 text-amber-600" />}
-            title="Active Creators"
-            value={isLoading ? "..." : stats.activeCreators.toLocaleString()}
-            description="Contributing to the protocol"
-            color="border-l-amber-500"
-          />
-        </div>
+        {/* Stats Section */}
+        <QuickStats />
 
-        {/* Featured Evermarks Section */}
-        {featuredEvermarks.length > 0 && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-serif font-bold text-gray-900 mb-2">
-                  Featured Evermarks
-                </h2>
-                <p className="text-gray-600">
-                  Discover the most engaging content on the platform
-                </p>
-              </div>
-              
-              {evermarks.length > 3 && (
-                <Link 
-                  to="/leaderboard"
-                  className="btn btn-ghost group"
-                >
-                  <TrophyIcon className="w-4 h-4 mr-2" />
-                  View Leaderboard
-                  <ChevronRightIcon className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              )}
-            </div>
-            
-            <div className="grid-responsive">
-              {featuredEvermarks.map(evermark => (
-                <HomeEvermarkCard key={evermark.id} evermark={evermark} />
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Trending Evermarks Section */}
+        <FeedSection
+          title="Trending Evermarks"
+          evermarks={trendingEvermarks}
+          isLoading={isLoadingTrending}
+          viewAllLink="/explore?sort=mostVoted"
+          icon={<TrendingUpIcon className="h-8 w-8 text-orange-600" />}
+          description="Most voted and engaging content this week"
+        />
 
         {/* Recent Evermarks Section */}
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-3xl font-serif font-bold text-gray-900 mb-2">
-                Latest Evermarks
-              </h2>
-              <p className="text-gray-600">
-                Recently created permanent content references
-              </p>
+        <FeedSection
+          title="Latest Evermarks"
+          evermarks={recentEvermarks}
+          isLoading={isLoadingRecent}
+          viewAllLink="/explore"
+          icon={<ClockIcon className="h-8 w-8 text-blue-600" />}
+          description="Recently created permanent content references"
+        />
+
+        {/* Call to Action Section */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 md:p-12 text-white text-center">
+          <div className="max-w-3xl mx-auto">
+            <h2 className="text-3xl md:text-4xl font-serif font-bold mb-4">
+              Ready to Share Something Amazing?
+            </h2>
+            <p className="text-purple-100 text-lg mb-8 leading-relaxed">
+              Transform any online content into a permanent, shareable Evermark. 
+              Join our community of curators and earn rewards for quality contributions.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link
+                to="/create"
+                className="inline-flex items-center px-6 py-3 bg-white text-purple-600 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              >
+                <PlusIcon className="w-5 h-5 mr-2" />
+                Create Your First Evermark
+              </Link>
+              <Link
+                to="/explore"
+                className="inline-flex items-center px-6 py-3 bg-purple-700 text-white rounded-lg hover:bg-purple-800 transition-colors font-medium"
+              >
+                <GridIcon className="w-5 h-5 mr-2" />
+                Explore All Evermarks
+              </Link>
             </div>
           </div>
-          
-          {isLoading ? (
-            <div className="grid-responsive">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="card">
-                  <div className="loading-skeleton h-48 mb-4" />
-                  <div className="card-content space-y-3">
-                    <div className="loading-skeleton h-6 w-3/4" />
-                    <div className="loading-skeleton h-4 w-1/2" />
-                    <div className="loading-skeleton h-4 w-full" />
-                    <div className="loading-skeleton h-4 w-2/3" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : evermarks.length === 0 ? (
-            <div className="card text-center py-16">
-              <div className="max-w-md mx-auto space-y-6">
-                <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-indigo-100 
-                                rounded-2xl flex items-center justify-center mx-auto">
-                  <BookOpenIcon className="h-10 w-10 text-purple-600" />
-                </div>
-                
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    No Evermarks Yet
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Be the first to create a permanent digital reference on the network.
-                  </p>
-                </div>
-                
-                {isConnected ? (
-                  <Link 
-                    to="/create"
-                    className="btn btn-primary"
-                  >
-                    <PlusIcon className="w-5 h-5 mr-2" />
-                    Create First Evermark
-                  </Link>
-                ) : (
-                  <button
-                    onClick={requireConnection}
-                    className="btn btn-primary"
-                  >
-                    <PlusIcon className="w-5 h-5 mr-2" />
-                    Connect & Create First Evermark
-                  </button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="grid-responsive">
-                {recentEvermarks.map(evermark => (
-                  <HomeEvermarkCard key={evermark.id} evermark={evermark} />
-                ))}
-              </div>
-              
-              {evermarks.length > 6 && (
-                <div className="text-center pt-8">
-                  <Link 
-                    to="/my-evermarks" 
-                    className="btn btn-secondary group"
-                  >
-                    View All Evermarks
-                    <ChevronRightIcon className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                  </Link>
-                </div>
-              )}
-            </>
-          )}
         </div>
       </div>
     </PageContainer>
