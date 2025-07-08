@@ -92,8 +92,8 @@ export default function LeaderboardPage() {
           key={entry.evermark.id} 
           className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
         >
-          {/* Mobile: Image at top, full width */}
-          <div className="relative h-32">
+          {/* Mobile: Image at top, taller for better visibility */}
+          <div className="relative h-40">
             <EvermarkImage
               src={entry.evermark.image}
               alt={entry.evermark.title}
@@ -104,14 +104,14 @@ export default function LeaderboardPage() {
             
             {/* Rank badge overlay */}
             <div className={cn(
-              "absolute top-3 left-3 flex items-center justify-center font-bold rounded-full w-10 h-10 shadow-lg",
+              "absolute top-3 left-3 flex items-center justify-center font-bold rounded-full w-12 h-12 shadow-lg",
               entry.rank === 1 ? "bg-yellow-500 text-white" :
               entry.rank === 2 ? "bg-gray-400 text-white" :
               entry.rank === 3 ? "bg-orange-500 text-white" :
               "bg-white text-gray-700 border-2 border-gray-300"
             )}>
               {entry.rank <= 3 ? (
-                <span className="text-sm">
+                <span className="text-lg">
                   {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
                 </span>
               ) : (
@@ -130,9 +130,10 @@ export default function LeaderboardPage() {
             </div>
           </div>
           
-          {/* Content section */}
-          <div className="p-4">
-            <h3 className="font-semibold text-gray-900 text-base leading-tight mb-2 line-clamp-2">
+          {/* Content section - More padding and space */}
+          <div className="p-5">
+            {/* Title - larger and not cut off */}
+            <h3 className="font-semibold text-gray-900 text-lg leading-tight mb-3 line-clamp-3">
               <a 
                 href={`/evermark/${entry.evermark.id}`}
                 className="hover:text-purple-600 transition-colors"
@@ -141,24 +142,37 @@ export default function LeaderboardPage() {
               </a>
             </h3>
             
-            <div className="flex items-center text-sm text-gray-600 mb-3">
-              <UserIcon className="h-4 w-4 mr-1" />
-              <span className="truncate">{entry.evermark.author}</span>
+            {/* Author info */}
+            <div className="flex items-center text-sm text-gray-600 mb-4">
+              <UserIcon className="h-4 w-4 mr-2" />
+              <span className="truncate">by {entry.evermark.author}</span>
             </div>
             
-            {/* Vote button */}
-            {primaryAddress && !activeLeaderboard.isFinalized && (
-              <button
-                onClick={() => {
-                  setSelectedEvermarkId(entry.evermark.id);
-                  setActiveTab('delegate');
-                }}
-                className="w-full bg-purple-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-purple-700 active:bg-purple-800"
+            {/* Action buttons */}
+            <div className="space-y-3">
+              {/* View Details button */}
+              <a
+                href={`/evermark/${entry.evermark.id}`}
+                className="w-full bg-gray-100 text-gray-700 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-200 flex items-center justify-center"
               >
-                <VoteIcon className="h-4 w-4 mr-2 inline" />
-                Delegate Votes
-              </button>
-            )}
+                <ExternalLinkIcon className="h-4 w-4 mr-2" />
+                View Details
+              </a>
+              
+              {/* Vote button */}
+              {primaryAddress && !activeLeaderboard.isFinalized && (
+                <button
+                  onClick={() => {
+                    setSelectedEvermarkId(entry.evermark.id);
+                    setActiveTab('delegate');
+                  }}
+                  className="w-full bg-purple-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-purple-700 active:bg-purple-800"
+                >
+                  <VoteIcon className="h-4 w-4 mr-2 inline" />
+                  Delegate Votes
+                </button>
+              )}
+            </div>
           </div>
         </div>
       );
