@@ -92,37 +92,38 @@ export default function LeaderboardPage() {
           key={entry.evermark.id} 
           className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
         >
-          {/* Mobile: Image at top, taller for better visibility */}
-          <div className="relative h-40">
-            <EvermarkImage
-              src={entry.evermark.image}
-              alt={entry.evermark.title}
-              aspectRatio="video"
-              rounded="none"
-              className="w-full h-full"
-            />
-            
-            {/* Rank badge overlay */}
-            <div className={cn(
-              "absolute top-3 left-3 flex items-center justify-center font-bold rounded-full w-12 h-12 shadow-lg",
-              entry.rank === 1 ? "bg-yellow-500 text-white" :
-              entry.rank === 2 ? "bg-gray-400 text-white" :
-              entry.rank === 3 ? "bg-orange-500 text-white" :
-              "bg-white text-gray-700 border-2 border-gray-300"
-            )}>
-              {entry.rank <= 3 ? (
-                <span className="text-lg">
-                  {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
-                </span>
-              ) : (
-                <span className="text-sm font-bold">#{entry.rank}</span>
-              )}
-            </div>
-            
-            {/* Vote count overlay */}
-            <div className="absolute top-3 right-3 bg-black/70 text-white px-2 py-1 rounded-full">
-              <div className="flex items-center text-xs font-medium">
-                <VoteIcon className="h-3 w-3 mr-1" />
+          {/* Mobile: Image with padding and max height */}
+          <div className="p-4 pb-3">
+            <div className="relative bg-gray-50 rounded-lg border border-gray-200 overflow-hidden" style={{ maxHeight: '160px', minHeight: '120px' }}>
+              <EvermarkImage
+                src={entry.evermark.image}
+                alt={entry.evermark.title}
+                aspectRatio="auto"
+                rounded="lg"
+                className="w-full h-full max-h-40 object-contain"
+                containerClassName="flex items-center justify-center min-h-[120px] max-h-40"
+              />
+              
+              {/* Rank badge overlay */}
+              <div className={cn(
+                "absolute top-2 left-2 flex items-center justify-center font-bold rounded-full w-8 h-8 text-xs shadow-md",
+                entry.rank === 1 ? "bg-yellow-500 text-white" :
+                entry.rank === 2 ? "bg-gray-400 text-white" :
+                entry.rank === 3 ? "bg-orange-500 text-white" :
+                "bg-white text-gray-700 border border-gray-300"
+              )}>
+                {entry.rank <= 3 ? (
+                  <span className="text-xs">
+                    {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
+                  </span>
+                ) : (
+                  <span className="font-bold">#{entry.rank}</span>
+                )}
+              </div>
+              
+              {/* Vote count overlay */}
+              <div className="absolute top-2 right-2 bg-black/70 text-white px-2 py-1 rounded-md text-xs font-medium">
+                <VoteIcon className="h-3 w-3 mr-1 inline" />
                 {votes >= 1000000 ? `${(votes / 1000000).toFixed(1)}M` :
                  votes >= 1000 ? `${(votes / 1000).toFixed(1)}K` : 
                  votes.toFixed(0)}
@@ -130,10 +131,10 @@ export default function LeaderboardPage() {
             </div>
           </div>
           
-          {/* Content section - More padding and space */}
-          <div className="p-5">
-            {/* Title - larger and not cut off */}
-            <h3 className="font-semibold text-gray-900 text-lg leading-tight mb-3 line-clamp-3">
+          {/* Content section - More discrete */}
+          <div className="px-4 pb-4">
+            {/* Title - smaller and more discrete */}
+            <h3 className="font-medium text-gray-900 text-base leading-snug mb-2 line-clamp-2">
               <a 
                 href={`/evermark/${entry.evermark.id}`}
                 className="hover:text-purple-600 transition-colors"
@@ -142,21 +143,21 @@ export default function LeaderboardPage() {
               </a>
             </h3>
             
-            {/* Author info */}
-            <div className="flex items-center text-sm text-gray-600 mb-4">
-              <UserIcon className="h-4 w-4 mr-2" />
+            {/* Author info - more discrete */}
+            <div className="flex items-center text-xs text-gray-500 mb-3">
+              <UserIcon className="h-3 w-3 mr-1" />
               <span className="truncate">by {entry.evermark.author}</span>
             </div>
             
-            {/* Action buttons */}
-            <div className="space-y-3">
+            {/* Action buttons - side by side */}
+            <div className="flex gap-2">
               {/* View Details button */}
               <a
                 href={`/evermark/${entry.evermark.id}`}
-                className="w-full bg-gray-100 text-gray-700 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-gray-200 flex items-center justify-center"
+                className="flex-1 bg-gray-100 text-gray-700 py-2 rounded-lg text-xs font-medium transition-colors hover:bg-gray-200 flex items-center justify-center"
               >
-                <ExternalLinkIcon className="h-4 w-4 mr-2" />
-                View Details
+                <ExternalLinkIcon className="h-3 w-3 mr-1" />
+                View
               </a>
               
               {/* Vote button */}
@@ -166,10 +167,10 @@ export default function LeaderboardPage() {
                     setSelectedEvermarkId(entry.evermark.id);
                     setActiveTab('delegate');
                   }}
-                  className="w-full bg-purple-600 text-white py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-purple-700 active:bg-purple-800"
+                  className="flex-1 bg-purple-600 text-white py-2 rounded-lg text-xs font-medium transition-colors hover:bg-purple-700 active:bg-purple-800"
                 >
-                  <VoteIcon className="h-4 w-4 mr-2 inline" />
-                  Delegate Votes
+                  <VoteIcon className="h-3 w-3 mr-1 inline" />
+                  Vote
                 </button>
               )}
             </div>
