@@ -1,614 +1,401 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  BookmarkIcon, 
-  PlusIcon, 
-  ImageIcon, 
-  UserIcon, 
-  VoteIcon, 
-  ClockIcon, 
-  HeartIcon,
-  BookOpenIcon,
-  StarIcon,
-  XIcon
-} from 'lucide-react';
+// src/pages/MyEvermarksPage.tsx - ✅ ENHANCED with Owned/Created tabs and Bookshelf showcase
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import PageContainer from '../components/layout/PageContainer';
-import { useUserEvermarks, useEvermarks } from '../hooks/useEvermarks';
-import { useDelegationHistory } from '../hooks/useDelegationHistory';
+import { 
+  BookOpenIcon, 
+  PlusIcon, 
+  GridIcon,
+  ListIcon,
+  HeartIcon,
+  StarIcon,
+  ImageIcon,
+  UserIcon,
+  CalendarIcon,
+  TrophyIcon,
+  BookmarkIcon,
+  ExternalLinkIcon,
+  EyeIcon,
+  ShareIcon
+} from 'lucide-react';
+import { useProfile } from '../hooks/useProfile';
+import { useUserEvermarks } from '../hooks/useEvermarks';
 import { useBookshelf } from '../hooks/useBookshelf';
-import { ProfileStatsWidget } from '../components/profile/ProfileStatsWidget';
 import { formatDistanceToNow } from 'date-fns';
-import { toEther } from 'thirdweb/utils';
-import { useWalletAuth } from '../providers/WalletProvider'; // 🎉 SIMPLIFIED IMPORT
+import PageContainer from '../components/layout/PageContainer';
+import { EvermarkCard } from '../components/evermark/EvermarkCard';
+import { ContractRequired } from '../components/auth/AuthGuard';
+import { cn, useIsMobile, textSizes, spacing } from '../utils/responsive';
 
-// Enhanced Evermark Card with Bookshelf Controls
-const EnhancedEvermarkCard: React.FC<{ 
-  evermark: any; 
-  showCreator?: boolean; 
-  delegationAmount?: string; 
-  delegationDate?: Date;
-  userAddress: string;
-}> = ({ 
-  evermark, 
-  showCreator = false, 
-  delegationAmount, 
-  delegationDate,
-  userAddress 
-}) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
-  const [showBookshelfMenu, setShowBookshelfMenu] = useState(false);
-  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+type TabType = 'owned' | 'created' | 'bookshelf';
+
+const MyEvermarksPage: React.FC = () => {
+  const { primaryAddress, isAuthenticated, displayName, avatar } = useProfile();
+  const { evermarks: ownedEvermarks, isLoading: isLoadingOwned } = useUserEvermarks(primaryAddress);
+  const { bookshelfData, getStats } = useBookshelf(primaryAddress);
+  const [activeTab, setActiveTab] = useState<TabType>('owned');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const isMobile = useIsMobile();
   
-  const { getBookshelfStatus, addToFavorites, addToCurrentReading, removeFromBookshelf, getStats } = useBookshelf(userAddress);
-  const bookshelfStatus = getBookshelfStatus(evermark.id);
-  const stats = getStats();
-
-  const handleImageLoad = () => setImageLoading(false);
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoading(false);
-  };
-
-  const handleAddToFavorites = () => {
-    const result = addToFavorites(evermark.id);
-    if (result.success) {
-      setActionFeedback('Added to Favorites! ❤️');
-      setTimeout(() => setActionFeedback(null), 2000);
-    } else {
-      setActionFeedback(result.error || 'Failed to add');
-      setTimeout(() => setActionFeedback(null), 3000);
-    }
-    setShowBookshelfMenu(false);
-  };
-
-  const handleAddToCurrentReading = () => {
-    const result = addToCurrentReading(evermark.id);
-    if (result.success) {
-      setActionFeedback('Added to Current Reading! 📖');
-      setTimeout(() => setActionFeedback(null), 2000);
-    } else {
-      setActionFeedback(result.error || 'Failed to add');
-      setTimeout(() => setActionFeedback(null), 3000);
-    }
-    setShowBookshelfMenu(false);
-  };
-
-  const handleRemoveFromBookshelf = () => {
-    removeFromBookshelf(evermark.id);
-    setActionFeedback('Removed from Bookshelf');
-    setTimeout(() => setActionFeedback(null), 2000);
-    setShowBookshelfMenu(false);
-  };
-
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all duration-200 overflow-hidden group relative">
-      {/* Bookshelf Status Indicators */}
-      <div className="absolute top-2 right-2 z-20 flex gap-1">
-        {bookshelfStatus.isFavorite && (
-          <div className="bg-red-100 text-red-600 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-            <HeartIcon className="h-3 w-3" />
-            <span>Favorite</span>
-          </div>
-        )}
-        {bookshelfStatus.isCurrentReading && (
-          <div className="bg-blue-100 text-blue-600 px-2 py-1 rounded-full text-xs flex items-center gap-1">
-            <BookOpenIcon className="h-3 w-3" />
-            <span>Reading</span>
-          </div>
-        )}
-      </div>
-
-      {/* Bookshelf Quick Actions */}
-      <div className="absolute top-2 left-2 z-20">
-        <div className="relative">
-          <button
-            onClick={() => setShowBookshelfMenu(!showBookshelfMenu)}
-            className={`p-2 rounded-full shadow-sm transition-all ${
-              bookshelfStatus.isFavorite || bookshelfStatus.isCurrentReading
-                ? 'bg-purple-600 text-white'
-                : 'bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600'
-            } opacity-0 group-hover:opacity-100`}
-          >
-            <StarIcon className="h-4 w-4" />
-          </button>
-
-          {/* Bookshelf Menu */}
-          {showBookshelfMenu && (
-            <>
-              <div 
-                className="fixed inset-0 z-10" 
-                onClick={() => setShowBookshelfMenu(false)} 
-              />
-              <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-30">
-                <div className="p-2">
-                  {bookshelfStatus.isFavorite || bookshelfStatus.isCurrentReading ? (
-                    <button
-                      onClick={handleRemoveFromBookshelf}
-                      className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded flex items-center gap-2"
-                    >
-                      <XIcon className="h-4 w-4" />
-                      Remove from Bookshelf
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        onClick={handleAddToFavorites}
-                        disabled={!stats.canAddFavorite}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <HeartIcon className="h-4 w-4 text-red-500" />
-                        <span>Add to Favorites</span>
-                        <span className="text-xs text-gray-500 ml-auto">
-                          ({stats.totalFavorites}/{stats.maxFavorites})
-                        </span>
-                      </button>
-                      
-                      <button
-                        onClick={handleAddToCurrentReading}
-                        disabled={!stats.canAddCurrentReading}
-                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <BookOpenIcon className="h-4 w-4 text-blue-500" />
-                        <span>Add to Current Reading</span>
-                        <span className="text-xs text-gray-500 ml-auto">
-                          ({stats.totalCurrentReading}/{stats.maxCurrentReading})
-                        </span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Action Feedback */}
-      {actionFeedback && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 bg-black text-white px-3 py-2 rounded-lg text-sm font-medium shadow-lg">
-          {actionFeedback}
-        </div>
-      )}
-
-      <Link to={`/evermark/${evermark.id}`} className="block">
-        {/* Image section */}
-        <div className="w-full h-32 bg-gray-100 overflow-hidden">
-          {evermark.image && !imageError ? (
-            <div className="relative w-full h-full">
-              {imageLoading && (
-                <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-lg"></div>
-              )}
-              <img
-                src={evermark.image}
-                alt={evermark.title}
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            </div>
-          ) : (
-            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-              <ImageIcon className="h-8 w-8 text-gray-400" />
-            </div>
-          )}
-        </div>
-        
-        {/* Content section */}
-        <div className="p-4">
-          <h3 className="font-medium text-gray-900 mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors">
-            {evermark.title}
-          </h3>
-          
-          <div className="text-sm text-gray-600 mb-3">
-            <div className="flex items-center gap-2 mt-1">
-              <UserIcon className="h-3 w-3" />
-              <span>by {evermark.author}</span>
-              <span className="text-gray-400">•</span>
-              <span>{formatDistanceToNow(new Date(evermark.creationTime), { addSuffix: true })}</span>
-            </div>
-            {showCreator && evermark.creator && (
-              <div className="flex items-center mt-1 text-xs">
-                <span className="text-gray-500">Creator: {evermark.creator.slice(0, 6)}...{evermark.creator.slice(-4)}</span>
-              </div>
-            )}
-          </div>
-          
-          {evermark.description && (
-            <p className="text-sm text-gray-500 mb-3 line-clamp-2">
-              {evermark.description}
-            </p>
-          )}
-          
-          {/* Delegation info for supported evermarks */}
-          {delegationAmount && delegationDate && (
-            <div className="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
-              <div className="flex items-center text-xs text-blue-700">
-                <VoteIcon className="h-3 w-3 mr-1" />
-                <span>Delegated {delegationAmount} WEMARK</span>
-              </div>
-              <div className="flex items-center text-xs text-blue-600 mt-1">
-                <ClockIcon className="h-3 w-3 mr-1" />
-                <span>{formatDistanceToNow(delegationDate, { addSuffix: true })}</span>
-              </div>
-            </div>
-          )}
-          
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">
-              {new Date(evermark.creationTime).toLocaleDateString()}
-            </span>
-            <BookmarkIcon className="h-4 w-4 text-purple-600" />
-          </div>
-        </div>
-      </Link>
-    </div>
-  );
-};
-
-// Bookshelf Quick Stats Widget
-const BookshelfQuickStats: React.FC<{ userAddress: string }> = ({ userAddress }) => {
-  const { getStats } = useBookshelf(userAddress);
-  const stats = getStats();
-
-  return (
-    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg p-4 border border-purple-200">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-gray-900 flex items-center gap-2">
-          <StarIcon className="h-5 w-5 text-purple-600" />
-          My Bookshelf
-        </h3>
-        <Link 
-          to="/bookshelf"
-          className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-        >
-          View All →
-        </Link>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-4">
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <HeartIcon className="h-4 w-4 text-red-500" />
-            <span className="text-lg font-bold text-gray-900">
-              {stats.totalFavorites}/{stats.maxFavorites}
-            </span>
-          </div>
-          <p className="text-xs text-gray-600">Favorites</p>
-        </div>
-        
-        <div className="text-center">
-          <div className="flex items-center justify-center gap-1 mb-1">
-            <BookOpenIcon className="h-4 w-4 text-blue-500" />
-            <span className="text-lg font-bold text-gray-900">
-              {stats.totalCurrentReading}/{stats.maxCurrentReading}
-            </span>
-          </div>
-          <p className="text-xs text-gray-600">Reading</p>
-        </div>
-      </div>
-      
-      {!stats.canAddFavorite && !stats.canAddCurrentReading && (
-        <div className="mt-3 p-2 bg-amber-100 rounded text-xs text-amber-700 text-center">
-          Bookshelf is full! Remove items to add new ones.
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Section Header Component
-const SectionHeader: React.FC<{ 
-  title: string; 
-  count: number; 
-  icon: React.ReactNode; 
-  description: string;
-  isExpanded: boolean;
-  onToggle: () => void;
-}> = ({ title, count, icon, description, isExpanded, onToggle }) => (
-  <div 
-    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
-    onClick={onToggle}
-  >
-    <div className="flex items-center">
-      <div className="p-2 bg-white rounded-lg mr-3 shadow-sm">
-        {icon}
-      </div>
-      <div>
-        <h3 className="font-medium text-gray-900">{title}</h3>
-        <p className="text-sm text-gray-600">{description}</p>
-      </div>
-    </div>
-    <div className="flex items-center gap-3">
-      <span className="text-lg font-bold text-purple-600">{count}</span>
-      <span className="text-gray-400">
-        {isExpanded ? '−' : '+'}
-      </span>
-    </div>
-  </div>
-);
-
-const EnhancedMyEvermarksPage: React.FC = () => {
-  // 🎉 SIMPLIFIED: Single hook replaces 15+ lines of complex wallet detection
-  const { isConnected, address, requireConnection } = useWalletAuth();
+  const bookshelfStats = getStats();
   
-  console.log("🔍 MyEvermarks wallet detection (SIMPLIFIED):", {
-    isConnected,
-    address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : null,
-  });
-  
-  // All hooks now use the clean address from provider
-  const { evermarks: userOwnedEvermarks, isLoading: isLoadingOwned } = useUserEvermarks(address);
-  const { evermarks: allEvermarks } = useEvermarks();
-  const { 
-    delegationHistory, 
-    getSupportedEvermarks, 
-    isLoading: isLoadingDelegations 
-  } = useDelegationHistory(address);
+  // Get evermarks that match bookshelf items
+  const getBookshelfEvermarks = () => {
+    const allBookshelfItems = [...bookshelfData.favorites, ...bookshelfData.currentReading];
+    return allBookshelfItems
+      .map(item => {
+        const evermark = ownedEvermarks.find(e => e.id === item.evermarkId);
+        if (!evermark) return null;
+        return {
+          evermark,
+          bookshelfItem: item,
+          category: bookshelfData.favorites.find(f => f.evermarkId === item.evermarkId) ? 'favorite' : 'currentReading'
+        };
+      })
+      .filter((item): item is { evermark: any; bookshelfItem: any; category: string } => item !== null)
+      .sort((a, b) => new Date(b.bookshelfItem.addedAt).getTime() - new Date(a.bookshelfItem.addedAt).getTime());
+  };
 
-  // Section expansion state
-  const [expandedSections, setExpandedSections] = useState({
-    created: true,
-    owned: false,
-    supported: false
-  });
+  // For now, "created" is the same as "owned" since we track ownership
+  // In the future, this could be enhanced to track actual creation vs acquisition
+  const createdEvermarks = ownedEvermarks;
+  const bookshelfEvermarks = getBookshelfEvermarks();
 
-  // Categorize owned evermarks into created vs received
-  const categorizedEvermarks = useMemo(() => {
-    if (!address || !userOwnedEvermarks.length) {
-      return { created: [], received: [] };
+  const tabs = [
+    {
+      id: 'owned' as TabType,
+      label: 'Owned',
+      icon: <BookOpenIcon className="h-4 w-4" />,
+      count: ownedEvermarks.length,
+      description: 'Evermarks you own'
+    },
+    {
+      id: 'created' as TabType,
+      label: 'Created',
+      icon: <PlusIcon className="h-4 w-4" />,
+      count: createdEvermarks.length,
+      description: 'Evermarks you created'
+    },
+    {
+      id: 'bookshelf' as TabType,
+      label: 'Bookshelf',
+      icon: <BookmarkIcon className="h-4 w-4" />,
+      count: bookshelfStats.totalFavorites + bookshelfStats.totalCurrentReading,
+      description: 'Your curated showcase'
     }
+  ];
 
-    const created = userOwnedEvermarks.filter(
-      evermark => evermark.creator?.toLowerCase() === address.toLowerCase()
-    );
-
-    const received = userOwnedEvermarks.filter(
-      evermark => evermark.creator?.toLowerCase() !== address.toLowerCase()
-    );
-
-    console.log('📊 Categorized evermarks:', { 
-      total: userOwnedEvermarks.length,
-      created: created.length, 
-      received: received.length 
-    });
-
-    return { created, received };
-  }, [userOwnedEvermarks, address]);
-
-  // Get supported evermarks from delegation history
-  const supportedEvermarkIds = getSupportedEvermarks();
-  const supportedEvermarks = useMemo(() => {
-    return allEvermarks.filter(evermark => 
-      supportedEvermarkIds.includes(evermark.id) &&
-      evermark.creator?.toLowerCase() !== address?.toLowerCase() // Exclude own creations
-    );
-  }, [allEvermarks, supportedEvermarkIds, address]);
-
-  // Get delegation info for supported evermarks
-  const getDelegationInfo = (evermarkId: string) => {
-    const delegations = delegationHistory.filter(d => d.evermarkId === evermarkId);
-    if (delegations.length === 0) return null;
-    
-    // Get most recent delegation
-    const latest = delegations[0]; // delegationHistory is already sorted by timestamp desc
-    const totalAmount = delegations.reduce((sum, d) => sum + d.amount, BigInt(0));
-    
-    return {
-      amount: toEther(totalAmount),
-      date: latest.timestamp
-    };
-  };
-
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  // 🎉 SIMPLIFIED: Clean disconnected state handling with auto-connection
-  if (!isConnected || !address) {
-    return (
-      <PageContainer title="My Collection">
-        <div className="text-center py-12">
-          <BookmarkIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Wallet Not Connected
-          </h3>
-          <p className="text-gray-600 mb-6">
-            Connect your wallet to view your Evermarks collection.
+  const renderBookshelfShowcase = () => {
+    if (bookshelfEvermarks.length === 0) {
+      return (
+        <div className="text-center py-12 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg border-2 border-dashed border-purple-200">
+          <BookmarkIcon className="mx-auto h-16 w-16 text-purple-300 mb-4" />
+          <h3 className="text-xl font-medium text-gray-900 mb-2">Showcase Your Favorites</h3>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">
+            Your bookshelf is your public showcase. Add your favorite Evermarks to share what inspires you.
           </p>
-          <button
-            onClick={requireConnection}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-          >
-            Connect Wallet
-          </button>
-        </div>
-      </PageContainer>
-    );
-  }
-
-  const isLoading = isLoadingOwned || isLoadingDelegations;
-
-  return (
-    <PageContainer title="My Collection">
-      <div className="space-y-6">
-        {/* Profile Stats Widget */}
-        <ProfileStatsWidget userAddress={address} />
-        
-        {/* Bookshelf Quick Stats */}
-        <BookshelfQuickStats userAddress={address} />
-        
-        <div className="flex justify-between items-center">
-          <div>
-            <p className="text-gray-600">Your personal library of Evermarks</p>
-            <p className="text-sm text-purple-600 mt-1">
-              💡 Hover over cards and click the ⭐ to add to your bookshelf
-            </p>
-          </div>
-          <div className="flex gap-3">
+          <div className="flex gap-3 justify-center">
             <Link
               to="/bookshelf"
-              className="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors"
-            >
-              <StarIcon className="w-4 h-4 mr-2" />
-              My Bookshelf
-            </Link>
-            <Link
-              to="/create"
               className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
             >
-              <PlusIcon className="w-4 h-4 mr-2" />
-              Add New
+              <BookmarkIcon className="h-4 w-4 mr-2" />
+              Manage Bookshelf
             </Link>
+            {ownedEvermarks.length > 0 && (
+              <button
+                onClick={() => setActiveTab('owned')}
+                className="inline-flex items-center px-4 py-2 bg-white text-purple-600 border border-purple-600 rounded-lg hover:bg-purple-50 transition-colors"
+              >
+                <BookOpenIcon className="h-4 w-4 mr-2" />
+                View Owned
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {/* Bookshelf Header */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg p-6 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {avatar && (
+                <img src={avatar} alt={displayName} className="w-12 h-12 rounded-full border-2 border-white" />
+              )}
+              <div>
+                <h2 className="text-xl font-bold">{displayName}'s Bookshelf</h2>
+                <p className="text-purple-100">
+                  {bookshelfStats.totalFavorites} favorites • {bookshelfStats.totalCurrentReading} currently reading
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Link
+                to="/bookshelf"
+                className="inline-flex items-center px-3 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors"
+              >
+                <BookmarkIcon className="h-4 w-4 mr-2" />
+                Manage
+              </Link>
+              <Link
+                to={`/${primaryAddress}/bookshelf`}
+                className="inline-flex items-center px-3 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors"
+              >
+                <ExternalLinkIcon className="h-4 w-4 mr-2" />
+                Public View
+              </Link>
+            </div>
           </div>
         </div>
 
-        {isLoading ? (
-          <div className="space-y-6">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-white rounded-lg p-6">
-                <div className="h-6 bg-gray-200 rounded animate-pulse mb-4"></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(3)].map((_, j) => (
-                    <div key={j} className="bg-gray-100 rounded-lg h-64 animate-pulse"></div>
-                  ))}
-                </div>
-              </div>
-            ))}
+        {/* Favorites Section */}
+        {bookshelfData.favorites.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center mb-4">
+              <HeartIcon className="h-5 w-5 text-red-500 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900">Favorites</h3>
+              <span className="ml-auto text-sm text-gray-500">{bookshelfStats.totalFavorites}</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {bookshelfEvermarks
+                .filter(item => item.category === 'favorite')
+                .slice(0, 6)
+                .map(({ evermark, bookshelfItem }) => (
+                  <div key={evermark.id} className="relative group">
+                    <div className="absolute top-2 right-2 z-10 bg-red-100 text-red-700 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                      <HeartIcon className="h-3 w-3 mr-1" />
+                      Favorite
+                    </div>
+                    <EvermarkCard 
+                      evermark={evermark} 
+                      isCompact={true}
+                      showActions={false}
+                    />
+                  </div>
+                ))}
+            </div>
           </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Section 1: Evermarks Created by User */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <SectionHeader
-                title="Created by You"
-                count={categorizedEvermarks.created.length}
-                icon={<PlusIcon className="h-5 w-5 text-green-600" />}
-                description="Evermarks you minted and created"
-                isExpanded={expandedSections.created}
-                onToggle={() => toggleSection('created')}
-              />
-              
-              {expandedSections.created && (
-                <div className="p-6">
-                  {categorizedEvermarks.created.length === 0 ? (
-                    <div className="text-center py-8">
-                      <PlusIcon className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                      <p className="text-gray-500">No created Evermarks yet</p>
-                      <Link
-                        to="/create"
-                        className="inline-flex items-center mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                      >
-                        Create Your First Evermark
-                      </Link>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {categorizedEvermarks.created.map(evermark => (
-                        <EnhancedEvermarkCard 
-                          key={evermark.id} 
-                          evermark={evermark} 
-                          userAddress={address}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+        )}
 
-            {/* Section 2: Evermarks Owned but Created by Others */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <SectionHeader
-                title="Owned by You"
-                count={categorizedEvermarks.received.length}
-                icon={<BookmarkIcon className="h-5 w-5 text-blue-600" />}
-                description="Evermarks you own but others created"
-                isExpanded={expandedSections.owned}
-                onToggle={() => toggleSection('owned')}
-              />
-              
-              {expandedSections.owned && (
-                <div className="p-6">
-                  {categorizedEvermarks.received.length === 0 ? (
-                    <div className="text-center py-8">
-                      <BookmarkIcon className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                      <p className="text-gray-500">No received Evermarks yet</p>
-                      <p className="text-sm text-gray-400 mt-2">
-                        You'll see Evermarks here when others transfer them to you
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {categorizedEvermarks.received.map(evermark => (
-                        <EnhancedEvermarkCard 
-                          key={evermark.id} 
-                          evermark={evermark} 
-                          showCreator={true}
-                          userAddress={address}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+        {/* Currently Reading Section */}
+        {bookshelfData.currentReading.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center mb-4">
+              <BookOpenIcon className="h-5 w-5 text-blue-500 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900">Currently Reading</h3>
+              <span className="ml-auto text-sm text-gray-500">{bookshelfStats.totalCurrentReading}</span>
             </div>
-
-            {/* Section 3: Evermarks User Has Delegated To */}
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <SectionHeader
-                title="Supported by You"
-                count={supportedEvermarks.length}
-                icon={<VoteIcon className="h-5 w-5 text-purple-600" />}
-                description="Evermarks you've delegated WEMARK tokens to"
-                isExpanded={expandedSections.supported}
-                onToggle={() => toggleSection('supported')}
-              />
-              
-              {expandedSections.supported && (
-                <div className="p-6">
-                  {supportedEvermarks.length === 0 ? (
-                    <div className="text-center py-8">
-                      <VoteIcon className="mx-auto h-8 w-8 text-gray-300 mb-2" />
-                      <p className="text-gray-500">No supported Evermarks yet</p>
-                      <p className="text-sm text-gray-400 mt-2">
-                        Support quality content by delegating WEMARK tokens to Evermarks you like
-                      </p>
-                      <Link
-                        to="/"
-                        className="inline-flex items-center mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                      >
-                        Explore Evermarks
-                      </Link>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {bookshelfEvermarks
+                .filter(item => item.category === 'currentReading')
+                .slice(0, 4)
+                .map(({ evermark, bookshelfItem }) => (
+                  <div key={evermark.id} className="relative group">
+                    <div className="absolute top-2 right-2 z-10 bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-xs font-medium flex items-center">
+                      <BookOpenIcon className="h-3 w-3 mr-1" />
+                      Reading
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {supportedEvermarks.map(evermark => {
-                        const delegationInfo = getDelegationInfo(evermark.id);
-                        return (
-                          <EnhancedEvermarkCard 
-                            key={evermark.id} 
-                            evermark={evermark} 
-                            showCreator={true}
-                            delegationAmount={delegationInfo?.amount}
-                            delegationDate={delegationInfo?.date}
-                            userAddress={address}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
+                    <EvermarkCard 
+                      evermark={evermark} 
+                      isCompact={true}
+                      showActions={false}
+                    />
+                  </div>
+                ))}
             </div>
           </div>
         )}
       </div>
+    );
+  };
+
+  const renderEvermarkGrid = (evermarks: any[]) => {
+    if (evermarks.length === 0) {
+      return (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+          <BookOpenIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            {activeTab === 'owned' ? 'No Evermarks Owned' : 'No Evermarks Created'}
+          </h3>
+          <p className="text-gray-600 mb-4">
+            {activeTab === 'owned' 
+              ? 'You don\'t own any Evermarks yet. Create your first one!'
+              : 'You haven\'t created any Evermarks yet. Share your first piece of content!'
+            }
+          </p>
+          <Link
+            to="/create"
+            className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+          >
+            <PlusIcon className="h-4 w-4 mr-2" />
+            Create Evermark
+          </Link>
+        </div>
+      );
+    }
+
+    if (viewMode === 'list') {
+      return (
+        <div className="space-y-4">
+          {evermarks.map(evermark => (
+            <EvermarkCard 
+              key={evermark.id} 
+              evermark={evermark} 
+              isCompact={true}
+              showDescription={false}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {evermarks.map(evermark => (
+          <EvermarkCard 
+            key={evermark.id} 
+            evermark={evermark}
+            showDescription={true}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <PageContainer>
+      <ContractRequired fallback={
+        <div className="text-center py-12">
+          <BookOpenIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Wallet to View Collection</h3>
+          <p className="text-gray-600">Connect your wallet to see your Evermarks and manage your bookshelf</p>
+        </div>
+      }>
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className={cn("font-serif font-bold text-gray-900", textSizes.responsive['xl-2xl-3xl'])}>
+                My Collection
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Manage your Evermarks and showcase your favorites
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              {/* View Mode Toggle */}
+              {activeTab !== 'bookshelf' && (
+                <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setViewMode('grid')}
+                    className={cn(
+                      "p-2 rounded transition-colors",
+                      viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                    )}
+                  >
+                    <GridIcon className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setViewMode('list')}
+                    className={cn(
+                      "p-2 rounded transition-colors",
+                      viewMode === 'list' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                    )}
+                  >
+                    <ListIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+              
+              {/* Create Button */}
+              <Link
+                to="/create"
+                className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Create
+              </Link>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors",
+                    activeTab === tab.id
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  )}
+                >
+                  {tab.icon}
+                  <span>{tab.label}</span>
+                  <span className={cn(
+                    "px-2 py-1 text-xs rounded-full",
+                    activeTab === tab.id 
+                      ? 'bg-purple-100 text-purple-600' 
+                      : 'bg-gray-100 text-gray-600'
+                  )}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          {/* Tab Content */}
+          <div className="min-h-96">
+            {isLoadingOwned ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading your collection...</p>
+              </div>
+            ) : (
+              <>
+                {activeTab === 'owned' && renderEvermarkGrid(ownedEvermarks)}
+                {activeTab === 'created' && renderEvermarkGrid(createdEvermarks)}
+                {activeTab === 'bookshelf' && renderBookshelfShowcase()}
+              </>
+            )}
+          </div>
+
+          {/* Quick Stats */}
+          {(ownedEvermarks.length > 0 || bookshelfStats.totalFavorites > 0) && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Collection Stats</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{ownedEvermarks.length}</div>
+                  <div className="text-sm text-gray-600">Total Owned</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{bookshelfStats.totalFavorites}</div>
+                  <div className="text-sm text-gray-600">Favorites</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{bookshelfStats.totalCurrentReading}</div>
+                  <div className="text-sm text-gray-600">Reading</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">
+                    {primaryAddress ? `${primaryAddress.slice(0, 4)}...${primaryAddress.slice(-4)}` : '0'}
+                  </div>
+                  <div className="text-sm text-gray-600">Address</div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </ContractRequired>
     </PageContainer>
   );
 };
 
-export default EnhancedMyEvermarksPage;
+export default MyEvermarksPage;

@@ -1,4 +1,4 @@
-// src/components/layout/Sidebar.tsx - ✅ ENHANCED with unified auth and mobile optimization
+// src/components/layout/Sidebar.tsx - ✅ CLEANED with improved UX
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
@@ -14,9 +14,8 @@ import {
   WifiIcon,
   WifiOffIcon,
   CoinsIcon,
-  UserIcon,
-  VoteIcon,
-  ChevronRightIcon
+  BookmarkIcon,
+  InfoIcon
 } from 'lucide-react';
 import { cn, useIsMobile, touchFriendly, textSizes, spacing } from '../../utils/responsive';
 
@@ -44,7 +43,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
   // ✅ Use unified wallet connection
   const { canInteract, walletType, isConnected } = useWalletConnection();
   
-  // Define navigation items with conditional visibility
+  // ✅ CLEANED: Simplified navigation items with better UX
   const navItems = [
     { 
       path: '/', 
@@ -72,32 +71,28 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       description: 'Your created Evermarks',
       requiresAuth: true
     },
-    // ✅ Add delegation link for authenticated users
-    ...(isAuthenticated ? [{
-      path: '/delegation', 
-      label: 'Delegation', 
-      icon: <VoteIcon className="h-5 w-5" />,
+    // ✅ UPDATED: Bookshelf now includes delegation functionality
+    { 
+      path: '/bookshelf', 
+      label: 'Bookshelf', 
+      icon: <BookmarkIcon className="h-5 w-5" />,
       badge: 'New',
-      description: 'Voting power delegation history'
-    }] : []),
+      description: 'Organize favorites and manage voting delegation',
+      requiresAuth: true
+    },
     // ✅ Add wrapping link only if user can interact with contracts
     ...(canInteract ? [{
       path: '/wrapping', 
-      label: 'Wrapping', 
+      label: 'Token Tools', 
       icon: <CoinsIcon className="h-5 w-5" />,
       badge: 'wEMARK',
-      description: 'Manage your EMARK tokens'
+      description: 'Wrap/unwrap EMARK tokens'
     }] : []),
-    { 
-      path: '/profile', 
-      label: 'Profile', 
-      icon: <UserIcon className="h-5 w-5" />,
-      description: 'Your profile and settings'
-    },
+    // ✅ REMOVED: No separate Profile link - avatar already handles this
     { 
       path: '/about', 
       label: 'About', 
-      icon: <AboutIcon className="h-5 w-5" />,
+      icon: <InfoIcon className="h-5 w-5" />,
       description: 'Learn about Evermark'
     },
   ];
@@ -114,7 +109,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
   const copyWalletAddress = async (address: string) => {
     try {
       await navigator.clipboard.writeText(address);
-      // You could add a toast notification here
       console.log('Wallet address copied to clipboard');
     } catch (err) {
       console.error('Failed to copy wallet address:', err);
@@ -161,14 +155,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       {isAuthenticated && (
         <div className={cn("border-b border-gray-200", spacing.responsive['sm-md-lg'])}>
           <div className="flex items-center space-x-3">
-            {/* Profile Picture - Clickable to go to profile */}
+            {/* ✅ ENHANCED: Profile Picture - Now the main way to access profile */}
             <Link 
               to={primaryAddress ? `/${primaryAddress}` : '/profile'} 
               className={cn(
                 "bg-purple-100 rounded-full flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-purple-300 transition-all cursor-pointer flex-shrink-0",
-                isMobile ? "h-10 w-10" : "h-12 w-12"
+                isMobile ? "h-12 w-12" : "h-14 w-14"
               )}
               onClick={closeSidebar}
+              title="View your profile"
             >
               {avatar ? (
                 <img 
@@ -188,23 +183,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
             
             {/* User Info - Enhanced */}
             <div className="flex-1 min-w-0">
-              <h3 className={cn(
-                "font-medium text-gray-900 truncate",
-                textSizes.responsive['sm-base-lg']
-              )}>
-                {displayName}
-              </h3>
+              <Link 
+                to={primaryAddress ? `/${primaryAddress}` : '/profile'}
+                onClick={closeSidebar}
+                className="block hover:text-purple-600 transition-colors"
+              >
+                <h3 className={cn(
+                  "font-medium text-gray-900 truncate",
+                  textSizes.responsive['sm-base-lg']
+                )}>
+                  {displayName}
+                </h3>
+              </Link>
               
               {/* Show handle OR wallet address with better hierarchy */}
               {handle ? (
-                <p className="text-xs sm:text-sm text-purple-600 truncate">{handle}</p>
+                <p className="text-xs sm:text-sm text-purple-600 truncate">@{handle}</p>
               ) : primaryAddress ? (
                 <button
                   onClick={() => copyWalletAddress(primaryAddress)}
                   className="font-mono text-xs text-gray-600 hover:text-purple-600 transition-colors cursor-pointer flex items-center gap-1 group truncate"
                   title="Click to copy wallet address"
                 >
-                  <span className="truncate">{primaryAddress.slice(0, 6)}...{primaryAddress.slice(-4)}</span>
+                  <span className="truncate">{primaryAddress.slice(0, 8)}...{primaryAddress.slice(-4)}</span>
                   <CopyIcon className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                 </button>
               ) : (
@@ -221,7 +222,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                   "capitalize",
                   canInteract ? 'text-green-600' : isConnected ? 'text-yellow-600' : 'text-red-600'
                 )}>
-                  {walletType}
+                  {canInteract ? 'Full Access' : isConnected ? 'Limited' : 'Connect Wallet'}
                 </span>
               </div>
             </div>
@@ -251,7 +252,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                 ? "bg-yellow-100 text-yellow-700" 
                 : "bg-red-100 text-red-700"
             )}>
-              {canInteract ? 'Full Access' : isConnected ? 'Limited' : 'Read Only'}
+              {canInteract ? 'Full Features' : isConnected ? 'Read Only' : 'No Wallet'}
             </span>
           </div>
         </div>
@@ -298,87 +299,83 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                       {item.badge}
                     </span>
                   )}
-                  
-                  {/* Arrow for external feel */}
-                  {item.requiresAuth && !isAuthenticated && (
-                    <ChevronRightIcon className="h-4 w-4 text-gray-400" />
-                  )}
                 </Link>
               </li>
             );
           })}
         </ul>
         
-        {/* ✅ Quick action for unauthenticated users */}
+        {/* ✅ ENHANCED: Better call-to-action for unauthenticated users */}
         {!isAuthenticated && (
           <div className="mt-6 px-2">
-            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-              <h4 className="text-sm font-medium text-gray-900 mb-2">Get Started</h4>
-              <p className="text-xs text-gray-600 mb-3">
-                Connect your wallet or Farcaster to create and vote on Evermarks
+            <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
+              <h4 className="text-sm font-semibold text-purple-900 mb-2">Get Started</h4>
+              <p className="text-xs text-purple-700 mb-3">
+                Connect your wallet to create Evermarks, vote, and build your personal bookshelf
               </p>
-              <Link
-                to="/about"
-                onClick={closeSidebar}
-                className="text-xs text-purple-600 hover:text-purple-700 font-medium"
-              >
-                Learn More →
-              </Link>
+              <div className="space-y-2">
+                <Link
+                  to="/about"
+                  onClick={closeSidebar}
+                  className="block text-xs text-center bg-white text-purple-600 border border-purple-300 px-3 py-2 rounded hover:bg-purple-50 transition-colors"
+                >
+                  Learn More
+                </Link>
+                <Link
+                  to="/"
+                  onClick={closeSidebar}
+                  className="block text-xs text-center bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 transition-colors"
+                >
+                  Explore Evermarks
+                </Link>
+              </div>
             </div>
           </div>
         )}
       </nav>
       
-      {/* ✅ Enhanced footer with better status indicators */}
+      {/* ✅ Enhanced footer with cleaner status */}
       <div className={cn("border-t border-gray-200 mt-auto", spacing.responsive['sm-md-lg'])}>
-        {/* Contract status indicator */}
-        <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center justify-between text-xs mb-2">
-            <span className="text-gray-600">Blockchain Access:</span>
-            <span className={cn(
-              "font-medium px-2 py-1 rounded-full",
-              canInteract 
-                ? 'bg-green-100 text-green-700' 
-                : isConnected 
-                ? 'bg-yellow-100 text-yellow-700'
-                : 'bg-red-100 text-red-700'
-            )}>
-              {canInteract ? 'Full' : isConnected ? 'Limited' : 'None'}
-            </span>
-          </div>
-          <div className="text-xs text-gray-500">
-            {canInteract 
-              ? '✅ Can create Evermarks and vote'
-              : isConnected 
-              ? '⚠️ Read-only blockchain access'
-              : '❌ Connect wallet for full features'
-            }
-          </div>
-        </div>
-        
-        {/* Logo and copyright */}
-        <div className="flex justify-center mb-2">
-          <img 
-            src="/logo.png" 
-            alt="Evermark Logo" 
-            className="h-6 sm:h-8"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        </div>
-        <p className="text-xs text-center text-gray-500">
-          © {new Date().getFullYear()} Evermark
-        </p>
-        
-        {/* Environment indicator for development */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-2 text-center">
-            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
-              Dev Mode
-            </span>
+        {/* ✅ SIMPLIFIED: More concise status indicator */}
+        {isAuthenticated && (
+          <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-gray-600">Blockchain:</span>
+              <span className={cn(
+                "font-medium",
+                canInteract ? 'text-green-600' : isConnected ? 'text-yellow-600' : 'text-red-600'
+              )}>
+                {canInteract ? '✅ Active' : isConnected ? '⚠️ Limited' : '❌ None'}
+              </span>
+            </div>
           </div>
         )}
+        
+        {/* Logo and copyright */}
+        <div className="text-center">
+          <div className="flex justify-center mb-2">
+            <img 
+              src="/logo.png" 
+              alt="Evermark Logo" 
+              className="h-6 sm:h-8"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            © {new Date().getFullYear()} Evermark
+          </p>
+          
+          {/* Environment indicator for development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-2">
+              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                Dev Mode
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-// Updated App.tsx for Mainnet - Enhanced Farcaster Mini App Integration + Delegation + Wrapping
+// Updated App.tsx - Cleaned routing with better UX
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppThirdwebProvider } from './lib/thirdweb';
@@ -14,6 +14,7 @@ import ProfilePage from './pages/ProfilePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import MyEvermarksPage from './pages/MyEvermarksPage';
 import WrappingPage from './pages/WrappingPage';
+import BookshelfPage from './pages/BookshelfPage'; // ✅ UPDATED: Use actual bookshelf page
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import { EvermarkDetail } from './components/evermark/EvermarkDetail';
 import { ShareRedirect } from './components/sharing/ShareButton';
@@ -21,12 +22,12 @@ import AboutPage from './pages/AboutPage';
 import UserCreatedEvermarksPage from './pages/UserCreatedEvermarksPage';
 import PublicProfilePage from './pages/PublicProfilePage';
 
-// New sharing components
+// Sharing components
 import { ShareHandler } from './components/sharing/ShareHandler';
 import { CreateFromCast } from './components/sharing/CreateFromCast';
 
-// NEW: Delegation component
-import { DelegationHistory } from './components/voting/DelegationHistory';
+// ✅ NEW: Public bookshelf component
+import { PublicBookshelfView } from './components/bookshelf/PublicBookshelfView';
 
 // Farcaster context types
 interface FarcasterContext {
@@ -214,21 +215,13 @@ function AppContent() {
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
           <Route path="/about" element={<AboutPage />} />
           
+          {/* ✅ UPDATED: Bookshelf now shows actual bookshelf page with delegation features */}
+          <Route path="/bookshelf" element={<BookshelfPage />} />
+          
           {/* Wrapping route - MUST come before /:address */}
           <Route path="/wrapping" element={<WrappingPage />} />
           
-          {/* Delegation route */}
-          <Route path="/delegation" element={
-            <div className="container mx-auto px-4 py-8">
-              <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900 mb-2">🗳️ Delegation History</h1>
-                <p className="text-gray-600">
-                  Track your voting power delegation and earn rewards for supporting great Evermarks
-                </p>
-              </div>
-              <DelegationHistory />
-            </div>
-          } />
+          {/* ✅ REMOVED: No more separate delegation route - integrated into bookshelf */}
           
           {/* Share functionality - Existing routes */}
           <Route path="/share" element={<ShareHandler />} />
@@ -236,13 +229,19 @@ function AppContent() {
           <Route path="/share/:id" element={<ShareRedirect />} />
           <Route path="/share/evermark/:id" element={<ShareRedirect />} />
           
+          {/* ✅ UPDATED: Redirect old delegation route to bookshelf */}
+          <Route path="/delegation" element={<Navigate to="/bookshelf" replace />} />
+          
           {/* Temporary placeholder routes */}
           <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
-          <Route path="/bookshelf" element={<ComingSoonPage feature="Bookshelf" />} />
+          
+          {/* ✅ NEW: Public bookshelf routes - MUST come before /:address catch-all */}
+          <Route path="/bookshelf/:address" element={<PublicBookshelfView />} />
           
           {/* Public Profile Routes - THESE MUST COME AFTER ALL SPECIFIC ROUTES */}
           <Route path="/:address" element={<PublicProfilePage />} />
           <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
+          <Route path="/:address/bookshelf" element={<PublicBookshelfView />} />
           
           {/* Handle any sub-paths that might come from Mini App URLs */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -252,7 +251,7 @@ function AppContent() {
   );
 }
 
-// Enhanced coming soon page with Farcaster context + delegation info
+// ✅ UPDATED: Enhanced coming soon page with bookshelf integration
 function ComingSoonPage({ feature }: { feature: string }) {
   const { isInFarcaster, isAuthenticated, hasVerifiedAddress } = useFarcasterUser();
   const farcasterContext = useFarcasterContext();
@@ -274,18 +273,18 @@ function ComingSoonPage({ feature }: { feature: string }) {
           </p>
         </div>
 
-        {/* NEW: Delegation call-to-action */}
+        {/* ✅ UPDATED: Bookshelf call-to-action instead of delegation */}
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
-          <h3 className="font-medium text-purple-900 mb-2">🗳️ Available Now: Delegation</h3>
+          <h3 className="font-medium text-purple-900 mb-2">📚 Available Now: Personal Bookshelf</h3>
           <p className="text-purple-800 text-sm mb-3">
-            Support your favorite Evermarks and earn rewards by delegating your voting power!
+            Organize your favorite Evermarks and manage your voting power delegation in one place!
           </p>
           <div className="flex gap-2 justify-center">
             <a 
-              href="/delegation" 
+              href="/bookshelf" 
               className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
             >
-              View Delegation
+              View Bookshelf
             </a>
             <a 
               href="/leaderboard" 
