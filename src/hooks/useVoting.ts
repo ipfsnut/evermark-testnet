@@ -1,72 +1,56 @@
-// Fixed useVoting.ts - Use unified wallet provider with correct ABI method names
+// src/hooks/useVoting.ts - ✅ FIXED with proper ThirdWeb v5 syntax and core infrastructure
 
 import { useState, useCallback, useMemo } from "react";
 import { useReadContract } from "thirdweb/react";
-import { getContract, prepareContractCall } from "thirdweb";
-import { encodeFunctionData } from "viem";
-import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS, VOTING_ABI, CARD_CATALOG_ABI } from "../lib/contracts";
-import { useWalletAuth, useWalletConnection } from "../providers/WalletProvider";
+import { useContracts } from './core/useContracts';
+import { useTransactionUtils } from './core/useTransactionUtils';
+import { useWalletAuth } from "../providers/WalletProvider";
 import { toEther, toWei } from "thirdweb/utils";
+import { VOTING_ABI, CONTRACTS } from "../lib/contracts";
 
 export function useVoting(evermarkId: string, userAddress?: string) {
-  const [isVoting, setIsVoting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // ✅ Use unified wallet providers
+  // ✅ Use unified wallet providers and core infrastructure
   const { address: walletAddress, isConnected, requireConnection } = useWalletAuth();
-  const { sendTransaction, walletType } = useWalletConnection();
+  const { executeTransaction, isProcessing } = useTransactionUtils();
+  const { voting, cardCatalog } = useContracts();
   
   // ✅ Use wallet provider address if userAddress not provided
   const effectiveUserAddress = userAddress || walletAddress;
   
-  // Both contracts needed for full voting functionality
-  const votingContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.VOTING,
-    abi: VOTING_ABI,
-  }), []);
-
-  const cardCatalogContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.CARD_CATALOG,
-    abi: CARD_CATALOG_ABI,
-  }), []);
-
-  // Get current cycle
+  // ✅ FIXED: Use correct ThirdWeb v5 syntax for all contract calls
   const { data: currentCycle, isLoading: isLoadingCycle, refetch: refetchCycle } = useReadContract({
-    contract: votingContract,
-    method: "getCurrentCycle",
+    contract: voting,
+    method: "function getCurrentCycle() view returns (uint256)",
     params: [],
   });
 
-  // Get voting power from CardCatalog
+  // ✅ FIXED: Get voting power from CardCatalog with proper syntax
   const { data: availableVotingPower, isLoading: isLoadingVotingPower, refetch: refetchVotingPower } = useReadContract({
-    contract: cardCatalogContract,
-    method: "getAvailableVotingPower",
+    contract: cardCatalog,
+    method: "function getAvailableVotingPower(address) view returns (uint256)",
     params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!effectiveUserAddress,
     },
   });
 
-  // Get total voting power from CardCatalog
+  // ✅ FIXED: Get total voting power from CardCatalog
   const { data: totalVotingPower } = useReadContract({
-    contract: cardCatalogContract,
-    method: "getTotalVotingPower",
+    contract: cardCatalog,
+    method: "function getTotalVotingPower(address) view returns (uint256)",
     params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!effectiveUserAddress,
     },
   });
 
-  // Get total wEMARK balance for debugging
+  // ✅ FIXED: Get total wEMARK balance for debugging
   const { data: totalWemark } = useReadContract({
-    contract: cardCatalogContract,
-    method: "balanceOf",
+    contract: cardCatalog,
+    method: "function balanceOf(address) view returns (uint256)",
     params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
     queryOptions: {
       enabled: !!effectiveUserAddress,
@@ -75,8 +59,8 @@ export function useVoting(evermarkId: string, userAddress?: string) {
 
   // ✅ FIXED: Use correct method name for getting votes in cycle
   const { data: totalVotes, isLoading: isLoadingTotalVotes, refetch: refetchTotalVotes } = useReadContract({
-    contract: votingContract,
-    method: "getEvermarkVotesInCycle",
+    contract: voting,
+    method: "function getEvermarkVotesInCycle(uint256,uint256) view returns (uint256)",
     params: [currentCycle || BigInt(1), BigInt(evermarkId || "0")] as const,
     queryOptions: {
       enabled: !!evermarkId && evermarkId !== "0" && !!currentCycle,
@@ -85,8 +69,8 @@ export function useVoting(evermarkId: string, userAddress?: string) {
 
   // ✅ FIXED: Use correct method name for getting user votes in cycle
   const userVotesQuery = useReadContract({
-    contract: votingContract,
-    method: "getUserVotesInCycle",
+    contract: voting,
+    method: "function getUserVotesInCycle(uint256,address,uint256) view returns (uint256)",
     params: [
       currentCycle || BigInt(1), 
       effectiveUserAddress || "0x0000000000000000000000000000000000000000", 
@@ -97,20 +81,20 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // Get cycle info
+  // ✅ FIXED: Get cycle info
   const { data: cycleInfo } = useReadContract({
-    contract: votingContract,
-    method: "getCycleInfo",
+    contract: voting,
+    method: "function getCycleInfo(uint256) view returns (uint256,uint256,uint256,uint256,bool,uint256)",
     params: [currentCycle || BigInt(1)] as const,
     queryOptions: {
       enabled: !!currentCycle,
     },
   });
 
-  // Get time remaining
+  // ✅ FIXED: Get time remaining
   const { data: timeRemaining } = useReadContract({
-    contract: votingContract,
-    method: "getTimeRemainingInCurrentCycle",
+    contract: voting,
+    method: "function getTimeRemainingInCurrentCycle() view returns (uint256)",
     params: [] as const,
   });
 
@@ -122,12 +106,11 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       availableVotingPower: availableVotingPower ? toEther(availableVotingPower) : "0",
       totalVotingPower: totalVotingPower ? toEther(totalVotingPower) : "0",
       currentCycle: currentCycle?.toString(),
-      walletType,
       isConnected
     });
   }
   
-  // ✅ Delegate votes using unified wallet provider
+  // ✅ Delegate votes using core transaction utilities
   const delegateVotes = useCallback(async (amount: string) => {
     console.log('🗳️ Starting delegate votes process...');
     
@@ -153,7 +136,6 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       return { success: false, error: errorMsg };
     }
 
-    setIsVoting(true);
     setError(null);
     setSuccess(null);
 
@@ -177,52 +159,39 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       amount: `${amount} wEMARK`,
       available: `${toEther(actualAvailable)} wEMARK`,
       hasEnough: voteAmountWei <= actualAvailable,
-      walletType
     });
 
     // Check with fresh data
     if (voteAmountWei > actualAvailable) {
       const errorMsg = `Insufficient voting power. Available: ${toEther(actualAvailable)} wEMARK`;
       setError(errorMsg);
-      setIsVoting(false);
       return { success: false, error: errorMsg };
     }
     
     try {
-      // ✅ Prepare transaction based on wallet type
-      let transaction;
-      
-      if (walletType === 'farcaster') {
-        // Use viem encoding for Farcaster frames
-        const data = encodeFunctionData({
-          abi: VOTING_ABI,
-          functionName: 'delegateVotes',
-          args: [BigInt(evermarkId), voteAmountWei]
-        });
-        
-        transaction = {
-          to: CONTRACTS.VOTING as `0x${string}`,
-          data,
-        };
-      } else {
-        // Use thirdweb for desktop
-        transaction = prepareContractCall({
-          contract: votingContract,
-          method: "delegateVotes",
-          params: [BigInt(evermarkId), voteAmountWei] as const,
-        });
-      }
-      
-      console.log('📡 Sending vote transaction via unified provider...');
-      
-      // ✅ Use unified wallet provider's sendTransaction
-      const result = await sendTransaction(transaction);
+      // ✅ Use core transaction utilities
+      const result = await executeTransaction(
+        CONTRACTS.VOTING,
+        VOTING_ABI,
+        "delegateVotes",
+        [BigInt(evermarkId), voteAmountWei],
+        {
+          successMessage: `Successfully delegated ${amount} wEMARK to this Evermark!`,
+          errorContext: {
+            operation: 'delegateVotes',
+            contract: 'VOTING',
+            amount,
+            tokenId: evermarkId,
+            methodName: 'delegateVotes',
+            userAddress: effectiveUserAddress
+          }
+        }
+      );
       
       if (result.success) {
         console.log("✅ Vote delegation successful:", result.transactionHash);
         
-        const successMsg = `Successfully delegated ${amount} wEMARK to this Evermark!`;
-        setSuccess(successMsg);
+        setSuccess(result.message || "Vote delegation successful");
         
         // Refetch all relevant data
         setTimeout(() => {
@@ -232,7 +201,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
           userVotesQuery.refetch?.();
         }, 2000);
         
-        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+        return result;
       } else {
         throw new Error(result.error || 'Transaction failed');
       }
@@ -257,24 +226,21 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       
       setError(errorMsg);
       return { success: false, error: errorMsg };
-    } finally {
-      setIsVoting(false);
     }
   }, [
     isConnected, 
     requireConnection, 
     evermarkId, 
     availableVotingPower, 
-    walletType,
-    votingContract, 
-    sendTransaction, 
+    executeTransaction,
     refetchCycle, 
     refetchTotalVotes, 
     refetchVotingPower, 
-    userVotesQuery
+    userVotesQuery,
+    effectiveUserAddress
   ]);
   
-  // ✅ Undelegate votes using unified wallet provider
+  // ✅ Undelegate votes using core transaction utilities
   const undelegateVotes = useCallback(async (amount: string) => {
     console.log('🗳️ Starting undelegate votes process...');
     
@@ -308,45 +274,33 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       return { success: false, error: errorMsg };
     }
     
-    setIsVoting(true);
     setError(null);
     setSuccess(null);
     
     try {
-      // ✅ Prepare transaction based on wallet type
-      let transaction;
-      
-      if (walletType === 'farcaster') {
-        // Use viem encoding for Farcaster frames
-        const data = encodeFunctionData({
-          abi: VOTING_ABI,
-          functionName: 'undelegateVotes',
-          args: [BigInt(evermarkId), withdrawAmountWei]
-        });
-        
-        transaction = {
-          to: CONTRACTS.VOTING as `0x${string}`,
-          data,
-        };
-      } else {
-        // Use thirdweb for desktop
-        transaction = prepareContractCall({
-          contract: votingContract,
-          method: "undelegateVotes",
-          params: [BigInt(evermarkId), withdrawAmountWei] as const,
-        });
-      }
-      
-      console.log('📡 Sending unvote transaction via unified provider...');
-      
-      // ✅ Use unified wallet provider's sendTransaction
-      const result = await sendTransaction(transaction);
+      // ✅ Use core transaction utilities
+      const result = await executeTransaction(
+        CONTRACTS.VOTING,
+        VOTING_ABI,
+        "undelegateVotes",
+        [BigInt(evermarkId), withdrawAmountWei],
+        {
+          successMessage: `Successfully withdrew ${amount} wEMARK from this Evermark!`,
+          errorContext: {
+            operation: 'undelegateVotes',
+            contract: 'VOTING',
+            amount,
+            tokenId: evermarkId,
+            methodName: 'undelegateVotes',
+            userAddress: effectiveUserAddress
+          }
+        }
+      );
       
       if (result.success) {
         console.log("✅ Vote undelegation successful:", result.transactionHash);
         
-        const successMsg = `Successfully withdrew ${amount} wEMARK from this Evermark!`;
-        setSuccess(successMsg);
+        setSuccess(result.message || "Vote undelegation successful");
         
         // Refetch all relevant data
         setTimeout(() => {
@@ -356,7 +310,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
           userVotesQuery.refetch?.();
         }, 2000);
         
-        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+        return result;
       } else {
         throw new Error(result.error || 'Transaction failed');
       }
@@ -377,24 +331,21 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       
       setError(errorMsg);
       return { success: false, error: errorMsg };
-    } finally {
-      setIsVoting(false);
     }
   }, [
     isConnected,
     requireConnection,
     userVotesQuery.data, 
     evermarkId, 
-    walletType,
-    votingContract, 
-    sendTransaction, 
+    executeTransaction,
     refetchCycle, 
     refetchTotalVotes, 
     refetchVotingPower, 
-    userVotesQuery
+    userVotesQuery,
+    effectiveUserAddress
   ]);
 
-  // ✅ NEW: Batch delegate votes function
+  // ✅ NEW: Batch delegate votes function using core utilities
   const delegateVotesBatch = useCallback(async (evermarkIds: string[], amounts: string[]) => {
     console.log('🗳️ Starting batch delegate votes process...');
     
@@ -419,7 +370,6 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       return { success: false, error: errorMsg };
     }
 
-    setIsVoting(true);
     setError(null);
     setSuccess(null);
     
@@ -427,39 +377,27 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       const evermarkIdsBigInt = evermarkIds.map(id => BigInt(id));
       const amountsBigInt = amounts.map(amount => toWei(amount));
       
-      // ✅ Prepare transaction based on wallet type
-      let transaction;
-      
-      if (walletType === 'farcaster') {
-        // Use viem encoding for Farcaster frames
-        const data = encodeFunctionData({
-          abi: VOTING_ABI,
-          functionName: 'delegateVotesBatch',
-          args: [evermarkIdsBigInt, amountsBigInt]
-        });
-        
-        transaction = {
-          to: CONTRACTS.VOTING as `0x${string}`,
-          data,
-        };
-      } else {
-        // Use thirdweb for desktop
-        transaction = prepareContractCall({
-          contract: votingContract,
-          method: "delegateVotesBatch",
-          params: [evermarkIdsBigInt, amountsBigInt] as const,
-        });
-      }
-      
-      console.log('📡 Sending batch vote transaction via unified provider...');
-      
-      const result = await sendTransaction(transaction);
+      // ✅ Use core transaction utilities
+      const result = await executeTransaction(
+        CONTRACTS.VOTING,
+        VOTING_ABI,
+        "delegateVotesBatch",
+        [evermarkIdsBigInt, amountsBigInt],
+        {
+          successMessage: `Successfully delegated votes to ${evermarkIds.length} Evermarks!`,
+          errorContext: {
+            operation: 'delegateVotesBatch',
+            contract: 'VOTING',
+            methodName: 'delegateVotesBatch',
+            userAddress: effectiveUserAddress
+          }
+        }
+      );
       
       if (result.success) {
         console.log("✅ Batch vote delegation successful:", result.transactionHash);
         
-        const successMsg = `Successfully delegated votes to ${evermarkIds.length} Evermarks!`;
-        setSuccess(successMsg);
+        setSuccess(result.message || "Batch vote delegation successful");
         
         // Refetch all relevant data
         setTimeout(() => {
@@ -469,7 +407,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
           userVotesQuery.refetch?.();
         }, 2000);
         
-        return { success: true, message: successMsg, transactionHash: result.transactionHash };
+        return result;
       } else {
         throw new Error(result.error || 'Transaction failed');
       }
@@ -488,19 +426,16 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       
       setError(errorMsg);
       return { success: false, error: errorMsg };
-    } finally {
-      setIsVoting(false);
     }
   }, [
     isConnected,
     requireConnection,
-    walletType,
-    votingContract,
-    sendTransaction,
+    executeTransaction,
     refetchCycle,
     refetchTotalVotes,
     refetchVotingPower,
-    userVotesQuery
+    userVotesQuery,
+    effectiveUserAddress
   ]);
   
   // Clear messages
@@ -516,10 +451,10 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     
   const cycleEndTime = useMemo(() => {
     if (!cycleInfo) return null;
-    return new Date(Number(cycleInfo.endTime) * 1000);
+    return new Date(Number(cycleInfo[1]) * 1000); // Use endTime from tuple
   }, [cycleInfo]);
   
-  const isCycleFinalized = cycleInfo?.finalized || false;
+  const isCycleFinalized = cycleInfo?.[4] || false; // Use finalized from tuple
   const canVote = !!effectiveUserAddress && !isLoadingVotingData && !isCycleFinalized && 
                   (availableVotingPower || BigInt(0)) > BigInt(0);
   
@@ -547,7 +482,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     isLoadingCycle,
     
     // Action states
-    isVoting,
+    isVoting: isProcessing,
     canVote,
     
     // Messages
@@ -589,7 +524,6 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     authInfo: {
       effectiveUserAddress,
       isConnected,
-      walletType
     }
   };
 }

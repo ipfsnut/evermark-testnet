@@ -1,9 +1,7 @@
+// src/hooks/useWrappingStats.ts - ✅ FIXED with proper imports and ThirdWeb v5 syntax
 import { useMemo } from 'react';
 import { useReadContract } from "thirdweb/react";
-import { getContract } from "thirdweb";
-import { client } from "../lib/thirdweb";
-import { CHAIN, CONTRACTS } from "../lib/contracts";
-import CardCatalogABI from "../lib/abis/CardCatalog.json";
+import { useContracts } from './core/useContracts';
 
 export interface WrappingStats {
   unbondingPeriod: number; // in seconds
@@ -13,24 +11,20 @@ export interface WrappingStats {
 }
 
 export function useWrappingStats() {
-  const wrappingContract = useMemo(() => getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.CARD_CATALOG,
-    abi: CardCatalogABI as any,
-  }), []);
+  // ✅ Use core contracts instead of creating our own
+  const { cardCatalog } = useContracts();
   
-  // Get unbonding period from contract (should be in seconds)
+  // ✅ FIXED: Use correct ThirdWeb v5 syntax
   const { data: unbondingPeriod } = useReadContract({
-    contract: wrappingContract,
-    method: "UNBONDING_PERIOD",
+    contract: cardCatalog,
+    method: "function UNBONDING_PERIOD() view returns (uint256)",
     params: [],
   });
   
-  // Get total wrapped in protocol
+  // ✅ FIXED: Use correct ThirdWeb v5 syntax
   const { data: totalWrapped } = useReadContract({
-    contract: wrappingContract,
-    method: "getTotalStakedEmark", // This might be the total wrapped amount
+    contract: cardCatalog,
+    method: "function getTotalStakedEmark() view returns (uint256)",
     params: [],
   });
   
