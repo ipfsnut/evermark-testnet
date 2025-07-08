@@ -2,28 +2,32 @@ import { useEffect } from "react";
 import { CoinsIcon, AlertCircleIcon, CheckCircleIcon, GiftIcon } from 'lucide-react';
 import { useWalletAuth } from "../../providers/WalletProvider";
 import { useRewardsDisplay } from "../../hooks/useRewardsDisplay";
+import { useRewards } from "../../hooks/useRewards";
 import { DevRewardsDashboard } from "./DevRewardsDashboard";
 
 export function RewardsPanel() {
   const { address } = useWalletAuth();
   
-  // 🔧 SIMPLIFIED: Use shared rewards calculation hook for dual-token system
+  // ✅ Use simplified rewards display hook for UI data
   const {
     current,
     format,
-    originalRewardsData,
     isLoading,
-    error,
+    error: displayError,
   } = useRewardsDisplay(address);
 
-  // Extract functions from original hook
+  // ✅ Use core rewards hook for actions
   const {
     isClaimingRewards,
+    error: rewardsError,
     success,
     claimRewards,
     clearMessages,
-    authInfo
-  } = originalRewardsData;
+    hasWalletAccess
+  } = useRewards(address);
+  
+  // Combine errors from both hooks
+  const error = displayError || rewardsError;
   
   useEffect(() => {
     if (success || error) {
@@ -36,8 +40,6 @@ export function RewardsPanel() {
     await claimRewards();
   };
   
-  const hasWalletAccess = !!address || authInfo?.hasWalletAccess;
-  
   if (!hasWalletAccess) {
     return (
       <>
@@ -45,13 +47,10 @@ export function RewardsPanel() {
           <div className="text-center py-8">
             <CoinsIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {authInfo?.isInFarcaster ? "Authenticate to View Rewards" : "Connect to View Rewards"}
+              Connect to View Rewards
             </h3>
             <p className="text-gray-600">
-              {authInfo?.isInFarcaster 
-                ? "Authenticate in Farcaster or connect a wallet to see and claim your dual-token rewards"
-                : "Connect your wallet to see and claim your dual-token rewards (WETH + $EMARK)"
-              }
+              Connect your wallet to see and claim your dual-token rewards (WETH + $EMARK)
             </p>
           </div>
         </div>
@@ -69,7 +68,7 @@ export function RewardsPanel() {
           <h3 className="text-lg font-semibold text-gray-900">Your Dual-Token Rewards</h3>
         </div>
         
-        {/* 🔧 FIXED: Dual-token reward display with proper decimal formatting */}
+        {/* ✅ Dual-token reward display using core hook formatting */}
         <div className="bg-gradient-to-r from-yellow-50 to-amber-50 p-6 rounded-lg border border-yellow-200 mb-6">
           <div className="flex flex-col sm:flex-row items-center sm:justify-between">
             <div className="mb-4 sm:mb-0">
@@ -81,7 +80,7 @@ export function RewardsPanel() {
                 </p>
               ) : current.hasClaimableRewards ? (
                 <div className="space-y-1">
-                  {/* 🔧 FIXED: Use consistent decimal formatting */}
+                  {/* ✅ Use consistent formatting from core hook */}
                   {current.hasEthRewards && (
                     <div className="flex items-center space-x-2">
                       <p className="text-xl font-bold text-blue-800">
@@ -99,7 +98,7 @@ export function RewardsPanel() {
                     </div>
                   )}
                   
-                  {/* 🔧 FIXED: Total value with proper formatting */}
+                  {/* ✅ Total value with proper formatting */}
                   <p className="text-sm text-amber-700 mt-2">
                     Total Value: {format.totalRewardsDisplay()} tokens
                   </p>
@@ -154,7 +153,7 @@ export function RewardsPanel() {
           </div>
         )}
         
-        {/* 🔧 FIXED: Dual-token breakdown display with proper decimals */}
+        {/* ✅ Dual-token breakdown display using core formatting */}
         {current.hasClaimableRewards && (
           <div className="mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
             <h4 className="text-sm font-medium text-gray-900 mb-2">Detailed Reward Breakdown</h4>

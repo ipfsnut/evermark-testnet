@@ -29,11 +29,30 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, icon: Icon, suffix, h
 );
 
 export const ProfileStatsWidget: React.FC<ProfileStatsWidgetProps> = ({ userAddress }) => {
-  const { evermarks } = useUserEvermarks(userAddress);
+  // ✅ Use core hook instead of manual fetching
+  const { evermarks, isLoading } = useUserEvermarks(userAddress);
 
   // Calculate stats from real data
   const totalEvermarks = evermarks.length;
   const createdEvermarks = evermarks.filter(e => e.creator?.toLowerCase() === userAddress?.toLowerCase()).length;
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Your Evermark Portfolio</h3>
+        </div>
+        
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="animate-pulse">
+              <div className="bg-gray-200 rounded-lg h-20"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">

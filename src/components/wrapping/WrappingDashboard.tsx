@@ -1,13 +1,10 @@
-// src/components/wrapping/WrappingDashboard.tsx
 import React, { useState } from 'react';
 import { 
   CoinsIcon, 
   LockIcon, 
   TrendingUpIcon, 
-  BookOpenIcon,
   CalculatorIcon,
   HistoryIcon,
-  TabletIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   InfoIcon
@@ -27,7 +24,7 @@ interface WrappingDashboardProps {
   className?: string;
 }
 
-// ✅ FIXED: Helper function to format token amounts consistently
+// ✅ Helper function to format token amounts consistently
 const formatTokenAmount = (amount: bigint, decimals: number = 2): string => {
   try {
     const etherValue = toEther(amount || BigInt(0));
@@ -39,7 +36,7 @@ const formatTokenAmount = (amount: bigint, decimals: number = 2): string => {
   }
 };
 
-// Quick Stats Overview Component
+// ✅ Quick Stats Overview Component using core hooks
 const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress }) => {
   const { totalWrapped, availableVotingPower } = useWrapping(userAddress);
   const { pendingRewards } = useRewards(userAddress);
@@ -48,7 +45,7 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
   const stats = [
     {
       label: 'Total Wrapped',
-      value: formatTokenAmount(totalWrapped || BigInt(0), 2), // ✅ FIXED: Now shows 2 decimals
+      value: formatTokenAmount(totalWrapped || BigInt(0), 2),
       suffix: 'wEMARK',
       icon: <LockIcon className="h-5 w-5 text-purple-600" />,
       bgColor: 'bg-purple-50',
@@ -56,7 +53,7 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
     },
     {
       label: 'Voting Power',
-      value: formatTokenAmount(availableVotingPower || BigInt(0), 2), // ✅ FIXED: Now shows 2 decimals
+      value: formatTokenAmount(availableVotingPower || BigInt(0), 2),
       suffix: 'wEMARK',
       icon: <CoinsIcon className="h-5 w-5 text-blue-600" />,
       bgColor: 'bg-blue-50',
@@ -64,8 +61,8 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
     },
     {
       label: 'Pending Rewards',
-      value: formatTokenAmount(pendingRewards || BigInt(0), 2), // ✅ FIXED: This was the main issue - now shows 2 decimals instead of 18!
-      suffix: '$EMARK',
+      value: formatTokenAmount(pendingRewards || BigInt(0), 4), // More decimals for rewards
+      suffix: 'Tokens',
       icon: <TrendingUpIcon className="h-5 w-5 text-green-600" />,
       bgColor: 'bg-green-50',
       textColor: 'text-green-600',
@@ -179,7 +176,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
           </div>
         </div>
         
-        {/* Quick Unbonding Info - FIXED */}
+        {/* Quick Unbonding Info */}
         <div className="mt-4 p-3 bg-white/10 rounded-lg backdrop-blur-sm">
           <div className="flex items-center justify-between">
             <span className="text-sm text-purple-100">Unbonding Period</span>
@@ -232,7 +229,7 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
         </CollapsibleSection>
       </div>
 
-      {/* Help Section - FIXED */}
+      {/* Help Section */}
       <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
         <div className="flex items-start">
           <InfoIcon className="h-6 w-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />

@@ -13,7 +13,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
   const { address, isConnected } = useWalletAuth();
   const [voteAmount, setVoteAmount] = useState("");
   
-  // 🎉 All the complex blockchain logic is now in the hook!
+  // ✅ Use core voting hook that provides everything we need
   const {
     totalVotes,
     userVotes,
@@ -37,7 +37,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
     }
   }, [success, error, clearMessages]);
   
-  // Simple handlers that use the hook's methods
+  // ✅ Simplified handlers using core voting hook
   const handleVote = async () => {
     const result = await delegateVotes(voteAmount);
     if (result.success) {
@@ -71,7 +71,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
         <h3 className="text-lg font-semibold text-gray-900">Voting Power</h3>
       </div>
       
-      {/* Voting Stats */}
+      {/* Voting Stats using core hook data */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="flex items-center">
@@ -165,7 +165,7 @@ export function VotingPanel({ evermarkId, isOwner = false }: VotingPanelProps) {
               )}
             </button>
             
-            {userVotes && userVotes > BigInt(0) && (
+            {userVotes > BigInt(0) && (
               <button 
                 onClick={handleUnvote}
                 disabled={isVoting || !voteAmount || parseFloat(voteAmount) <= 0}

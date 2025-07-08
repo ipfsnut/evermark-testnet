@@ -1,27 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useReadContract } from "thirdweb/react";
 import { getContract } from "thirdweb";
 import { client } from "../../lib/thirdweb";
-import { CHAIN, CONTRACTS, EMARK_TOKEN_ABI, CARD_CATALOG_ABI } from "../../lib/contracts";
+import { CHAIN, CONTRACTS } from "../../lib/contracts";
 import {
   CalculatorIcon,
   CoinsIcon,
   InfoIcon,
-  LockIcon,
   VoteIcon,
   RefreshCwIcon,
   AlertCircleIcon,
 } from 'lucide-react';
 import { useRewardsDisplay } from '../../hooks/useRewardsDisplay';
-import { formatEmarkWithSymbol, formatWEmarkWithSymbol } from '../../utils/formatters';
 import { useWalletAuth } from '../../providers/WalletProvider';
+import { useUserData } from '../../hooks/core/useUserData';
 import { toEther } from "thirdweb/utils";
 
 export const RewardsCalculator: React.FC = () => {
   const { address, isConnected } = useWalletAuth();
   const [showDetails, setShowDetails] = useState(false);
 
-  // 🔧 SIMPLIFIED: Use shared rewards calculation hook for dual-token system
+  // ✅ Use simplified rewards calculation hook that provides everything
   const {
     current,
     projections,
@@ -33,53 +32,42 @@ export const RewardsCalculator: React.FC = () => {
     error,
   } = useRewardsDisplay(address);
 
-  // Get additional user data
-  const emarkContract = getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.EMARK_TOKEN,
-    abi: EMARK_TOKEN_ABI,
-  });
+  // ✅ Use core infrastructure for additional data
+  const { balances } = useUserData(address);
 
-  const cardCatalogContract = getContract({
-    client,
-    chain: CHAIN,
-    address: CONTRACTS.CARD_CATALOG,
-    abi: CARD_CATALOG_ABI,
-  });
+  // ✅ Create cardCatalog contract without type assertion (let TypeScript infer)
+  const cardCatalog = useMemo(() => {
+    // Import CardCatalog ABI dynamically
+    const CardCatalogABI = require("../../lib/abis/CardCatalog.json");
+    
+    return getContract({
+      client,
+      chain: CHAIN,
+      address: CONTRACTS.CARD_CATALOG,
+      abi: CardCatalogABI, // Remove the type assertion
+    });
+  }, []);
 
-  const { data: emarkBalance } = useReadContract({
-    contract: emarkContract,
-    method: "balanceOf",
-    params: [address || "0x0000000000000000000000000000000000000000"],
-    queryOptions: {
-      enabled: !!address,
-    },
-  });
-
+  // Get additional user data using proper ThirdWeb v5 syntax
   const { data: delegatedPower } = useReadContract({
-    contract: cardCatalogContract,
-    method: "getDelegatedVotingPower",
+    contract: cardCatalog,
+    method: "function getDelegatedVotingPower(address) view returns (uint256)",
     params: [address || "0x0000000000000000000000000000000000000000"],
     queryOptions: {
       enabled: !!address,
     },
   });
 
-  // 🔧 FIXED: Calculate current period starting from 0 (resets on Sundays)
+  // ✅ Calculate current period using simplified logic
   const calculateCurrentPeriod = () => {
     if (period.timeUntilRebalance <= 0) return 'Loading...';
     
-    // Get current time
     const now = new Date();
-    
-    // Find the most recent Sunday (start of current week) at 00:00:00 UTC
-    const dayOfWeek = now.getUTCDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const dayOfWeek = now.getUTCDay();
     const mostRecentSunday = new Date(now);
     mostRecentSunday.setUTCDate(now.getUTCDate() - dayOfWeek);
     mostRecentSunday.setUTCHours(0, 0, 0, 0);
     
-    // Calculate weeks since the reference Sunday
     const referenceTimestamp = Math.floor(mostRecentSunday.getTime() / 1000);
     const currentTimestamp = Math.floor(now.getTime() / 1000);
     const weeksSinceReference = Math.floor((currentTimestamp - referenceTimestamp) / (7 * 24 * 60 * 60));
@@ -164,7 +152,7 @@ export const RewardsCalculator: React.FC = () => {
         </p>
       </div>
 
-      {/* 🔧 FIXED: Two-column reward display with proper decimal formatting */}
+      {/* ✅ Two-column reward display using core hook data */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         {/* WETH Rewards Column */}
         <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-lg border border-blue-200">
@@ -241,7 +229,7 @@ export const RewardsCalculator: React.FC = () => {
         </div>
       </div>
 
-      {/* 🔧 FIXED: Breakdown using dual-token calculations with proper formatting */}
+      {/* ✅ Breakdown using dual-token calculations from core hook */}
       <div className="space-y-3">
         <h4 className="text-sm font-medium text-gray-700">
           {current.hasClaimableRewards ? 'Live Reward Breakdown' : 'Potential Reward Structure'}
@@ -317,13 +305,13 @@ export const RewardsCalculator: React.FC = () => {
             <h4 className="text-sm font-medium text-blue-900 mb-2">Your Token Balances & Period Info</h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-blue-800">
               <div>
-                <strong>Liquid $EMARK:</strong> {formatEmarkWithSymbol(emarkBalance, 2)}
+                <strong>Liquid $EMARK:</strong> {balances.emarkBalance ? (Number(balances.emarkBalance) / 1e18).toFixed(2) : '0.00'} EMARK
               </div>
               <div>
                 <strong>Staked (wEMARK):</strong> {format.stakedAmountDisplay()} wEMARK
               </div>
               <div>
-                <strong>Delegated Power:</strong> {formatWEmarkWithSymbol(actualDelegatedPower, 2)}
+                <strong>Delegated Power:</strong> {(Number(actualDelegatedPower) / 1e18).toFixed(2)} wEMARK
               </div>
               <div>
                 <strong>Available Power:</strong> {availablePower.toFixed(2)} wEMARK

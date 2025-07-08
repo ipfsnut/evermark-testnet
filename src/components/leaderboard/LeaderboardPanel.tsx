@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { toEther } from "thirdweb/utils";
 
 export function LeaderboardPanel() {
+  // ✅ Use core leaderboard hook that handles all the complexity
   const { entries, isLoading, error, isFinalized, weekNumber } = useLeaderboard();
   
   const getWeekDateRange = (weekNum: number) => {

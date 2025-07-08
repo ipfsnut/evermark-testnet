@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useWallet } from '../hooks/useWallet';
+import { useWalletAuth } from '../providers/WalletProvider'; // ✅ UPDATED: Use unified wallet
 import { useUserEvermarks } from '../hooks/useEvermarks';
 import { useBookshelf } from '../hooks/useBookshelf';
 import { 
@@ -296,7 +296,7 @@ const QuickAddSection: React.FC<{ userAddress: string }> = ({ userAddress }) => 
 };
 
 const EnhancedBookshelfPage: React.FC = () => {
-  const { address, isConnected } = useWallet();
+  const { address, isConnected } = useWalletAuth(); // ✅ UPDATED: Use unified wallet
   const { evermarks } = useUserEvermarks(address);
   const { bookshelfData, isLoading, removeFromBookshelf, updateNotes, getStats } = useBookshelf(address);
   

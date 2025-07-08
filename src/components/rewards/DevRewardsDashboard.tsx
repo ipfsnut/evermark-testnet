@@ -1,23 +1,23 @@
 import React, { useState, useMemo } from 'react';
-import { useReadContract, useSendTransaction } from "thirdweb/react";
-import { getContract, prepareContractCall } from "thirdweb";
+import { useReadContract } from "thirdweb/react";
+import { getContract } from "thirdweb";
 import { client } from "../../lib/thirdweb";
 import { CHAIN, CONTRACTS, REWARDS_ABI, EMARK_TOKEN_ABI, FEE_COLLECTOR_ABI } from "../../lib/contracts";
-import { useWalletAuth } from "../../providers/WalletProvider";
-import { toWei, toEther } from "thirdweb/utils";
 import {
   ShieldCheckIcon,
   CoinsIcon,
   RefreshCwIcon,
   AlertTriangleIcon,
   CheckCircleIcon,
-  TrendingUpIcon,
-  DatabaseIcon,
   DollarSignIcon,
-  Wallet
+  DatabaseIcon,
 } from 'lucide-react';
+import { useTransactionUtils } from '../../hooks/core/useTransactionUtils';
+import { useUserData } from '../../hooks/core/useUserData';
+import { useWalletAuth } from "../../providers/WalletProvider";
+import { toWei } from "thirdweb/utils";
 
-// Dev wallet address (replace with your actual dev wallet)
+// Dev wallet address
 const DEV_WALLET_ADDRESS = "0x2B27EA7DaA8Bf1dE98407447b269Dfe280753fe3";
 
 export const DevRewardsDashboard: React.FC = () => {
@@ -25,12 +25,16 @@ export const DevRewardsDashboard: React.FC = () => {
   const [ethAmount, setEthAmount] = useState("");
   const [wethAmount, setWethAmount] = useState("");
   const [emarkAmount, setEmarkAmount] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // ✅ Create contracts manually since rewards might not be in useContracts()
+  const { executeTransaction, isProcessing } = useTransactionUtils();
+  const { balances, refetch } = useUserData(address);
 
   // Only show for dev wallet
   const isDevWallet = address && address.toLowerCase() === DEV_WALLET_ADDRESS.toLowerCase();
 
+  // ✅ Create contracts using proper ThirdWeb v5 pattern
   const rewardsContract = useMemo(() => getContract({
     client,
     chain: CHAIN,
@@ -52,68 +56,39 @@ export const DevRewardsDashboard: React.FC = () => {
     abi: FEE_COLLECTOR_ABI,
   }), []);
 
-  // Get current period status
+  // ✅ Use proper ThirdWeb v5 syntax
   const { data: periodStatus, refetch: refetchPeriodStatus } = useReadContract({
     contract: rewardsContract,
-    method: "getPeriodStatus",
+    method: "function getPeriodStatus() view returns (uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)",
     params: [],
   });
 
-  // Get dev's ETH balance using useWalletBalance or similar
-  // Note: ETH balance fetching depends on your wallet provider setup
-  // For now, we'll skip showing ETH balance
-  const ethBalance = BigInt(0); // TODO: Implement proper ETH balance fetching
-
-  // Get dev's EMARK balance
-  const { data: devEmarkBalance } = useReadContract({
-    contract: emarkContract,
-    method: "balanceOf",
-    params: [address || "0x0000000000000000000000000000000000000000"],
-    queryOptions: {
-      enabled: !!address,
-    },
-  });
-
-  // TODO: Get WETH balance if there's a WETH contract
-  // const { data: wethBalance } = useReadContract({
-  //   contract: wethContract,
-  //   method: "balanceOf", 
-  //   params: [address || "0x0000000000000000000000000000000000000000"],
-  //   queryOptions: {
-  //     enabled: !!address,
-  //   },
-  // });
-
-  // Get current EMARK allowance
   const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
     contract: emarkContract,
-    method: "allowance",
+    method: "function allowance(address,address) view returns (uint256)",
     params: [address || "0x0000000000000000000000000000000000000000", CONTRACTS.REWARDS],
     queryOptions: {
       enabled: !!address,
     },
   });
 
-  // Get FeeCollector status
   const { data: feeCollectorEvermarkRewards } = useReadContract({
     contract: feeCollectorContract,
-    method: "evermarkRewards",
+    method: "function evermarkRewards() view returns (address)",
     params: [],
   });
 
   const { data: totalEthCollected } = useReadContract({
     contract: feeCollectorContract,
-    method: "totalEthCollected",
+    method: "function totalEthCollected() view returns (uint256)",
     params: [],
   });
-
-  const { mutate: sendTransaction } = useSendTransaction();
 
   const clearMessage = () => {
     setTimeout(() => setMessage(null), 5000);
   };
 
-  // ✅ NEW: Fund ETH rewards
+  // ✅ Simplified using core transaction utilities
   const fundEthRewards = async () => {
     if (!ethAmount || parseFloat(ethAmount) <= 0) {
       setMessage({ type: 'error', text: 'Please enter a valid ETH amount' });
@@ -121,73 +96,53 @@ export const DevRewardsDashboard: React.FC = () => {
       return;
     }
 
-    setIsProcessing(true);
-    setMessage(null);
-
     try {
       const amountWei = toWei(ethAmount);
-
-      console.log('🔍 ETH Funding Debug:', {
-        amount: ethAmount,
-        amountWei: amountWei.toString(),
-        devEthBalance: ethBalance ? toEther(ethBalance) : '0'
-      });
-
       setMessage({ type: 'success', text: 'Funding ETH rewards pool...' });
 
-      // ✅ ETH funding is typically a payable function
-      const fundTransaction = prepareContractCall({
-        contract: rewardsContract,
-        method: "fundEthRewards", // Assuming this method exists and is payable
-        params: [],
-        value: amountWei, // Send ETH as value
-      });
-
-      const fundingResult = await new Promise<boolean>((resolve) => {
-        sendTransaction(fundTransaction, {
-          onSuccess: (result) => {
-            console.log("✅ ETH funding successful:", result);
-            setMessage({ 
-              type: 'success', 
-              text: `✅ Successfully funded ${ethAmount} ETH to rewards pool!` 
-            });
-            setEthAmount("");
-            // Refetch data after successful funding
-            setTimeout(() => {
-              refetchPeriodStatus();
-            }, 2000);
-            resolve(true);
-          },
-          onError: (error) => {
-            console.error("❌ ETH funding failed:", error);
-            setMessage({ 
-              type: 'error', 
-              text: `ETH funding failed: ${error.message || 'Transaction failed'}` 
-            });
-            resolve(false);
+      const result = await executeTransaction(
+        CONTRACTS.REWARDS,
+        REWARDS_ABI,
+        "fundEthRewards",
+        [],
+        {
+          value: amountWei,
+          successMessage: `✅ Successfully funded ${ethAmount} ETH to rewards pool!`,
+          errorContext: {
+            operation: 'fundEthRewards',
+            contract: 'REWARDS',
+            amount: ethAmount,
+            methodName: 'fundEthRewards',
+            userAddress: address
           }
-        });
-      });
+        }
+      );
 
-      if (fundingResult) {
-        console.log('🎉 ETH rewards funding completed successfully!');
+      if (result.success) {
+        setEthAmount("");
+        setTimeout(() => {
+          refetchPeriodStatus();
+          refetch();
+        }, 2000);
       }
 
+      setMessage({ 
+        type: result.success ? 'success' : 'error', 
+        text: result.message || result.error || 'Transaction completed'
+      });
     } catch (error: any) {
-      console.error("❌ Error funding ETH rewards:", error);
       setMessage({ 
         type: 'error', 
         text: `Failed to fund ETH rewards: ${error.message || 'Unknown error'}` 
       });
     } finally {
-      setIsProcessing(false);
       if (message?.type === 'error') {
         clearMessage();
       }
     }
   };
 
-  // ✅ UPDATED: Fund WETH rewards (now functional)
+  // ✅ Simplified using core transaction utilities
   const fundWethRewards = async () => {
     if (!wethAmount || parseFloat(wethAmount) <= 0) {
       setMessage({ type: 'error', text: 'Please enter a valid WETH amount' });
@@ -195,72 +150,52 @@ export const DevRewardsDashboard: React.FC = () => {
       return;
     }
 
-    setIsProcessing(true);
-    setMessage(null);
-
     try {
       const amountWei = toWei(wethAmount);
-
-      console.log('🔍 WETH Funding Debug:', {
-        amount: wethAmount,
-        amountWei: amountWei.toString(),
-      });
-
-      // TODO: Add WETH allowance check if needed
-      // For now, assuming direct funding without approval
-
       setMessage({ type: 'success', text: 'Funding WETH rewards pool...' });
 
-      const fundTransaction = prepareContractCall({
-        contract: rewardsContract,
-        method: "fundWethRewards",
-        params: [amountWei],
-      });
-
-      const fundingResult = await new Promise<boolean>((resolve) => {
-        sendTransaction(fundTransaction, {
-          onSuccess: (result) => {
-            console.log("✅ WETH funding successful:", result);
-            setMessage({ 
-              type: 'success', 
-              text: `✅ Successfully funded ${wethAmount} WETH to rewards pool!` 
-            });
-            setWethAmount("");
-            setTimeout(() => {
-              refetchPeriodStatus();
-            }, 2000);
-            resolve(true);
-          },
-          onError: (error) => {
-            console.error("❌ WETH funding failed:", error);
-            setMessage({ 
-              type: 'error', 
-              text: `WETH funding failed: ${error.message || 'Transaction failed'}` 
-            });
-            resolve(false);
+      const result = await executeTransaction(
+        CONTRACTS.REWARDS,
+        REWARDS_ABI,
+        "fundWethRewards",
+        [amountWei],
+        {
+          successMessage: `✅ Successfully funded ${wethAmount} WETH to rewards pool!`,
+          errorContext: {
+            operation: 'fundWethRewards',
+            contract: 'REWARDS',
+            amount: wethAmount,
+            methodName: 'fundWethRewards',
+            userAddress: address
           }
-        });
-      });
+        }
+      );
 
-      if (fundingResult) {
-        console.log('🎉 WETH rewards funding completed successfully!');
+      if (result.success) {
+        setWethAmount("");
+        setTimeout(() => {
+          refetchPeriodStatus();
+          refetch();
+        }, 2000);
       }
 
+      setMessage({ 
+        type: result.success ? 'success' : 'error', 
+        text: result.message || result.error || 'Transaction completed'
+      });
     } catch (error: any) {
-      console.error("❌ Error funding WETH rewards:", error);
       setMessage({ 
         type: 'error', 
         text: `Failed to fund WETH rewards: ${error.message || 'Unknown error'}` 
       });
     } finally {
-      setIsProcessing(false);
       if (message?.type === 'error') {
         clearMessage();
       }
     }
   };
 
-  // ✅ EXISTING: Fund EMARK rewards (already working)
+  // ✅ Simplified using core transaction utilities with approval logic
   const fundEmarkRewards = async () => {
     if (!emarkAmount || parseFloat(emarkAmount) <= 0) {
       setMessage({ type: 'error', text: 'Please enter a valid EMARK amount' });
@@ -268,110 +203,72 @@ export const DevRewardsDashboard: React.FC = () => {
       return;
     }
 
-    setIsProcessing(true);
-    setMessage(null);
-
     try {
       const amountWei = toWei(emarkAmount);
       const currentAllowanceBigInt = currentAllowance || BigInt(0);
 
-      console.log('🔍 EMARK Funding Debug:', {
-        amount: emarkAmount,
-        amountWei: amountWei.toString(),
-        currentAllowance: currentAllowanceBigInt.toString(),
-        needsApproval: currentAllowanceBigInt < amountWei
-      });
-
-      // Step 1: Check if approval is needed
+      // Check if approval is needed
       if (currentAllowanceBigInt < amountWei) {
-        console.log('🔄 Requesting EMARK approval...');
         setMessage({ type: 'success', text: 'Step 1/2: Requesting EMARK approval...' });
 
-        const approveTransaction = prepareContractCall({
-          contract: emarkContract,
-          method: "approve",
-          params: [CONTRACTS.REWARDS, amountWei],
-        });
+        const approveResult = await executeTransaction(
+          CONTRACTS.EMARK_TOKEN,
+          EMARK_TOKEN_ABI,
+          "approve",
+          [CONTRACTS.REWARDS, amountWei],
+          {
+            errorContext: { operation: 'approve-for-rewards', amount: emarkAmount }
+          }
+        );
 
-        const approvalResult = await new Promise<boolean>((resolve) => {
-          sendTransaction(approveTransaction, {
-            onSuccess: (result) => {
-              console.log("✅ EMARK approval successful:", result);
-              resolve(true);
-            },
-            onError: (error) => {
-              console.error("❌ EMARK approval failed:", error);
-              setMessage({ 
-                type: 'error', 
-                text: `Approval failed: ${error.message || 'Transaction rejected'}` 
-              });
-              resolve(false);
-            }
-          });
-        });
-
-        if (!approvalResult) {
-          setIsProcessing(false);
-          clearMessage();
-          return;
+        if (!approveResult.success) {
+          throw new Error(approveResult.error || 'Approval failed');
         }
 
-        // Wait for approval to be confirmed and refetch allowance
-        console.log('⏳ Waiting for approval confirmation...');
+        // Wait for approval confirmation
         await new Promise(resolve => setTimeout(resolve, 3000));
         await refetchAllowance();
-      } else {
-        console.log('✅ Sufficient allowance already exists');
       }
 
       // Step 2: Fund the rewards
-      console.log('🔄 Funding EMARK rewards...');
       setMessage({ type: 'success', text: 'Step 2/2: Funding rewards pool...' });
 
-      const fundTransaction = prepareContractCall({
-        contract: rewardsContract,
-        method: "fundEmarkRewards",
-        params: [amountWei],
-      });
-
-      const fundingResult = await new Promise<boolean>((resolve) => {
-        sendTransaction(fundTransaction, {
-          onSuccess: (result) => {
-            console.log("✅ EMARK funding successful:", result);
-            setMessage({ 
-              type: 'success', 
-              text: `✅ Successfully funded ${emarkAmount} EMARK to rewards pool!` 
-            });
-            setEmarkAmount("");
-            setTimeout(() => {
-              refetchPeriodStatus();
-              refetchAllowance();
-            }, 2000);
-            resolve(true);
-          },
-          onError: (error) => {
-            console.error("❌ EMARK funding failed:", error);
-            setMessage({ 
-              type: 'error', 
-              text: `Funding failed: ${error.message || 'Transaction failed'}` 
-            });
-            resolve(false);
+      const result = await executeTransaction(
+        CONTRACTS.REWARDS,
+        REWARDS_ABI,
+        "fundEmarkRewards",
+        [amountWei],
+        {
+          successMessage: `✅ Successfully funded ${emarkAmount} EMARK to rewards pool!`,
+          errorContext: {
+            operation: 'fundEmarkRewards',
+            contract: 'REWARDS',
+            amount: emarkAmount,
+            methodName: 'fundEmarkRewards',
+            userAddress: address
           }
-        });
-      });
+        }
+      );
 
-      if (fundingResult) {
-        console.log('🎉 EMARK rewards funding completed successfully!');
+      if (result.success) {
+        setEmarkAmount("");
+        setTimeout(() => {
+          refetchPeriodStatus();
+          refetchAllowance();
+          refetch();
+        }, 2000);
       }
 
+      setMessage({ 
+        type: result.success ? 'success' : 'error', 
+        text: result.message || result.error || 'Transaction completed'
+      });
     } catch (error: any) {
-      console.error("❌ Error funding EMARK rewards:", error);
       setMessage({ 
         type: 'error', 
         text: `Failed to fund EMARK rewards: ${error.message || 'Unknown error'}` 
       });
     } finally {
-      setIsProcessing(false);
       if (message?.type === 'error') {
         clearMessage();
       }
@@ -379,52 +276,48 @@ export const DevRewardsDashboard: React.FC = () => {
   };
 
   const manualRebalance = async () => {
-    setIsProcessing(true);
-    setMessage(null);
-
     try {
-      const transaction = prepareContractCall({
-        contract: rewardsContract,
-        method: "manualRebalance",
-        params: [],
-      });
-
-      await new Promise<void>((resolve, reject) => {
-        sendTransaction(transaction, {
-          onSuccess: () => {
-            setMessage({ 
-              type: 'success', 
-              text: 'Successfully triggered manual rebalance!' 
-            });
-            setTimeout(() => refetchPeriodStatus(), 3000);
-            resolve();
-          },
-          onError: (error) => {
-            console.error("❌ Manual rebalance failed:", error);
-            reject(error);
+      const result = await executeTransaction(
+        CONTRACTS.REWARDS,
+        REWARDS_ABI,
+        "manualRebalance",
+        [],
+        {
+          successMessage: 'Successfully triggered manual rebalance!',
+          errorContext: {
+            operation: 'manualRebalance',
+            contract: 'REWARDS',
+            methodName: 'manualRebalance',
+            userAddress: address
           }
-        });
-      });
+        }
+      );
 
+      if (result.success) {
+        setTimeout(() => refetchPeriodStatus(), 3000);
+      }
+
+      setMessage({ 
+        type: result.success ? 'success' : 'error', 
+        text: result.message || result.error || 'Transaction completed'
+      });
     } catch (error: any) {
-      console.error("Error triggering rebalance:", error);
       setMessage({ 
         type: 'error', 
         text: `Failed to trigger rebalance: ${error.message || 'Unknown error'}` 
       });
     } finally {
-      setIsProcessing(false);
       clearMessage();
     }
   };
 
   if (!isDevWallet) {
-    return null; // Don't show anything for non-dev wallets
+    return null;
   }
 
-  // Parse period status
-  const currentEthPool = periodStatus?.[3] ? toEther(periodStatus[3]) : "0";
-  const currentEmarkPool = periodStatus?.[4] ? toEther(periodStatus[4]) : "0";
+  // Parse period status using your core data
+  const currentEthPool = periodStatus?.[3] ? (Number(periodStatus[3]) / 1e18).toFixed(4) : "0";
+  const currentEmarkPool = periodStatus?.[4] ? (Number(periodStatus[4]) / 1e18).toFixed(2) : "0";
   const currentEthRate = periodStatus?.[5]?.toString() || "0";
   const currentEmarkRate = periodStatus?.[6]?.toString() || "0";
   const nextEthRate = periodStatus?.[7]?.toString() || "0";
@@ -434,13 +327,12 @@ export const DevRewardsDashboard: React.FC = () => {
   const hasEthPool = parseFloat(currentEthPool) > 0;
   const hasEmarkPool = parseFloat(currentEmarkPool) > 0;
 
-  // Show allowance info
-  const currentAllowanceFormatted = currentAllowance ? toEther(currentAllowance) : "0";
+  // Show allowance info using core balance data
+  const currentAllowanceFormatted = currentAllowance ? (Number(currentAllowance) / 1e18).toFixed(2) : "0";
   const needsApproval = emarkAmount && currentAllowance ? 
     currentAllowance < toWei(emarkAmount) : true;
 
-  // Format ETH balance (TODO: implement proper ETH balance fetching)
-  const ethBalanceFormatted = "Check wallet"; // ethBalance ? toEther(ethBalance) : "0";
+  const ethBalanceFormatted = "Check wallet"; // Could use balances.ethBalance if available
 
   return (
     <div className="mt-8 bg-gradient-to-r from-red-50 to-orange-50 rounded-lg shadow-sm p-6 border-2 border-red-200">
@@ -468,7 +360,7 @@ export const DevRewardsDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Current Status - Updated for three pools */}
+      {/* Current Status - Three pools */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg border border-gray-200">
           <div className="flex items-center justify-between mb-2">
@@ -505,7 +397,7 @@ export const DevRewardsDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* ✅ UPDATED: Triple funding interface */}
+      {/* Triple funding interface */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         {/* Fund ETH */}
         <div className="bg-white p-4 rounded-lg border border-gray-200">
@@ -587,7 +479,7 @@ export const DevRewardsDashboard: React.FC = () => {
           <div className="space-y-3">
             <div>
               <label className="block text-xs text-gray-600 mb-1">
-                Your Balance: {devEmarkBalance ? toEther(devEmarkBalance) : "0"} EMARK
+                Your Balance: {balances.emarkBalance ? (Number(balances.emarkBalance) / 1e18).toFixed(2) : "0"} EMARK
               </label>
               <label className="block text-xs text-gray-500 mb-1">
                 Current Allowance: {currentAllowanceFormatted} EMARK
@@ -648,6 +540,7 @@ export const DevRewardsDashboard: React.FC = () => {
             onClick={() => {
               refetchPeriodStatus();
               refetchAllowance();
+              refetch();
             }}
             className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors text-sm"
           >

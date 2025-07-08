@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { toEther, toWei } from "thirdweb/utils";
 import { LockIcon, UnlockIcon, CoinsIcon, AlertCircleIcon, CheckCircleIcon, ClockIcon, XIcon } from 'lucide-react';
 import { useWrapping } from "../../hooks/useWrapping";
-import { formatDistanceToNow } from "date-fns";
 import { useRewards } from "../../hooks/useRewards";
+import { formatDistanceToNow } from "date-fns";
 
 interface WrappingWidgetProps {
   userAddress?: string;
@@ -13,44 +13,46 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
   const [wrapAmount, setWrapAmount] = useState("");
   const [unwrapAmount, setUnwrapAmount] = useState("");
   const [activeTab, setActiveTab] = useState<"wrap" | "unwrap">("wrap");
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   
+  // ✅ Use core wrapping hook
   const {
+    emarkBalance,
+    wEmarkBalance,
     totalWrapped,
-    availableVotingPower,
     unbondingAmount,
     unbondingReleaseTime,
-    canClaimUnbonding,
-    isLoadingWrapped,
-    isLoadingVotingPower,
-    isLoadingUnbonding,
     isWrapping,
     isUnwrapping,
-    error: wrappingError,
-    success: wrappingSuccess,
     wrapTokens,
     requestUnwrap,
     completeUnwrap,
     cancelUnbonding,
-    clearMessages: clearWrappingMessages
+    hasWalletAccess,
+    refetch
   } = useWrapping(userAddress);
   
+  // ✅ Use core rewards hook
   const {
     pendingRewards,
-    isLoadingRewards,
     isClaimingRewards,
+    claimRewards,
     error: rewardsError,
     success: rewardsSuccess,
-    claimRewards,
     clearMessages: clearRewardsMessages
   } = useRewards(userAddress);
   
   // Clear messages after 5 seconds
   useEffect(() => {
-    if (wrappingSuccess || wrappingError) {
-      const timer = setTimeout(() => clearWrappingMessages(), 5000);
+    if (success || error) {
+      const timer = setTimeout(() => {
+        setError(null);
+        setSuccess(null);
+      }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [wrappingSuccess, wrappingError, clearWrappingMessages]);
+  }, [success, error]);
   
   useEffect(() => {
     if (rewardsSuccess || rewardsError) {
@@ -61,44 +63,79 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
   
   const handleWrap = async () => {
     if (!wrapAmount || parseFloat(wrapAmount) <= 0) return;
+    
     try {
+      setError(null);
+      setSuccess(null);
+      
       await wrapTokens(toWei(wrapAmount));
+      
+      // ✅ Simplified - let the hook handle success/error states
+      setSuccess("Wrap transaction submitted!");
       setWrapAmount("");
-    } catch (error) {
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
       console.error("Wrap failed:", error);
+      setError(error.message || "Wrapping failed");
     }
   };
   
   const handleRequestUnwrap = async () => {
     if (!unwrapAmount || parseFloat(unwrapAmount) <= 0) return;
+    
     try {
+      setError(null);
+      setSuccess(null);
+      
       await requestUnwrap(toWei(unwrapAmount));
+      
+      // ✅ Simplified - let the hook handle success/error states  
+      setSuccess("Unwrap request submitted!");
       setUnwrapAmount("");
-    } catch (error) {
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
       console.error("Unwrap request failed:", error);
+      setError(error.message || "Unwrap request failed");
     }
   };
   
   const handleCompleteUnwrap = async () => {
     try {
+      setError(null);
+      setSuccess(null);
+      
       await completeUnwrap();
-    } catch (error) {
+      
+      // ✅ Simplified - let the hook handle success/error states
+      setSuccess("Complete unwrap transaction submitted!");
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
       console.error("Complete unwrap failed:", error);
+      setError(error.message || "Complete unwrap failed");
     }
   };
   
   const handleCancelUnbonding = async () => {
     try {
+      setError(null);
+      setSuccess(null);
+      
       await cancelUnbonding();
-    } catch (error) {
+      
+      // ✅ Simplified - let the hook handle success/error states
+      setSuccess("Cancel unbonding transaction submitted!");
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
       console.error("Cancel unbonding failed:", error);
+      setError(error.message || "Cancel unbonding failed");
     }
   };
   
   const handleClaimRewards = async () => {
     try {
       await claimRewards();
-    } catch (error) {
+      setTimeout(() => refetch(), 2000);
+    } catch (error: any) {
       console.error("Claim rewards failed:", error);
     }
   };
@@ -107,8 +144,16 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
     return Number(unbondingReleaseTime) * 1000 <= Date.now();
   };
   
-  if (!userAddress) {
-    return null;
+  if (!hasWalletAccess) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+        <div className="text-center py-8">
+          <LockIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Wallet</h3>
+          <p className="text-gray-600">Connect your wallet to wrap and unwrap tokens</p>
+        </div>
+      </div>
+    );
   }
   
   return (
@@ -116,17 +161,17 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
       <h2 className="text-xl font-serif font-bold text-gray-900 mb-4">Wrapping & Rewards</h2>
       
       {/* Status Messages */}
-      {(wrappingError || rewardsError) && (
+      {(error || rewardsError) && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
           <AlertCircleIcon className="h-4 w-4 text-red-600 mr-2 flex-shrink-0" />
-          <span className="text-red-700 text-sm">{wrappingError || rewardsError}</span>
+          <span className="text-red-700 text-sm">{error || rewardsError}</span>
         </div>
       )}
       
-      {(wrappingSuccess || rewardsSuccess) && (
+      {(success || rewardsSuccess) && (
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center">
           <CheckCircleIcon className="h-4 w-4 text-green-600 mr-2 flex-shrink-0" />
-          <span className="text-green-700 text-sm">{wrappingSuccess || rewardsSuccess}</span>
+          <span className="text-green-700 text-sm">{success || rewardsSuccess}</span>
         </div>
       )}
       
@@ -161,6 +206,9 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
             <label htmlFor="wrap-amount" className="block text-sm font-medium text-gray-700 mb-2">
               Amount to Wrap ($EMARK)
             </label>
+            <div className="text-xs text-gray-500 mb-2">
+              Available: {emarkBalance ? toEther(emarkBalance) : "0"} $EMARK
+            </div>
             <input
               id="wrap-amount"
               type="number"
@@ -229,6 +277,9 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
             <label htmlFor="unwrap-amount" className="block text-sm font-medium text-gray-700 mb-2">
               Amount to Unwrap (wEMARK)
             </label>
+            <div className="text-xs text-gray-500 mb-2">
+              Available: {wEmarkBalance ? toEther(wEmarkBalance) : "0"} wEMARK
+            </div>
             <input
               id="unwrap-amount"
               type="number"
@@ -273,7 +324,7 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
           </p>
           
           {/* Pending Unbonding Request */}
-          {!isLoadingUnbonding && unbondingAmount && unbondingAmount > BigInt(0) && (
+          {unbondingAmount > BigInt(0) && (
             <div className="mt-6">
               <h3 className="text-sm font-medium text-gray-700 mb-2">Pending Unbonding Request</h3>
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
