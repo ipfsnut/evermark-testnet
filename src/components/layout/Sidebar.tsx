@@ -1,8 +1,8 @@
-// src/components/layout/Sidebar.tsx - ✅ UPDATED with Explore integration and improvements
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useProfile } from '../../hooks/useProfile';
 import { useWalletConnection } from '../../providers/WalletProvider';
+import SwapWidget from '../swap/SwapWidget';
 import { 
   X as CloseIcon, 
   Home as HomeIcon, 
@@ -354,6 +354,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       
       {/* ✅ ENHANCED: Organized Navigation with Categories */}
       <nav className="flex-1 px-2 py-4 overflow-y-auto">
+        {/* ✅ NEW: Quick Swap Button */}
+        {isAuthenticated && (
+          <div className="mb-4 px-1">
+            <SwapWidget />
+            <p className="text-xs text-gray-500 mt-1 text-center">
+              Quick $EMARK swap
+            </p>
+          </div>
+        )}
+
         {/* Discovery Section */}
         {renderNavSection('Discover', navItemsByCategory.discover)}
         
