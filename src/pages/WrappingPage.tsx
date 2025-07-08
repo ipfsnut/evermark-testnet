@@ -1,7 +1,7 @@
 // src/pages/WrappingPage.tsx - Updated with Swap Widget at the top
 import React from 'react';
 import { WrappingDashboard } from '../components/wrapping/WrappingDashboard';
-import { SwapWidget } from '../components/swap/SwapWidget';
+import SwapWidget from '../components/swap/SwapWidget';
 import { RewardsPanel } from '../components/rewards/RewardsPanel';
 import { useProfile } from '../hooks/useProfile';
 import { useFarcasterUser } from '../lib/farcaster';

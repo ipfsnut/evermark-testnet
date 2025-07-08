@@ -23,7 +23,7 @@ interface Token {
   caipId: string;
   decimals: number;
   logoURI?: string;
-  color: string; // Add color for theming
+  color: string;
 }
 
 // Enhanced tokens with colors and better styling
@@ -61,8 +61,6 @@ const SUPPORTED_TOKENS: Token[] = [
     color: 'from-purple-500 to-pink-600'
   }
 ];
-
-// SwapActionCard component removed - only using single "Get $EMARK" button now
 
 // Simplified Farcaster Native Swap - Just Get $EMARK
 const FarcasterNativeSwap: React.FC = () => {
@@ -454,7 +452,7 @@ const ExternalSwapWidget: React.FC = () => {
 };
 
 // Main SwapWidget Component
-export const SwapWidget: React.FC = () => {
+const SwapWidget: React.FC = () => {
   const { isInFarcaster } = useFarcasterUser();
 
   return (
@@ -488,3 +486,5 @@ export const SwapWidget: React.FC = () => {
     </div>
   );
 };
+
+export default SwapWidget;
