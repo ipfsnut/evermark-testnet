@@ -62,177 +62,13 @@ const SUPPORTED_TOKENS: Token[] = [
   }
 ];
 
-// Beautiful swap action card component
-const SwapActionCard: React.FC<{
-  fromToken: Token;
-  toToken: Token;
-  amount: string;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  isPopular?: boolean;
-  onSwap: () => void;
-  isLoading: boolean;
-}> = ({ fromToken, toToken, amount, title, description, icon, isPopular, onSwap, isLoading }) => {
-  return (
-    <div className={`
-      relative group overflow-hidden rounded-xl border-2 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl
-      ${isPopular ? 'border-purple-300 bg-gradient-to-br from-purple-50 to-indigo-50' : 'border-gray-200 bg-white hover:border-purple-200'}
-    `}>
-      {/* Popular badge */}
-      {isPopular && (
-        <div className="absolute top-3 right-3 z-10">
-          <div className="flex items-center px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full">
-            <StarIcon className="h-3 w-3 mr-1" />
-            POPULAR
-          </div>
-        </div>
-      )}
+// SwapActionCard component removed - only using single "Get $EMARK" button now
 
-      {/* Main content */}
-      <div className="p-6">
-        {/* Header with icon */}
-        <div className="flex items-center mb-4">
-          <div className={`
-            p-3 rounded-xl bg-gradient-to-r ${fromToken.color} text-white mr-3 shadow-lg
-            group-hover:shadow-xl transition-shadow duration-300
-          `}>
-            {icon}
-          </div>
-          <div>
-            <h3 className="font-bold text-gray-900 text-lg">{title}</h3>
-            <p className="text-sm text-gray-600">{description}</p>
-          </div>
-        </div>
-
-        {/* Token flow visualization */}
-        <div className="flex items-center justify-between mb-6 p-4 bg-gray-50 rounded-lg">
-          {/* From token */}
-          <div className="flex items-center space-x-3">
-            <div className="relative">
-              <img 
-                src={fromToken.logoURI} 
-                alt={fromToken.symbol}
-                className="w-10 h-10 rounded-full border-2 border-white shadow-md"
-                onError={(e) => {
-                  e.currentTarget.src = '/EvermarkLogo.png';
-                }}
-              />
-            </div>
-            <div>
-              <div className="font-bold text-gray-900">{amount} {fromToken.symbol}</div>
-              <div className="text-xs text-gray-500">{fromToken.name}</div>
-            </div>
-          </div>
-
-          {/* Arrow with gradient */}
-          <div className="flex-1 flex justify-center">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full blur-sm"></div>
-              <div className="relative bg-white p-2 rounded-full border-2 border-purple-200">
-                <ArrowUpDownIcon className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-          </div>
-
-          {/* To token */}
-          <div className="flex items-center space-x-3">
-            <div>
-              <div className="font-bold text-gray-900 text-right">~ {toToken.symbol}</div>
-              <div className="text-xs text-gray-500 text-right">{toToken.name}</div>
-            </div>
-            <div className="relative">
-              <img 
-                src={toToken.logoURI} 
-                alt={toToken.symbol}
-                className="w-10 h-10 rounded-full border-2 border-white shadow-md"
-                onError={(e) => {
-                  e.currentTarget.src = '/EvermarkLogo.png';
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Beautiful swap button */}
-        <button
-          onClick={onSwap}
-          disabled={isLoading}
-          className={`
-            w-full py-4 px-6 rounded-xl font-bold text-white transition-all duration-300 transform
-            ${isLoading 
-              ? 'bg-gray-400 cursor-not-allowed' 
-              : `bg-gradient-to-r ${fromToken.color} hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]`
-            }
-            relative overflow-hidden group
-          `}
-        >
-          {/* Shimmer effect */}
-          <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-          
-          {/* Button content */}
-          <div className="relative flex items-center justify-center">
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
-                Opening Farcaster...
-              </>
-            ) : (
-              <>
-                <WalletIcon className="h-5 w-5 mr-3" />
-                Swap {fromToken.symbol} → {toToken.symbol}
-              </>
-            )}
-          </div>
-        </button>
-
-        {/* Additional info */}
-        <div className="mt-3 text-center">
-          <p className="text-xs text-gray-500">
-            Opens in your Farcaster wallet • Powered by Base
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Farcaster Native Swap Component with beautiful design
+// Simplified Farcaster Native Swap - Just Get $EMARK
 const FarcasterNativeSwap: React.FC = () => {
   const [isSwapping, setIsSwapping] = useState(false);
 
-  // Enhanced swap actions with better UX
-  const swapActions = [
-    {
-      fromToken: SUPPORTED_TOKENS[0], // ETH
-      toToken: SUPPORTED_TOKENS[3],   // EMARK
-      amount: '0.01',
-      title: 'Get EMARK with ETH',
-      description: 'Start participating in governance',
-      icon: <CoinsIcon className="h-5 w-5" />,
-      isPopular: true
-    },
-    {
-      fromToken: SUPPORTED_TOKENS[1], // USDC
-      toToken: SUPPORTED_TOKENS[3],   // EMARK
-      amount: '10',
-      title: 'Get EMARK with USDC',
-      description: 'Use stablecoins for predictable swaps',
-      icon: <TrendingUpIcon className="h-5 w-5" />,
-      isPopular: false
-    },
-    {
-      fromToken: SUPPORTED_TOKENS[1], // USDC
-      toToken: SUPPORTED_TOKENS[0],   // ETH
-      amount: '50',
-      title: 'Get ETH for Gas',
-      description: 'Ensure you have ETH for transactions',
-      icon: <SparklesIcon className="h-5 w-5" />,
-      isPopular: false
-    }
-  ];
-
-  const handleFarcasterSwap = async (fromToken: Token, toToken: Token, amount: string) => {
+  const handleGetEmark = async () => {
     if (!sdk) {
       console.error('Farcaster SDK not available');
       return;
@@ -241,34 +77,41 @@ const FarcasterNativeSwap: React.FC = () => {
     setIsSwapping(true);
 
     try {
-      console.log('🔄 Initiating Farcaster swap...', {
-        sellToken: fromToken.caipId,
-        buyToken: toToken.caipId,
-        sellAmount: (parseFloat(amount) * Math.pow(10, fromToken.decimals)).toString()
+      const ethToken = SUPPORTED_TOKENS[0]; // ETH
+      const emarkToken = SUPPORTED_TOKENS[3]; // EMARK
+      const amount = '0.01'; // 0.01 ETH
+
+      console.log('🔄 Getting EMARK with ETH...', {
+        sellToken: ethToken.caipId,
+        buyToken: emarkToken.caipId,
+        sellAmount: (parseFloat(amount) * Math.pow(10, ethToken.decimals)).toString()
       });
 
-      const sellAmountUnits = (parseFloat(amount) * Math.pow(10, fromToken.decimals)).toString();
+      const sellAmountUnits = (parseFloat(amount) * Math.pow(10, ethToken.decimals)).toString();
 
       const result = await sdk.actions.swapToken({
-        sellToken: fromToken.caipId,
-        buyToken: toToken.caipId,
+        sellToken: ethToken.caipId,
+        buyToken: emarkToken.caipId,
         sellAmount: sellAmountUnits
       });
 
       if (result.success) {
-        console.log('✅ Swap successful:', result.swap);
+        console.log('✅ EMARK swap successful:', result.swap);
       } else {
-        console.error('❌ Swap failed:', result.error);
+        console.error('❌ EMARK swap failed:', result.error);
         if (result.reason !== 'rejected_by_user') {
           console.warn('Swap error:', result.error?.message || 'Unknown error');
         }
       }
     } catch (error) {
-      console.error('❌ Swap error:', error);
+      console.error('❌ EMARK swap error:', error);
     } finally {
       setIsSwapping(false);
     }
   };
+
+  const ethToken = SUPPORTED_TOKENS[0]; // ETH
+  const emarkToken = SUPPORTED_TOKENS[3]; // EMARK
 
   return (
     <div className="space-y-6">
@@ -278,41 +121,135 @@ const FarcasterNativeSwap: React.FC = () => {
           <WalletIcon className="h-4 w-4 mr-2" />
           Farcaster Native Swapping
         </div>
-        <h3 className="text-xl font-bold text-gray-900 mb-2">Choose Your Swap</h3>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">Get $EMARK Tokens</h3>
         <p className="text-gray-600">
-          These buttons will open your connected wallet within Farcaster to complete the swap safely.
+          Swap ETH for EMARK tokens to participate in governance and earn rewards.
         </p>
       </div>
 
-      {/* Swap action cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {swapActions.map((action, index) => (
-          <SwapActionCard
-            key={index}
-            fromToken={action.fromToken}
-            toToken={action.toToken}
-            amount={action.amount}
-            title={action.title}
-            description={action.description}
-            icon={action.icon}
-            isPopular={action.isPopular}
-            onSwap={() => handleFarcasterSwap(action.fromToken, action.toToken, action.amount)}
-            isLoading={isSwapping}
-          />
-        ))}
+      {/* Single beautiful EMARK swap card */}
+      <div className="max-w-md mx-auto">
+        <div className="relative group overflow-hidden rounded-xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-indigo-50 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
+          {/* Popular badge */}
+          <div className="absolute top-3 right-3 z-10">
+            <div className="flex items-center px-2 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full">
+              <StarIcon className="h-3 w-3 mr-1" />
+              RECOMMENDED
+            </div>
+          </div>
+
+          {/* Main content */}
+          <div className="p-6">
+            {/* Header with icon */}
+            <div className="flex items-center justify-center mb-6">
+              <div className="p-4 rounded-xl bg-gradient-to-r from-purple-500 to-pink-600 text-white shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+                <CoinsIcon className="h-8 w-8" />
+              </div>
+            </div>
+
+            <div className="text-center mb-6">
+              <h3 className="font-bold text-gray-900 text-xl mb-2">Get $EMARK</h3>
+              <p className="text-gray-600">Start participating in governance</p>
+            </div>
+
+            {/* Token flow visualization */}
+            <div className="flex items-center justify-between mb-6 p-4 bg-white rounded-lg border border-purple-100">
+              {/* From ETH */}
+              <div className="flex items-center space-x-3">
+                <img 
+                  src={ethToken.logoURI} 
+                  alt="ETH"
+                  className="w-10 h-10 rounded-full border-2 border-white shadow-md"
+                  onError={(e) => {
+                    e.currentTarget.src = '/EvermarkLogo.png';
+                  }}
+                />
+                <div>
+                  <div className="font-bold text-gray-900">0.01 ETH</div>
+                  <div className="text-xs text-gray-500">Ethereum</div>
+                </div>
+              </div>
+
+              {/* Arrow with gradient */}
+              <div className="flex-1 flex justify-center">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full blur-sm"></div>
+                  <div className="relative bg-white p-2 rounded-full border-2 border-purple-200">
+                    <ArrowUpDownIcon className="h-4 w-4 text-purple-600" />
+                  </div>
+                </div>
+              </div>
+
+              {/* To EMARK */}
+              <div className="flex items-center space-x-3">
+                <div>
+                  <div className="font-bold text-gray-900 text-right">~ $EMARK</div>
+                  <div className="text-xs text-gray-500 text-right">Evermark Token</div>
+                </div>
+                <img 
+                  src={emarkToken.logoURI} 
+                  alt="EMARK"
+                  className="w-10 h-10 rounded-full border-2 border-white shadow-md"
+                  onError={(e) => {
+                    e.currentTarget.src = '/EvermarkLogo.png';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Beautiful get EMARK button */}
+            <button
+              onClick={handleGetEmark}
+              disabled={isSwapping}
+              className={`
+                w-full py-4 px-6 rounded-xl font-bold text-white transition-all duration-300 transform
+                ${isSwapping 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-purple-500 to-pink-600 hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98]'
+                }
+                relative overflow-hidden group
+              `}
+            >
+              {/* Shimmer effect */}
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+              
+              {/* Button content */}
+              <div className="relative flex items-center justify-center">
+                {isSwapping ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-3"></div>
+                    Opening Farcaster...
+                  </>
+                ) : (
+                  <>
+                    <WalletIcon className="h-5 w-5 mr-3" />
+                    Get $EMARK
+                  </>
+                )}
+              </div>
+            </button>
+
+            {/* Additional info */}
+            <div className="mt-4 text-center">
+              <p className="text-xs text-gray-500">
+                Opens in your Farcaster wallet • Powered by Base
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Help section */}
+      {/* Simplified help section */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6">
         <div className="flex items-start space-x-3">
           <InfoIcon className="h-6 w-6 text-blue-600 mt-0.5 flex-shrink-0" />
           <div>
-            <h4 className="font-semibold text-blue-900 mb-2">How Farcaster Swapping Works</h4>
+            <h4 className="font-semibold text-blue-900 mb-2">How It Works</h4>
             <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Click any swap button to open your Farcaster wallet</li>
-              <li>• Review the transaction details in your wallet</li>
-              <li>• Confirm the swap to complete the transaction</li>
-              <li>• Tokens will appear in your wallet on Base network</li>
+              <li>• Click "Get $EMARK" to open your Farcaster wallet</li>
+              <li>• Review the swap (0.01 ETH → $EMARK tokens)</li>
+              <li>• Confirm to complete the transaction on Base</li>
+              <li>• Use $EMARK for governance voting and rewards</li>
             </ul>
           </div>
         </div>
