@@ -19,7 +19,9 @@ import {
   GridIcon,
   SearchIcon,
   TrendingUpIcon,
-  UserIcon
+  UserIcon,
+  ZapIcon,
+  ActivityIcon
 } from 'lucide-react';
 import { cn, useIsMobile, touchFriendly, textSizes, spacing } from '../../utils/responsive';
 
@@ -32,7 +34,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
   const location = useLocation();
   const isMobile = useIsMobile();
   
-  // ✅ Use unified auth system
   const {
     displayName,
     avatar,
@@ -44,17 +45,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     primaryAddress
   } = useProfile();
   
-  // ✅ Use unified wallet connection
   const { canInteract, walletType, isConnected } = useWalletConnection();
   
-  // ✅ UPDATED: Enhanced navigation items with Explore and better organization
+  // Enhanced navigation items with cyber styling
   const navItems = [
     { 
       path: '/', 
       label: 'Home', 
       icon: <HomeIcon className="h-5 w-5" />,
       description: 'Discover featured Evermarks',
-      category: 'discover'
+      category: 'discover',
+      glow: 'hover:shadow-cyan-500/20'
     },
     { 
       path: '/explore', 
@@ -62,14 +63,16 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       icon: <GridIcon className="h-5 w-5" />,
       description: 'Browse all Evermarks with filters',
       category: 'discover',
-      badge: 'New'
+      badge: 'New',
+      glow: 'hover:shadow-blue-500/20'
     },
     { 
       path: '/leaderboard', 
       label: 'Leaderboard', 
       icon: <TrophyIcon className="h-5 w-5" />,
       description: 'Top voted Evermarks',
-      category: 'discover'
+      category: 'discover',
+      glow: 'hover:shadow-yellow-500/20'
     },
     { 
       path: '/create', 
@@ -77,7 +80,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       icon: <CreateIcon className="h-5 w-5" />,
       description: 'Create new Evermark',
       requiresAuth: true,
-      category: 'user'
+      category: 'user',
+      glow: 'hover:shadow-green-500/20'
     },
     { 
       path: '/my-evermarks', 
@@ -85,7 +89,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       icon: <BookOpenIcon className="h-5 w-5" />,
       description: 'Your created Evermarks',
       requiresAuth: true,
-      category: 'user'
+      category: 'user',
+      glow: 'hover:shadow-purple-500/20'
     },
     { 
       path: '/bookshelf', 
@@ -93,7 +98,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       icon: <BookmarkIcon className="h-5 w-5" />,
       description: 'Curated favorites and voting delegation',
       requiresAuth: true,
-      category: 'user'
+      category: 'user',
+      glow: 'hover:shadow-pink-500/20'
     },
     ...(canInteract ? [{
       path: '/wrapping', 
@@ -101,18 +107,19 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
       icon: <CoinsIcon className="h-5 w-5" />,
       badge: 'wEMARK',
       description: 'Wrap/unwrap EMARK tokens',
-      category: 'tools'
+      category: 'tools',
+      glow: 'hover:shadow-green-500/20'
     }] : []),
     { 
       path: '/about', 
       label: 'About', 
       icon: <InfoIcon className="h-5 w-5" />,
       description: 'Learn about Evermark Protocol',
-      category: 'info'
+      category: 'info',
+      glow: 'hover:shadow-gray-500/20'
     },
   ];
   
-  // ✅ NEW: Group navigation items by category
   const navItemsByCategory = {
     discover: navItems.filter(item => item.category === 'discover'),
     user: navItems.filter(item => item.category === 'user'),
@@ -120,7 +127,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     info: navItems.filter(item => item.category === 'info')
   };
   
-  // Check if a nav item is active
   const isActive = (path: string) => {
     if (path === '/') {
       return location.pathname === '/';
@@ -128,14 +134,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     return location.pathname.startsWith(path);
   };
   
-  // Copy wallet address to clipboard
   const copyWalletAddress = async (address: string) => {
     try {
       await navigator.clipboard.writeText(address);
       console.log('Wallet address copied to clipboard');
     } catch (err) {
       console.error('Failed to copy wallet address:', err);
-      // Fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = address;
       document.body.appendChild(textArea);
@@ -145,7 +149,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     }
   };
   
-  // ✅ NEW: Render navigation section
   const renderNavSection = (title: string, items: typeof navItems, showTitle = true) => {
     const visibleItems = items.filter(item => !item.requiresAuth || isAuthenticated);
     
@@ -154,52 +157,52 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
     return (
       <div className="mb-6">
         {showTitle && (
-          <h3 className="px-3 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <h3 className="px-3 mb-3 text-xs font-bold text-green-400 uppercase tracking-wider">
             {title}
           </h3>
         )}
-        <ul className="space-y-1">
+        <ul className="space-y-2">
           {visibleItems.map((item) => (
             <li key={item.path}>
               <Link
                 to={item.path}
                 className={cn(
-                  "flex items-center rounded-lg transition-all duration-200 group relative",
-                  spacing.responsive['sm-md-lg'],
-                  textSizes.responsive['sm-base-lg'],
+                  "flex items-center rounded-lg transition-all duration-300 group relative",
+                  "px-3 py-3 mx-1",
                   touchFriendly.button,
                   isActive(item.path)
-                    ? 'bg-purple-50 text-purple-700 border border-purple-200 shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100 active:bg-gray-200'
+                    ? 'bg-gradient-to-r from-green-900/30 to-purple-900/30 text-green-400 border border-green-400/30 shadow-lg shadow-green-500/20'
+                    : 'text-gray-300 hover:bg-gray-800/50 hover:text-white border border-transparent hover:border-gray-600',
+                  item.glow
                 )}
                 onClick={closeSidebar}
                 title={item.description}
               >
                 <span className={cn(
-                  "mr-3 transition-colors",
-                  isActive(item.path) ? 'text-purple-600' : 'text-gray-500 group-hover:text-gray-700'
+                  "mr-3 transition-all duration-300",
+                  isActive(item.path) ? 'text-green-400' : 'text-gray-500 group-hover:text-green-400'
                 )}>
                   {item.icon}
                 </span>
-                <span className="flex-1">{item.label}</span>
+                <span className="flex-1 font-medium">{item.label}</span>
                 
-                {/* Enhanced badges with better styling */}
+                {/* Enhanced badges */}
                 {item.badge && (
                   <span className={cn(
-                    "ml-2 px-2 py-0.5 text-xs font-medium rounded-full",
+                    "ml-2 px-2 py-1 text-xs font-bold rounded-full border",
                     item.badge === 'New' 
-                      ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                      ? 'bg-blue-500/20 text-blue-400 border-blue-400/30 shadow-sm shadow-blue-500/30' 
                       : item.badge === 'wEMARK'
-                      ? 'bg-green-100 text-green-700 border border-green-200'
-                      : 'bg-gray-100 text-gray-700 border border-gray-200'
+                      ? 'bg-green-500/20 text-green-400 border-green-400/30 shadow-sm shadow-green-500/30'
+                      : 'bg-gray-500/20 text-gray-400 border-gray-400/30'
                   )}>
                     {item.badge}
                   </span>
                 )}
                 
-                {/* Active indicator */}
+                {/* Active indicator with glow */}
                 {isActive(item.path) && (
-                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-purple-600 rounded-r" />
+                  <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-green-400 to-cyan-400 rounded-r shadow-sm shadow-green-500/50" />
                 )}
               </Link>
             </li>
@@ -211,50 +214,50 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
   
   return (
     <div className={cn(
-      "fixed md:sticky top-0 left-0 h-full md:h-screen w-64 bg-white border-r border-gray-200 z-20 transform transition-transform duration-300 ease-in-out flex flex-col",
+      "fixed md:sticky top-0 left-0 h-full md:h-screen w-64 z-20 transform transition-transform duration-300 ease-in-out flex flex-col",
+      "bg-gradient-to-b from-gray-900 via-black to-gray-900 border-r border-green-400/30",
       isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
     )}>
-      {/* ✅ Enhanced Sidebar Header */}
-      <div className={cn("border-b border-gray-200 flex items-center justify-between", spacing.responsive['sm-md-lg'])}>
-        <Link 
-          to="/" 
-          className={cn(
-            "font-serif font-bold text-purple-600 hover:text-purple-700 transition-colors flex items-center",
-            textSizes.responsive['lg-xl-2xl']
-          )}
-          onClick={closeSidebar}
-        >
-          <img 
-            src="/EvermarkLogo.png" 
-            alt="Evermark Logo" 
-            className="h-8 w-8 mr-2"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          Evermark
-        </Link>
-        <button
-          className={cn(
-            "md:hidden rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors",
-            touchFriendly.button
-          )}
-          onClick={closeSidebar}
-          aria-label="Close navigation menu"
-        >
-          <CloseIcon className="h-5 w-5" />
-        </button>
+      {/* Enhanced Sidebar Header */}
+      <div className="border-b border-green-400/30 p-4 bg-gradient-to-r from-gray-900/50 to-black/50 backdrop-blur-sm">
+        <div className="flex items-center justify-between">
+          <Link 
+            to="/" 
+            className={cn(
+              "font-serif font-bold flex items-center group",
+              "bg-gradient-to-r from-green-400 via-cyan-400 to-purple-500 bg-clip-text text-transparent",
+              "hover:from-green-300 hover:via-cyan-300 hover:to-purple-400 transition-all duration-300"
+            )}
+            onClick={closeSidebar}
+          >
+            <div className="w-8 h-8 bg-gradient-to-r from-green-400 to-purple-500 rounded-full flex items-center justify-center mr-3 shadow-lg shadow-green-500/30 group-hover:shadow-green-500/50 transition-all duration-300">
+              <ZapIcon className="h-5 w-5 text-black" />
+            </div>
+            <span className="text-lg font-bold">EVERMARK</span>
+          </Link>
+          <button
+            className={cn(
+              "md:hidden rounded-md text-gray-400 hover:text-green-400 hover:bg-gray-800/50 transition-colors p-2",
+              "border border-gray-700 hover:border-green-400/50",
+              touchFriendly.button
+            )}
+            onClick={closeSidebar}
+            aria-label="Close navigation menu"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
       </div>
       
-      {/* ✅ Enhanced User Profile Section */}
+      {/* Enhanced User Profile Section */}
       {isAuthenticated && (
-        <div className={cn("border-b border-gray-200", spacing.responsive['sm-md-lg'])}>
+        <div className="border-b border-green-400/30 p-4 bg-gradient-to-r from-purple-900/20 to-blue-900/20">
           <div className="flex items-center space-x-3">
-            {/* ✅ ENHANCED: Profile Picture */}
             <Link 
               to={primaryAddress ? `/${primaryAddress}` : '/profile'} 
               className={cn(
-                "bg-purple-100 rounded-full flex items-center justify-center overflow-hidden hover:ring-2 hover:ring-purple-300 transition-all cursor-pointer flex-shrink-0",
+                "bg-gradient-to-r from-green-400/20 to-purple-500/20 rounded-full flex items-center justify-center overflow-hidden transition-all cursor-pointer flex-shrink-0",
+                "border-2 border-green-400/30 hover:border-green-400/60 hover:shadow-lg hover:shadow-green-500/30",
                 isMobile ? "h-12 w-12" : "h-14 w-14"
               )}
               onClick={closeSidebar}
@@ -267,37 +270,29 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <span className={cn(
-                  "font-bold text-purple-600",
-                  textSizes.responsive['lg-xl-2xl']
-                )}>
+                <span className="font-bold text-green-400 text-xl">
                   {displayName.charAt(0).toUpperCase()}
                 </span>
               )}
             </Link>
             
-            {/* User Info - Enhanced */}
             <div className="flex-1 min-w-0">
               <Link 
                 to={primaryAddress ? `/${primaryAddress}` : '/profile'}
                 onClick={closeSidebar}
-                className="block hover:text-purple-600 transition-colors"
+                className="block hover:text-green-400 transition-colors"
               >
-                <h3 className={cn(
-                  "font-medium text-gray-900 truncate",
-                  textSizes.responsive['sm-base-lg']
-                )}>
+                <h3 className="font-bold text-white truncate">
                   {displayName}
                 </h3>
               </Link>
               
-              {/* Show handle OR wallet address with better hierarchy */}
               {handle ? (
-                <p className="text-xs sm:text-sm text-purple-600 truncate">@{handle}</p>
+                <p className="text-sm text-cyan-400 truncate">@{handle}</p>
               ) : primaryAddress ? (
                 <button
                   onClick={() => copyWalletAddress(primaryAddress)}
-                  className="font-mono text-xs text-gray-600 hover:text-purple-600 transition-colors cursor-pointer flex items-center gap-1 group truncate"
+                  className="font-mono text-xs text-gray-400 hover:text-green-400 transition-colors cursor-pointer flex items-center gap-1 group truncate"
                   title="Click to copy wallet address"
                 >
                   <span className="truncate">{primaryAddress.slice(0, 8)}...{primaryAddress.slice(-4)}</span>
@@ -307,17 +302,17 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
                 <p className="text-xs text-gray-500">No wallet connected</p>
               )}
               
-              {/* ✅ ENHANCED: Connection status with better visual hierarchy */}
-              <div className="flex items-center mt-1 text-xs">
+              {/* Connection status with cyber styling */}
+              <div className="flex items-center mt-2 text-xs">
                 <div className={cn(
-                  "w-2 h-2 rounded-full mr-2",
-                  canInteract ? 'bg-green-400' : isConnected ? 'bg-yellow-400' : 'bg-red-400'
+                  "w-2 h-2 rounded-full mr-2 animate-pulse",
+                  canInteract ? 'bg-green-400 shadow-sm shadow-green-400' : isConnected ? 'bg-yellow-400 shadow-sm shadow-yellow-400' : 'bg-red-400'
                 )}></div>
                 <span className={cn(
-                  "capitalize font-medium",
-                  canInteract ? 'text-green-600' : isConnected ? 'text-yellow-600' : 'text-red-600'
+                  "font-bold text-xs",
+                  canInteract ? 'text-green-400' : isConnected ? 'text-yellow-400' : 'text-red-400'
                 )}>
-                  {canInteract ? 'Full Access' : isConnected ? 'Read Only' : 'Connect Wallet'}
+                  {canInteract ? 'FULL ACCESS' : isConnected ? 'READ ONLY' : 'OFFLINE'}
                 </span>
               </div>
             </div>
@@ -325,82 +320,84 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
         </div>
       )}
       
-      {/* ✅ Enhanced Frame-specific messaging */}
+      {/* Farcaster status */}
       {isInFarcaster && (
-        <div className="px-3 sm:px-4 py-2 bg-purple-50 border-b border-purple-100">
+        <div className="px-4 py-3 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border-b border-purple-400/30">
           <div className="flex items-center justify-center space-x-2">
-            <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></div>
-            <p className="text-xs font-medium text-purple-700">Running in Farcaster</p>
-            {isAuthenticated ? (
-              <WifiIcon className="h-3 w-3 text-purple-600" />
+            <ActivityIcon className="h-4 w-4 text-purple-400 animate-pulse" />
+            <span className="text-xs font-bold text-purple-400">FARCASTER MODE</span>
+            {canInteract ? (
+              <WifiIcon className="h-3 w-3 text-green-400" />
             ) : (
-              <WifiOffIcon className="h-3 w-3 text-purple-400" />
+              <WifiOffIcon className="h-3 w-3 text-red-400" />
             )}
           </div>
-          <div className="mt-1 text-center">
+          <div className="mt-2 text-center">
             <span className={cn(
-              "text-xs px-2 py-0.5 rounded-full",
+              "text-xs px-3 py-1 rounded-full font-bold border",
               canInteract 
-                ? "bg-green-100 text-green-700"
+                ? "bg-green-500/20 text-green-400 border-green-400/30"
                 : isConnected 
-                ? "bg-yellow-100 text-yellow-700" 
-                : "bg-red-100 text-red-700"
+                ? "bg-yellow-500/20 text-yellow-400 border-yellow-400/30" 
+                : "bg-red-500/20 text-red-400 border-red-400/30"
             )}>
-              {canInteract ? 'Full Features' : isConnected ? 'Read Only' : 'No Wallet'}
+              {canInteract ? 'FULL FEATURES' : isConnected ? 'LIMITED' : 'NO WALLET'}
             </span>
           </div>
         </div>
       )}
       
-      {/* ✅ ENHANCED: Organized Navigation with Categories */}
+      {/* Navigation with cyber styling */}
       <nav className="flex-1 px-2 py-4 overflow-y-auto">
-        {/* ✅ NEW: Quick Swap Button */}
+        {/* Quick Swap Widget with cyber styling */}
         {isAuthenticated && (
-          <div className="mb-4 px-1">
-            <SwapWidget />
-            <p className="text-xs text-gray-500 mt-1 text-center">
-              Quick $EMARK swap
-            </p>
+          <div className="mb-6 mx-2">
+            <div className="bg-gradient-to-r from-green-900/20 to-cyan-900/20 border border-green-400/30 rounded-lg p-3 backdrop-blur-sm">
+              <SwapWidget />
+              <p className="text-xs text-green-400 mt-2 text-center font-medium">
+                QUICK $EMARK SWAP
+              </p>
+            </div>
           </div>
         )}
 
         {/* Discovery Section */}
-        {renderNavSection('Discover', navItemsByCategory.discover)}
+        {renderNavSection('DISCOVER', navItemsByCategory.discover)}
         
-        {/* User Section (only if authenticated) */}
-        {isAuthenticated && renderNavSection('My Evermarks', navItemsByCategory.user)}
+        {/* User Section */}
+        {isAuthenticated && renderNavSection('MY EVERMARKS', navItemsByCategory.user)}
         
-        {/* Tools Section (only if can interact) */}
-        {navItemsByCategory.tools.length > 0 && renderNavSection('Tools', navItemsByCategory.tools)}
+        {/* Tools Section */}
+        {navItemsByCategory.tools.length > 0 && renderNavSection('TOOLS', navItemsByCategory.tools)}
         
         {/* Info Section */}
-        {renderNavSection('Information', navItemsByCategory.info)}
+        {renderNavSection('SYSTEM', navItemsByCategory.info)}
         
-        {/* ✅ ENHANCED: Better call-to-action for unauthenticated users */}
+        {/* Enhanced CTA for unauthenticated users */}
         {!isAuthenticated && (
-          <div className="mt-6 px-2">
-            <div className="p-4 bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg border border-purple-200">
-              <h4 className="text-sm font-semibold text-purple-900 mb-2 flex items-center">
+          <div className="mt-6 mx-2">
+            <div className="p-4 bg-gradient-to-br from-purple-900/30 to-blue-900/30 rounded-lg border border-purple-400/30 backdrop-blur-sm">
+              <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center">
                 <UserIcon className="h-4 w-4 mr-2" />
-                Get Started
+                INITIALIZE
               </h4>
-              <p className="text-xs text-purple-700 mb-3 leading-relaxed">
-                Connect your wallet to create Evermarks, vote on content, and build your personal bookshelf
+              <p className="text-xs text-gray-300 mb-4 leading-relaxed">
+                Connect your wallet to access the full Evermark Protocol and start earning $WEMARK rewards
               </p>
               <div className="space-y-2">
                 <Link
                   to="/explore"
                   onClick={closeSidebar}
-                  className="block text-xs text-center bg-purple-600 text-white px-3 py-2 rounded hover:bg-purple-700 transition-colors font-medium"
+                  className="block text-xs text-center bg-gradient-to-r from-purple-600 to-blue-600 text-white px-3 py-2 rounded hover:from-purple-500 hover:to-blue-500 transition-all font-bold shadow-lg shadow-purple-500/30"
                 >
-                  Explore Evermarks
+                  EXPLORE EVERMARKS
                 </Link>
                 <Link
                   to="/about"
                   onClick={closeSidebar}
-                  className="block text-xs text-center bg-white text-purple-600 border border-purple-300 px-3 py-2 rounded hover:bg-purple-50 transition-colors"
+                  className="block text-xs text-center bg-gray-800 text-purple-400 border border-purple-400/50 px-3 py-2 rounded hover:bg-gray-700 transition-colors"
                 >
-                  Learn More
+                  LEARN PROTOCOL
                 </Link>
               </div>
             </div>
@@ -408,45 +405,44 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, closeSidebar }) => {
         )}
       </nav>
       
-      {/* ✅ Enhanced footer with version info */}
-      <div className={cn("border-t border-gray-200 mt-auto", spacing.responsive['sm-md-lg'])}>
+      {/* Enhanced footer */}
+      <div className="border-t border-green-400/30 mt-auto p-4 bg-gradient-to-r from-gray-900/50 to-black/50">
         {/* Network status for authenticated users */}
         {isAuthenticated && (
-          <div className="mb-3 p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="text-gray-600 font-medium">Network:</span>
-              <span className="text-purple-600 font-semibold">Base Mainnet</span>
+          <div className="mb-4 p-3 bg-gradient-to-r from-green-900/20 to-cyan-900/20 rounded-lg border border-green-400/30">
+            <div className="flex items-center justify-between text-xs mb-2">
+              <span className="text-gray-400 font-medium">NETWORK:</span>
+              <span className="text-green-400 font-bold">BASE MAINNET</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-600">Status:</span>
+              <span className="text-gray-400">STATUS:</span>
               <span className={cn(
-                "font-medium flex items-center gap-1",
-                canInteract ? 'text-green-600' : isConnected ? 'text-yellow-600' : 'text-red-600'
+                "font-bold flex items-center gap-1",
+                canInteract ? 'text-green-400' : isConnected ? 'text-yellow-400' : 'text-red-400'
               )}>
                 <div className={cn(
-                  "w-1.5 h-1.5 rounded-full",
+                  "w-2 h-2 rounded-full animate-pulse",
                   canInteract ? 'bg-green-400' : isConnected ? 'bg-yellow-400' : 'bg-red-400'
                 )}></div>
-                {canInteract ? 'Active' : isConnected ? 'Limited' : 'Offline'}
+                {canInteract ? 'ONLINE' : isConnected ? 'LIMITED' : 'OFFLINE'}
               </span>
             </div>
           </div>
         )}
         
-        {/* Logo and version info */}
-        <div className="text-center">
-          <p className="text-xs text-gray-500 mb-1">
-            © {new Date().getFullYear()} Evermark Protocol
+        {/* System info */}
+        <div className="text-center space-y-1">
+          <p className="text-xs text-gray-500 font-medium">
+            © {new Date().getFullYear()} EVERMARK PROTOCOL
           </p>
-          <p className="text-xs text-gray-400">
-            v2.0.0 • Base Mainnet
+          <p className="text-xs text-green-400 font-bold">
+            v2.0.0 • MAINNET BUILD
           </p>
           
-          {/* Environment indicator for development */}
           {process.env.NODE_ENV === 'development' && (
             <div className="mt-2">
-              <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
-                Development Mode
+              <span className="text-xs bg-orange-500/20 text-orange-400 border border-orange-400/30 px-2 py-1 rounded font-bold">
+                DEV MODE
               </span>
             </div>
           )}

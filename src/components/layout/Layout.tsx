@@ -53,7 +53,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   }, [sidebarOpen]);
   
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-black">
       <div className="flex flex-1">
         {/* Sidebar */}
         <Sidebar isOpen={sidebarOpen} closeSidebar={() => setSidebarOpen(false)} />
@@ -63,40 +63,97 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           <Header openSidebar={() => setSidebarOpen(true)} />
           
           <main className="flex-1 overflow-y-auto">
-            {/* 🎯 IMPROVED: Better mobile padding and spacing */}
-            <div className="p-3 sm:p-4 md:p-6 lg:p-8">
-              <div className="w-full max-w-none mx-auto">
-                {children}
-              </div>
+            {/* Enhanced content area with cyber styling */}
+            <div className="min-h-full">
+              {children}
             </div>
           </main>
           
-          {/* Global Footer - replaces individual page footers */}
+          {/* Global Footer */}
           <Footer />
         </div>
       </div>
       
-      {/* 🎯 IMPROVED: Enhanced mobile sidebar overlay */}
+      {/* Enhanced mobile sidebar overlay with cyber effects */}
       {sidebarOpen && window.innerWidth < 768 && (
         <div 
-          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-10 backdrop-blur-sm"
+          className="md:hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-10"
           onClick={() => setSidebarOpen(false)}
           style={{ 
-            // Ensure overlay is above everything except sidebar
             zIndex: 15,
-            // Smooth transition
-            animation: 'fadeIn 0.2s ease-out'
+            background: 'radial-gradient(circle at 50% 50%, rgba(0, 255, 65, 0.1) 0%, rgba(0, 0, 0, 0.8) 70%)',
+            animation: 'fadeIn 0.3s ease-out'
           }}
         />
       )}
       
       <style>{`
         @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from { 
+            opacity: 0;
+            backdrop-filter: blur(0px);
+          }
+          to { 
+            opacity: 1;
+            backdrop-filter: blur(8px);
+          }
+        }
+        
+        /* Custom scrollbar for cyber theme */
+        ::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+          background: #1a1a1a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+          background: linear-gradient(to bottom, #00ff41, #bf00ff);
+          border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+          background: linear-gradient(to bottom, #00ff41, #00ffff);
+        }
+
+        /* Smooth transitions for all interactive elements */
+        * {
+          transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          transition-duration: 200ms;
+        }
+
+        /* Enhanced selection colors */
+        ::selection {
+          background-color: rgba(0, 255, 65, 0.3);
+          color: #ffffff;
+        }
+
+        /* Cyber glow keyframes */
+        @keyframes cyber-glow {
+          0%, 100% { 
+            text-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+          }
+          50% { 
+            text-shadow: 0 0 10px currentColor, 0 0 20px currentColor, 0 0 30px currentColor;
+          }
+        }
+
+        .cyber-glow {
+          animation: cyber-glow 2s ease-in-out infinite;
+        }
+
+        /* Matrix-style background animation (subtle) */
+        @keyframes matrix-rain {
+          0% { transform: translateY(-100vh); opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { transform: translateY(100vh); opacity: 0; }
         }
       `}</style>
     </div>
   );
 };
+
 export default Layout;
