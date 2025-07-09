@@ -7,7 +7,8 @@ import {
   HistoryIcon,
   ChevronDownIcon,
   ChevronUpIcon,
-  InfoIcon
+  InfoIcon,
+  ZapIcon
 } from 'lucide-react';
 import { WrappingWidget } from './WrappingWidget';
 import { RewardsCalculator } from '../rewards/RewardsCalculator';
@@ -18,6 +19,7 @@ import { useRewards } from '../../hooks/useRewards';
 import { useDelegationHistory } from '../../hooks/useDelegationHistory';
 import { toEther } from 'thirdweb/utils';
 import { useWalletAuth } from '../../providers/WalletProvider';
+import { cn, useIsMobile } from '../../utils/responsive';
 
 interface WrappingDashboardProps {
   userAddress: string;
@@ -47,49 +49,57 @@ const WrappingStatsOverview: React.FC<{ userAddress: string }> = ({ userAddress 
       label: 'Total Wrapped',
       value: formatTokenAmount(totalWrapped || BigInt(0), 2),
       suffix: 'wEMARK',
-      icon: <LockIcon className="h-5 w-5 text-purple-600" />,
-      bgColor: 'bg-purple-50',
-      textColor: 'text-purple-600',
+      icon: <LockIcon className="h-5 w-5" />,
+      gradient: 'from-purple-400 to-purple-600',
+      glow: 'shadow-purple-500/20'
     },
     {
       label: 'Voting Power',
       value: formatTokenAmount(availableVotingPower || BigInt(0), 2),
       suffix: 'wEMARK',
-      icon: <CoinsIcon className="h-5 w-5 text-blue-600" />,
-      bgColor: 'bg-blue-50',
-      textColor: 'text-blue-600',
+      icon: <CoinsIcon className="h-5 w-5" />,
+      gradient: 'from-blue-400 to-blue-600',
+      glow: 'shadow-blue-500/20'
     },
     {
       label: 'Pending Rewards',
-      value: formatTokenAmount(pendingRewards || BigInt(0), 4), // More decimals for rewards
+      value: formatTokenAmount(pendingRewards || BigInt(0), 4),
       suffix: 'Tokens',
-      icon: <TrendingUpIcon className="h-5 w-5 text-green-600" />,
-      bgColor: 'bg-green-50',
-      textColor: 'text-green-600',
+      icon: <TrendingUpIcon className="h-5 w-5" />,
+      gradient: 'from-green-400 to-green-600',
+      glow: 'shadow-green-500/20'
     },
     {
       label: 'Delegation Usage',
       value: delegationStats?.delegationPercentage?.toFixed(1) || '0.0',
       suffix: '%',
-      icon: <CalculatorIcon className="h-5 w-5 text-amber-600" />,
-      bgColor: 'bg-amber-50',
-      textColor: 'text-amber-600',
+      icon: <CalculatorIcon className="h-5 w-5" />,
+      gradient: 'from-yellow-400 to-yellow-600',
+      glow: 'shadow-yellow-500/20'
     },
   ];
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       {stats.map((stat, index) => (
-        <div key={index} className={`${stat.bgColor} p-4 rounded-lg border border-gray-200`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">{stat.label}</span>
-            {stat.icon}
+        <div key={index} className={cn(
+          "bg-gray-800/50 border border-gray-700 rounded-lg p-4 shadow-lg",
+          stat.glow
+        )}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-400">{stat.label}</span>
+            <div className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center bg-gradient-to-r text-black",
+              stat.gradient
+            )}>
+              {stat.icon}
+            </div>
           </div>
           <div className="flex items-baseline">
-            <span className={`text-2xl font-bold ${stat.textColor}`}>
+            <span className="text-2xl font-bold text-white">
               {stat.value}
             </span>
-            <span className="text-sm text-gray-500 ml-1">{stat.suffix}</span>
+            <span className="text-sm text-gray-400 ml-1">{stat.suffix}</span>
           </div>
         </div>
       ))}
@@ -104,36 +114,73 @@ const CollapsibleSection: React.FC<{
   children: React.ReactNode;
   defaultExpanded?: boolean;
   description?: string;
-}> = ({ title, icon, children, defaultExpanded = false, description }) => {
+  accentColor?: string;
+}> = ({ title, icon, children, defaultExpanded = false, description, accentColor = "cyan" }) => {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
+  const colorVariants = {
+    cyan: {
+      bg: 'bg-cyan-900/30',
+      border: 'border-cyan-500/30',
+      text: 'text-cyan-400',
+      hover: 'hover:bg-cyan-800/30'
+    },
+    purple: {
+      bg: 'bg-purple-900/30',
+      border: 'border-purple-500/30',
+      text: 'text-purple-400',
+      hover: 'hover:bg-purple-800/30'
+    },
+    green: {
+      bg: 'bg-green-900/30',
+      border: 'border-green-500/30',
+      text: 'text-green-400',
+      hover: 'hover:bg-green-800/30'
+    }
+  };
+
+  const colors = colorVariants[accentColor as keyof typeof colorVariants] || colorVariants.cyan;
+
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+    <div className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden shadow-lg shadow-gray-900/50">
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        className={cn(
+          "w-full px-6 py-4 flex items-center justify-between transition-colors",
+          colors.hover
+        )}
       >
         <div className="flex items-center">
-          <div className="p-2 bg-gray-100 rounded-lg mr-3">
-            {icon}
+          <div className={cn(
+            "p-2 rounded-lg mr-3 border",
+            colors.bg,
+            colors.border
+          )}>
+            <div className={colors.text}>
+              {icon}
+            </div>
           </div>
           <div className="text-left">
-            <h3 className="font-medium text-gray-900">{title}</h3>
+            <h3 className="font-medium text-white">{title}</h3>
             {description && (
-              <p className="text-sm text-gray-600">{description}</p>
+              <p className="text-sm text-gray-400">{description}</p>
             )}
           </div>
         </div>
-        {isExpanded ? (
-          <ChevronUpIcon className="h-5 w-5 text-gray-400" />
-        ) : (
-          <ChevronDownIcon className="h-5 w-5 text-gray-400" />
-        )}
+        <div className={colors.text}>
+          {isExpanded ? (
+            <ChevronUpIcon className="h-5 w-5" />
+          ) : (
+            <ChevronDownIcon className="h-5 w-5" />
+          )}
+        </div>
       </button>
       
       {isExpanded && (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          {children}
+        <div className="px-6 pb-6 border-t border-gray-700">
+          <div className="pt-4">
+            {children}
+          </div>
         </div>
       )}
     </div>
@@ -147,44 +194,57 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
 }) => {
   const { isConnected } = useWalletAuth();
   const wrappingStats = useWrappingStats();
+  const isMobile = useIsMobile();
 
   if (!isConnected || !userAddress) {
     return (
-      <div className={`bg-white rounded-lg shadow-sm p-6 border border-gray-200 ${className}`}>
+      <div className={cn("bg-gray-800/50 border border-gray-700 rounded-lg shadow-lg p-6", className)}>
         <div className="text-center py-8">
-          <LockIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Wrapping Dashboard</h3>
-          <p className="text-gray-600">Connect your wallet to access wrapping features</p>
+          <LockIcon className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">Wrapping Dashboard</h3>
+          <p className="text-gray-400">Connect your wallet to access wrapping features</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={cn("space-y-6", className)}>
       {/* Dashboard Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg p-6 text-white">
-        <div className="flex items-center justify-between">
+      <div className="bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-500/30 rounded-lg p-6 text-white shadow-lg shadow-purple-500/20">
+        <div className={cn(
+          "flex justify-between",
+          isMobile ? "flex-col space-y-4" : "items-center"
+        )}>
           <div>
-            <h2 className="text-2xl font-bold mb-2">Wrapping Dashboard</h2>
-            <p className="text-purple-100">
+            <h2 className="text-2xl font-bold mb-2 text-purple-300 flex items-center">
+              <ZapIcon className="h-6 w-6 mr-3" />
+              Wrapping Dashboard
+            </h2>
+            <p className="text-purple-200">
               Wrap your $EMARK tokens to receive wEMARK for voting and governance
             </p>
           </div>
-          <div className="hidden md:block">
-            <LockIcon className="h-12 w-12 text-purple-200" />
+          <div className={cn("hidden", !isMobile && "md:block")}>
+            <LockIcon className="h-12 w-12 text-purple-300/50" />
           </div>
         </div>
         
         {/* Quick Unbonding Info */}
-        <div className="mt-4 p-3 bg-white/10 rounded-lg backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-purple-100">Unbonding Period</span>
-            <span className="text-lg font-bold">{wrappingStats.formatUnbondingPeriod()}</span>
+        <div className="mt-4 p-4 bg-white/10 rounded-lg backdrop-blur-sm border border-purple-400/30">
+          <div className={cn(
+            "flex justify-between",
+            isMobile ? "flex-col space-y-2" : "items-center"
+          )}>
+            <span className="text-sm text-purple-200">Unbonding Period</span>
+            <span className="text-lg font-bold text-white">{wrappingStats.formatUnbondingPeriod()}</span>
           </div>
-          <div className="flex items-center justify-between mt-1">
-            <span className="text-sm text-purple-100">Total Protocol Wrapped</span>
-            <span className="text-sm">{formatTokenAmount(wrappingStats.totalProtocolWrapped, 2)} wEMARK</span>
+          <div className={cn(
+            "flex justify-between mt-2",
+            isMobile ? "flex-col space-y-1" : "items-center"
+          )}>
+            <span className="text-sm text-purple-200">Total Protocol Wrapped</span>
+            <span className="text-sm text-white">{formatTokenAmount(wrappingStats.totalProtocolWrapped, 2)} wEMARK</span>
           </div>
         </div>
       </div>
@@ -197,56 +257,53 @@ export const WrappingDashboard: React.FC<WrappingDashboardProps> = ({
         {/* Token Wrapping */}
         <CollapsibleSection
           title="Token Wrapping"
-          icon={<CoinsIcon className="h-5 w-5 text-purple-600" />}
+          icon={<CoinsIcon className="h-5 w-5" />}
           description="Wrap $EMARK tokens to receive wEMARK for voting and governance"
           defaultExpanded={true}
+          accentColor="purple"
         >
-          <div className="mt-4">
-            <WrappingWidget userAddress={userAddress} />
-          </div>
+          <WrappingWidget userAddress={userAddress} />
         </CollapsibleSection>
 
         {/* Rewards Calculator */}
         <CollapsibleSection
           title="Rewards Calculator"
-          icon={<CalculatorIcon className="h-5 w-5 text-green-600" />}
+          icon={<CalculatorIcon className="h-5 w-5" />}
           description="Calculate potential rewards based on your wrapping and delegation activity"
+          accentColor="green"
         >
-          <div className="mt-4">
-            <RewardsCalculator />
-          </div>
+          <RewardsCalculator />
         </CollapsibleSection>
 
         {/* Delegation History */}
         <CollapsibleSection
           title="Delegation & Voting"
-          icon={<HistoryIcon className="h-5 w-5 text-blue-600" />}
+          icon={<HistoryIcon className="h-5 w-5" />}
           description="Track your voting power usage and delegation history"
+          accentColor="cyan"
         >
-          <div className="mt-4">
-            <DelegationHistory />
-          </div>
+          <DelegationHistory />
         </CollapsibleSection>
       </div>
 
       {/* Help Section */}
-      <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+      <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-6">
         <div className="flex items-start">
-          <InfoIcon className="h-6 w-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0" />
+          <InfoIcon className="h-6 w-6 text-blue-400 mr-3 mt-0.5 flex-shrink-0" />
           <div>
-            <h3 className="font-medium text-blue-900 mb-2">Wrapping Guide</h3>
-            <div className="text-sm text-blue-800 space-y-2">
+            <h3 className="font-medium text-blue-300 mb-3">Wrapping Guide</h3>
+            <div className="text-sm text-blue-200 space-y-3">
               <p>
-                <strong>Token Wrapping:</strong> Wrap $EMARK to receive wEMARK tokens for voting and governance participation.
+                <strong className="text-blue-300">Token Wrapping:</strong> Wrap $EMARK to receive wEMARK tokens for voting and governance participation.
               </p>
               <p>
-                <strong>Two-Step Process:</strong> First approve $EMARK spending, then wrap to receive wEMARK.
+                <strong className="text-blue-300">Two-Step Process:</strong> First approve $EMARK spending, then wrap to receive wEMARK.
               </p>
               <p>
-                <strong>Delegation:</strong> Use your wEMARK to vote on quality content and participate in governance.
+                <strong className="text-blue-300">Delegation:</strong> Use your wEMARK to vote on quality content and participate in governance.
               </p>
               <p>
-                <strong>Unwrapping:</strong> Requires a {wrappingStats.formatUnbondingPeriod()} unbonding period for security.
+                <strong className="text-blue-300">Unwrapping:</strong> Requires a {wrappingStats.formatUnbondingPeriod()} unbonding period for security.
               </p>
             </div>
           </div>

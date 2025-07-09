@@ -22,7 +22,7 @@ export interface EnhancedMetadata {
   doi?: string;
   isbn?: string;
   url?: string;
-  castUrl?: string; // Added this field
+  castUrl?: string;
   publisher?: string;
   publicationDate?: string;
   journal?: string;
@@ -52,7 +52,7 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
     doi: initialMetadata?.doi || '',
     isbn: initialMetadata?.isbn || '',
     url: initialMetadata?.url || '',
-    castUrl: initialMetadata?.castUrl || '', // Added this field
+    castUrl: initialMetadata?.castUrl || '',
     publisher: initialMetadata?.publisher || '',
     publicationDate: initialMetadata?.publicationDate || '',
     journal: initialMetadata?.journal || '',
@@ -122,7 +122,7 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
     <div className="space-y-6">
       {/* Content Type Selection */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
           Content Type
         </label>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
@@ -131,22 +131,22 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
               key={type}
               type="button"
               onClick={() => setContentType(type)}
-              className={`flex items-center justify-center px-3 py-2 rounded-lg border transition-colors ${
+              className={`flex items-center justify-center px-3 py-3 rounded-lg border transition-all duration-200 ${
                 contentType === type
-                  ? 'border-purple-500 bg-purple-50 text-purple-700'
-                  : 'border-gray-300 hover:border-gray-400'
+                  ? 'border-cyan-400 bg-cyan-900/30 text-cyan-300 shadow-lg shadow-cyan-500/20'
+                  : 'border-gray-600 bg-gray-700/50 text-gray-300 hover:border-gray-500 hover:bg-gray-700'
               }`}
             >
               {contentTypeIcons[type]}
-              <span className="ml-2 text-sm">{type}</span>
+              <span className="ml-2 text-sm font-medium">{type}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Type-Specific Fields */}
-      <div className="p-4 bg-gray-50 rounded-lg">
-        <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+      <div className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-cyan-400 mb-4 flex items-center">
           {contentTypeIcons[contentType]}
           <span className="ml-2">{contentType} Details</span>
         </h4>
@@ -154,62 +154,62 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
         {contentType === 'DOI' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">DOI</label>
+              <label className="block text-sm text-gray-300 mb-2">DOI</label>
               <input
                 type="text"
                 value={typeSpecificData.doi || ''}
                 onChange={(e) => handleTypeSpecificChange('doi', e.target.value)}
                 placeholder="10.1234/example"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Journal</label>
+                <label className="block text-sm text-gray-300 mb-2">Journal</label>
                 <input
                   type="text"
                   value={typeSpecificData.journal || ''}
                   onChange={(e) => handleTypeSpecificChange('journal', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Publication Date</label>
+                <label className="block text-sm text-gray-300 mb-2">Publication Date</label>
                 <input
                   type="date"
                   value={typeSpecificData.publicationDate || ''}
                   onChange={(e) => handleTypeSpecificChange('publicationDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white"
                 />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Volume</label>
+                <label className="block text-sm text-gray-300 mb-2">Volume</label>
                 <input
                   type="text"
                   value={typeSpecificData.volume || ''}
                   onChange={(e) => handleTypeSpecificChange('volume', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Issue</label>
+                <label className="block text-sm text-gray-300 mb-2">Issue</label>
                 <input
                   type="text"
                   value={typeSpecificData.issue || ''}
                   onChange={(e) => handleTypeSpecificChange('issue', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Pages</label>
+                <label className="block text-sm text-gray-300 mb-2">Pages</label>
                 <input
                   type="text"
                   value={typeSpecificData.pages || ''}
                   onChange={(e) => handleTypeSpecificChange('pages', e.target.value)}
                   placeholder="1-10"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
                 />
               </div>
             </div>
@@ -219,32 +219,32 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
         {contentType === 'ISBN' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">ISBN</label>
+              <label className="block text-sm text-gray-300 mb-2">ISBN</label>
               <input
                 type="text"
                 value={typeSpecificData.isbn || ''}
                 onChange={(e) => handleTypeSpecificChange('isbn', e.target.value)}
                 placeholder="978-3-16-148410-0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Publisher</label>
+                <label className="block text-sm text-gray-300 mb-2">Publisher</label>
                 <input
                   type="text"
                   value={typeSpecificData.publisher || ''}
                   onChange={(e) => handleTypeSpecificChange('publisher', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600 mb-1">Publication Date</label>
+                <label className="block text-sm text-gray-300 mb-2">Publication Date</label>
                 <input
                   type="date"
                   value={typeSpecificData.publicationDate || ''}
                   onChange={(e) => handleTypeSpecificChange('publicationDate', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white"
                 />
               </div>
             </div>
@@ -253,13 +253,13 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
 
         {contentType === 'URL' && (
           <div>
-            <label className="block text-sm text-gray-600 mb-1">URL</label>
+            <label className="block text-sm text-gray-300 mb-2">URL</label>
             <input
               type="url"
               value={typeSpecificData.url || ''}
               onChange={(e) => handleTypeSpecificChange('url', e.target.value)}
               placeholder="https://example.com/article"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
             />
           </div>
         )}
@@ -267,15 +267,15 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
         {contentType === 'Cast' && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Cast URL or Hash</label>
+              <label className="block text-sm text-gray-300 mb-2">Cast URL or Hash</label>
               <input
                 type="text"
                 value={typeSpecificData.castUrl || ''}
                 onChange={(e) => handleTypeSpecificChange('castUrl', e.target.value)}
                 placeholder="https://warpcast.com/username/0x1234... or 0x1234..."
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-2">
                 Enter a Warpcast URL or cast hash to extract metadata automatically
               </p>
             </div>
@@ -283,8 +283,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
         )}
 
         {contentType === 'Custom' && (
-          <div className="p-3 bg-purple-50 rounded-lg">
-            <p className="text-sm text-purple-700">
+          <div className="p-4 bg-purple-900/30 border border-purple-500/30 rounded-lg">
+            <p className="text-sm text-purple-300">
               Use custom fields below to add any metadata specific to your content
             </p>
           </div>
@@ -293,24 +293,24 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
 
       {/* Tags */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <label className="block text-sm font-medium text-gray-300 mb-3">
           Tags
         </label>
         
         {/* Tag Input */}
-        <div className="flex gap-2 mb-3">
+        <div className="flex gap-2 mb-4">
           <input
             type="text"
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTag())}
             placeholder="Add a tag..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
           />
           <button
             type="button"
             onClick={handleAddTag}
-            className="px-3 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+            className="px-4 py-2 bg-gradient-to-r from-purple-500 to-purple-700 text-white rounded-lg hover:from-purple-400 hover:to-purple-600 transition-colors shadow-lg shadow-purple-500/30"
           >
             <PlusIcon className="h-4 w-4" />
           </button>
@@ -318,8 +318,8 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
 
         {/* Suggested Tags */}
         {suggestedTags[contentType].length > 0 && (
-          <div className="mb-3">
-            <p className="text-xs text-gray-600 mb-2">Suggested:</p>
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2">Suggested:</p>
             <div className="flex flex-wrap gap-2">
               {suggestedTags[contentType].map(tag => (
                 <button
@@ -327,10 +327,10 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
                   type="button"
                   onClick={() => !tags.includes(tag) && setTags([...tags, tag])}
                   disabled={tags.includes(tag)}
-                  className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                  className={`px-3 py-1 text-xs rounded-full transition-colors ${
                     tags.includes(tag)
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+                      ? 'bg-gray-600 text-gray-500 cursor-not-allowed'
+                      : 'bg-purple-900/30 text-purple-300 border border-purple-500/30 hover:bg-purple-800/30'
                   }`}
                 >
                   +{tag}
@@ -346,14 +346,14 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
             {tags.map(tag => (
               <span
                 key={tag}
-                className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm"
+                className="inline-flex items-center px-3 py-1 bg-cyan-900/30 text-cyan-300 rounded-full text-sm border border-cyan-500/30"
               >
                 <TagIcon className="h-3 w-3 mr-1" />
                 {tag}
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="ml-2 hover:text-purple-900"
+                  className="ml-2 hover:text-cyan-100 transition-colors"
                 >
                   <XIcon className="h-3 w-3" />
                 </button>
@@ -365,14 +365,14 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
 
       {/* Custom Fields */}
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+        <div className="flex items-center justify-between mb-3">
+          <label className="block text-sm font-medium text-gray-300">
             Custom Metadata Fields
           </label>
           <button
             type="button"
             onClick={handleAddCustomField}
-            className="text-sm text-purple-600 hover:text-purple-700 flex items-center"
+            className="text-sm text-cyan-400 hover:text-cyan-300 flex items-center transition-colors"
           >
             <PlusIcon className="h-4 w-4 mr-1" />
             Add Field
@@ -388,19 +388,19 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
                   value={field.key}
                   onChange={(e) => handleUpdateCustomField(index, { key: e.target.value })}
                   placeholder="Field name"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
                 />
                 <input
                   type="text"
                   value={field.value}
                   onChange={(e) => handleUpdateCustomField(index, { value: e.target.value })}
                   placeholder="Value"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-cyan-400 focus:border-transparent text-white placeholder-gray-400"
                 />
                 <button
                   type="button"
                   onClick={() => handleRemoveCustomField(index)}
-                  className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  className="px-3 py-2 text-red-400 hover:bg-red-900/30 hover:text-red-300 rounded-lg transition-colors"
                 >
                   <XIcon className="h-4 w-4" />
                 </button>
@@ -410,7 +410,7 @@ export const MetadataForm: React.FC<MetadataFormProps> = ({
         )}
 
         {customFields.length === 0 && (
-          <p className="text-sm text-gray-500 italic">
+          <p className="text-sm text-gray-500 italic bg-gray-800/30 p-3 rounded-lg border border-gray-700">
             No custom fields added. Click "Add Field" to include additional metadata.
           </p>
         )}
