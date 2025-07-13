@@ -20,7 +20,7 @@ import { cn, useIsMobile } from '../utils/responsive';
 
 // Quick stats component
 const CyberStats: React.FC = () => {
-  const { recentEvermarks, isLoading } = useRecentEvermarks(100);
+  const { evermarks: recentEvermarks, isLoading } = useRecentEvermarks(100);
   const isMobile = useIsMobile();
   
   const stats = React.useMemo(() => {
@@ -109,8 +109,8 @@ const CyberStats: React.FC = () => {
 
 export default function EnhancedHomePage() {
   const { isConnected, address, requireConnection } = useWalletAuth();
-  const { trendingEvermarks, isLoading: isLoadingTrending } = useTrendingEvermarks(6);
-  const { recentEvermarks, isLoading: isLoadingRecent } = useRecentEvermarks(6);
+  const { evermarks: trendingEvermarks, isLoading: isLoadingTrending } = useTrendingEvermarks(6);
+  const { evermarks: recentEvermarks, isLoading: isLoadingRecent } = useRecentEvermarks(6);
   const isMobile = useIsMobile();
 
   // Use the unified modal hook

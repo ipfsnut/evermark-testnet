@@ -1,12 +1,6 @@
 // src/hooks/core/useSupabaseCache.ts - Supabase caching layer for blockchain data
-import { useCallback, useMemo } from 'react';
-import { createClient } from '@supabase/supabase-js';
-
-// Supabase client (assuming you have this configured)
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
-);
+import { useCallback } from 'react';
+import { supabase } from '../../lib/supabase';
 
 interface CacheEntry {
   id?: string;
