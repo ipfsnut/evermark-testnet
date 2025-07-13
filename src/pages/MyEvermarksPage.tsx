@@ -23,15 +23,10 @@ import { useUserEvermarks } from '../hooks/useEvermarks';
 import { useBookshelf } from '../hooks/useBookshelf';
 import { formatDistanceToNow } from 'date-fns';
 import { EvermarkCard } from '../components/evermark/EvermarkCard';
-import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal'; // ✅ ADDED: Import unified modal
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal';
+import { useModal } from '../hooks/useModal';
 import { ContractRequired } from '../components/auth/AuthGuard';
 import { cn, useIsMobile, textSizes, spacing } from '../utils/responsive';
-
-// ✅ ADDED: Modal options interface
-interface ModalOptions {
-  autoExpandDelegation?: boolean;
-  initialExpandedSection?: 'delegation' | 'rewards' | 'history';
-}
 
 type TabType = 'owned' | 'created' | 'bookshelf';
 
@@ -45,33 +40,8 @@ const MyEvermarksPage: React.FC = () => {
   
   const bookshelfStats = getStats();
 
-  // ✅ ADDED: Unified modal state management
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean;
-    evermarkId: string;
-    options: ModalOptions;
-  }>({
-    isOpen: false,
-    evermarkId: '',
-    options: {}
-  });
-
-  // ✅ ADDED: Unified modal handlers
-  const handleOpenModal = (evermarkId: string, options: ModalOptions = {}) => {
-    setModalState({
-      isOpen: true,
-      evermarkId,
-      options
-    });
-  };
-
-  const handleCloseModal = () => {
-    setModalState({
-      isOpen: false,
-      evermarkId: '',
-      options: {}
-    });
-  };
+  // Use the unified modal hook
+  const { modalState, openModal, closeModal } = useModal();
   
   // Get evermarks that match bookshelf items
   const getBookshelfEvermarks = () => {
@@ -207,7 +177,7 @@ const MyEvermarksPage: React.FC = () => {
                     <EvermarkCard 
                       evermark={evermark} 
                       variant="compact"
-                      onOpenModal={handleOpenModal} // ✅ FIXED: Added unified modal handler
+                      onOpenModal={openModal}
                       bookshelfCategory="favorite"
                       showQuickActions={false}
                     />
@@ -238,7 +208,7 @@ const MyEvermarksPage: React.FC = () => {
                     <EvermarkCard 
                       evermark={evermark} 
                       variant="compact"
-                      onOpenModal={handleOpenModal} // ✅ FIXED: Added unified modal handler
+                      onOpenModal={openModal}
                       bookshelfCategory="currentReading"
                       showQuickActions={false}
                     />
@@ -287,7 +257,7 @@ const MyEvermarksPage: React.FC = () => {
               evermark={evermark} 
               variant="list"
               showDescription={false}
-              onOpenModal={handleOpenModal} // ✅ FIXED: Added unified modal handler
+              onOpenModal={openModal}
             />
           ))}
         </div>
@@ -301,7 +271,7 @@ const MyEvermarksPage: React.FC = () => {
             key={evermark.id} 
             evermark={evermark}
             showDescription={true}
-            onOpenModal={handleOpenModal} // ✅ FIXED: Added unified modal handler
+            onOpenModal={openModal}
           />
         ))}
       </div>
@@ -452,12 +422,12 @@ const MyEvermarksPage: React.FC = () => {
           )}
         </div>
 
-        {/* ✅ ADDED: EnhancedEvermarkModal */}
+        {/* Enhanced Evermark Modal */}
         {modalState.isOpen && (
           <EnhancedEvermarkModal
             evermarkId={modalState.evermarkId}
             isOpen={modalState.isOpen}
-            onClose={handleCloseModal}
+            onClose={closeModal}
             autoExpandDelegation={modalState.options.autoExpandDelegation}
             initialExpandedSection={modalState.options.initialExpandedSection}
           />
