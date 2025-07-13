@@ -1,4 +1,4 @@
-// src/components/evermark/EvermarkCard.tsx - Simplified Unified Component
+// src/components/evermark/EvermarkCard.tsx - Dark Cyber Theme
 import React from 'react';
 import { 
   UserIcon, 
@@ -97,53 +97,56 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
   const { viewStats } = useViewTracking(id);
   const isMobile = useIsMobile();
   
-  // Variant configurations
+  // Variant configurations - UPDATED for dark theme
   const getVariantConfig = () => {
-    const baseClasses = 'bg-white border border-gray-200 rounded-lg overflow-hidden transition-all duration-300 hover:shadow-md group cursor-pointer';
+    const baseClasses = cn(
+      'bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden transition-all duration-300 group cursor-pointer',
+      'hover:border-cyan-400/50 hover:shadow-lg hover:shadow-cyan-500/20 backdrop-blur-sm'
+    );
     
     switch (variant) {
       case 'hero':
         return {
-          container: `${baseClasses} hover:border-purple-300 hover:shadow-lg`,
+          container: cn(baseClasses, 'hover:shadow-xl hover:shadow-purple-500/30 hover:border-purple-400/50'),
           spacing: 'p-6 sm:p-8',
           imageHeight: 'h-64 sm:h-80',
-          titleSize: 'text-xl sm:text-2xl font-bold text-gray-900',
+          titleSize: 'text-xl sm:text-2xl font-bold text-white',
           isHero: true
         };
         
       case 'leaderboard':
         return {
-          container: `${baseClasses} hover:border-yellow-300`,
+          container: cn(baseClasses, 'hover:border-yellow-400/50 hover:shadow-yellow-500/20'),
           spacing: 'p-4',
           imageHeight: isMobile ? 'h-32' : 'h-40',
-          titleSize: 'text-lg font-semibold text-gray-900',
+          titleSize: 'text-lg font-semibold text-white',
           isCompact: true
         };
         
       case 'compact':
         return {
-          container: `${baseClasses} hover:border-blue-300`,
+          container: cn(baseClasses, 'hover:border-blue-400/50 hover:shadow-blue-500/20'),
           spacing: 'p-4',
           imageHeight: 'h-32 sm:h-40',
-          titleSize: 'text-base font-semibold text-gray-900',
+          titleSize: 'text-base font-semibold text-white',
           isCompact: true
         };
         
       case 'list':
         return {
-          container: `${baseClasses} flex flex-row hover:border-green-300`,
+          container: cn(baseClasses, 'flex flex-row hover:border-green-400/50 hover:shadow-green-500/20'),
           spacing: 'p-4',
           imageHeight: 'w-24 h-24 sm:w-32 sm:h-32',
-          titleSize: 'text-base font-semibold text-gray-900',
+          titleSize: 'text-base font-semibold text-white',
           isList: true
         };
         
       default: // 'standard'
         return {
-          container: `${baseClasses} hover:border-purple-300`,
+          container: cn(baseClasses, 'hover:border-purple-400/50 hover:shadow-purple-500/20'),
           spacing: 'p-4 sm:p-6',
           imageHeight: 'h-48 sm:h-56',
-          titleSize: 'text-lg sm:text-xl font-semibold text-gray-900',
+          titleSize: 'text-lg sm:text-xl font-semibold text-white',
           isDefault: true
         };
     }
@@ -151,7 +154,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
 
   const config = getVariantConfig();
 
-  // Event handlers - SIMPLIFIED
+  // Event handlers
   const handleCardClick = () => {
     onOpenModal(id);
   };
@@ -163,24 +166,23 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
 
   const handleQuickAction = (e: React.MouseEvent, action: string) => {
     e.stopPropagation();
-    // Handle quick actions without opening modal
     console.log(`Quick action: ${action} for evermark ${id}`);
   };
 
-  // Badge components
+  // Badge components - UPDATED for dark theme
   const RankBadge = () => {
     if (!showRank || !rank) return null;
 
     const getRankStyle = (rank: number) => {
       switch (rank) {
         case 1:
-          return 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-black shadow-lg shadow-yellow-500/50 animate-pulse';
+          return 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-black shadow-lg shadow-yellow-500/50 animate-pulse border border-yellow-300';
         case 2:
-          return 'bg-gradient-to-r from-gray-300 to-gray-500 text-black shadow-lg shadow-gray-500/50';
+          return 'bg-gradient-to-r from-gray-300 to-gray-500 text-black shadow-lg shadow-gray-500/50 border border-gray-200';
         case 3:
-          return 'bg-gradient-to-r from-orange-400 to-orange-600 text-black shadow-lg shadow-orange-500/50';
+          return 'bg-gradient-to-r from-orange-400 to-orange-600 text-black shadow-lg shadow-orange-500/50 border border-orange-300';
         default:
-          return 'bg-gray-800 text-green-400 border border-green-400 shadow-md shadow-green-500/30';
+          return 'bg-gray-900/80 text-green-400 border border-green-400/50 shadow-md shadow-green-500/30 backdrop-blur-sm';
       }
     };
 
@@ -198,7 +200,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
     if (!showVotes || votes === undefined || votes === null) return null;
 
     return (
-      <div className="absolute top-2 right-2 z-20 bg-black/80 text-green-400 px-2 py-1 rounded border border-green-400/50 text-xs font-bold flex items-center backdrop-blur-sm">
+      <div className="absolute top-2 right-2 z-20 bg-black/80 text-green-400 px-2 py-1 rounded border border-green-400/50 text-xs font-bold flex items-center backdrop-blur-sm shadow-lg shadow-green-500/30">
         <ZapIcon className="h-3 w-3 mr-1" />
         {formatVotes(votes)}
       </div>
@@ -212,12 +214,12 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
       favorite: {
         icon: <HeartIcon className="h-3 w-3" />,
         label: 'Fav',
-        style: 'bg-red-500/80 text-white border border-red-400'
+        style: 'bg-red-500/80 text-white border border-red-400/50 shadow-lg shadow-red-500/30'
       },
       currentReading: {
         icon: <BookOpenIcon className="h-3 w-3" />,
         label: 'Reading',
-        style: 'bg-blue-500/80 text-white border border-blue-400'
+        style: 'bg-blue-500/80 text-white border border-blue-400/50 shadow-lg shadow-blue-500/30'
       }
     };
 
@@ -234,7 +236,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
     );
   };
 
-  // List variant (horizontal layout)
+  // List variant (horizontal layout) - UPDATED for dark theme
   if (config.isList) {
     return (
       <div 
@@ -252,6 +254,8 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
               priority={priority}
               className="w-full h-full"
             />
+            {/* Dark overlay for better contrast */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent rounded-lg" />
             <RankBadge />
             <VoteBadge />
             <BookshelfBadge />
@@ -261,7 +265,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
         {/* Content */}
         <div className={cn('flex-1 min-w-0 flex flex-col justify-between', config.spacing)}>
           <div>
-            <h3 className={cn(config.titleSize, 'group-hover:text-purple-600 transition-colors')}>
+            <h3 className={cn(config.titleSize, 'group-hover:text-cyan-400 transition-colors')}>
               {title}
             </h3>
             <div className="flex items-center mt-1 mb-2 text-gray-400">
@@ -292,7 +296,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
                 {showVotes && (
                   <button
                     onClick={handleDelegationClick}
-                    className="px-3 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium hover:bg-purple-200 transition-colors"
+                    className="px-3 py-1 bg-purple-600/20 text-purple-300 border border-purple-500/30 rounded text-xs font-medium hover:bg-purple-600/30 hover:border-purple-400/50 transition-colors"
                   >
                     <ZapIcon className="h-3 w-3 mr-1 inline" />
                     Delegate
@@ -300,20 +304,20 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
                 )}
                 <button
                   onClick={(e) => handleQuickAction(e, 'share')}
-                  className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="p-1 text-gray-400 hover:text-cyan-400 transition-colors"
                 >
                   <ShareIcon className="h-3 w-3" />
                 </button>
               </div>
             )}
-            <ChevronRightIcon className="h-4 w-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+            <ChevronRightIcon className="h-4 w-4 text-gray-500 group-hover:text-cyan-400 transition-colors" />
           </div>
         </div>
       </div>
     );
   }
 
-  // Standard card layout (vertical)
+  // Standard card layout (vertical) - UPDATED for dark theme
   return (
     <div 
       className={cn(config.container, 'flex flex-col h-full', className)}
@@ -331,8 +335,8 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
             className="w-full h-full group-hover:scale-105 transition-transform duration-500"
           />
           
-          {/* Gradient overlay for better text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          {/* Enhanced gradient overlay for dark theme */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
           
           <RankBadge />
           <VoteBadge />
@@ -343,7 +347,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
       {/* Content */}
       <div className={cn('flex-1 flex flex-col', config.spacing)}>
         {/* Title */}
-        <h3 className={cn(config.titleSize, 'mb-2 line-clamp-2 group-hover:text-purple-600 transition-colors')}>
+        <h3 className={cn(config.titleSize, 'mb-2 line-clamp-2 group-hover:text-cyan-400 transition-colors')}>
           {title}
         </h3>
 
@@ -361,15 +365,15 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
 
         {/* Description */}
         {showDescription && description && !config.isCompact && (
-          <p className="text-sm text-gray-600 line-clamp-3 flex-1 mb-4">
+          <p className="text-sm text-gray-300 line-clamp-3 flex-1 mb-4">
             {description}
           </p>
         )}
 
         {/* Footer */}
-        <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-200">
+        <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-700">
           {/* Views and Votes */}
-          <div className="flex items-center gap-3 text-xs text-gray-500">
+          <div className="flex items-center gap-3 text-xs text-gray-400">
             {showViews && viewStats && (
               <span className="flex items-center text-cyan-400">
                 <EyeIcon className="h-3 w-3 mr-1" />
@@ -391,9 +395,10 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
                 <button
                   onClick={handleDelegationClick}
                   className={cn(
-                    'px-3 py-1 bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded font-medium text-xs',
-                    'hover:from-purple-400 hover:to-purple-500 transition-all duration-200',
-                    'shadow-sm hover:shadow-md flex items-center gap-1'
+                    'px-3 py-1 bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-cyan-300 rounded font-medium text-xs',
+                    'hover:from-purple-500/30 hover:to-blue-500/30 hover:text-cyan-200 transition-all duration-200',
+                    'border border-purple-500/30 hover:border-cyan-400/50 shadow-sm hover:shadow-md flex items-center gap-1',
+                    'hover:shadow-cyan-500/20'
                   )}
                 >
                   <ZapIcon className="h-3 w-3" />
@@ -403,12 +408,12 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
               {!isMobile && (
                 <button
                   onClick={(e) => handleQuickAction(e, 'share')}
-                  className="p-2 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 hover:text-gray-800 transition-colors"
+                  className="p-2 bg-gray-700/50 text-gray-400 rounded hover:bg-gray-600/50 hover:text-cyan-400 transition-colors border border-gray-600/50 hover:border-cyan-400/30"
                 >
                   <ShareIcon className="h-3 w-3" />
                 </button>
               )}
-              <ChevronRightIcon className="h-4 w-4 text-gray-400 group-hover:text-purple-600 transition-colors" />
+              <ChevronRightIcon className="h-4 w-4 text-gray-500 group-hover:text-cyan-400 transition-colors" />
             </div>
           )}
         </div>
@@ -417,9 +422,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
   );
 };
 
-// REMOVED: All specialized card exports - use the unified component with props instead
-
-// Helper component for convenience in leaderboard
+// Helper components remain the same but with updated styling
 export const LeaderboardEvermarkCard: React.FC<{
   evermark: any;
   rank: number;
@@ -438,7 +441,6 @@ export const LeaderboardEvermarkCard: React.FC<{
   />
 );
 
-// Helper component for explore page
 export const ExploreEvermarkCard: React.FC<{
   evermark: any;
   onOpenModal: (id: string, options?: ModalOptions) => void;
@@ -452,7 +454,6 @@ export const ExploreEvermarkCard: React.FC<{
   />
 );
 
-// Helper component for hero display
 export const HeroEvermarkCard: React.FC<{
   evermark: any;
   onOpenModal: (id: string, options?: ModalOptions) => void;

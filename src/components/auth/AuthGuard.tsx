@@ -1,4 +1,4 @@
-// src/components/auth/AuthGuard.tsx - Handles different authentication requirements
+// src/components/auth/AuthGuard.tsx - Dark Cyber Theme
 import React from 'react';
 import { useProfile, useContractAuth } from '../../hooks/useProfile';
 import { WalletConnect } from '../ConnectButton';
@@ -25,11 +25,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   // If we specifically require wallet connection
   if (requireWallet && !profile.isWalletConnected) {
     return fallback || (
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+      <div className="bg-gray-800/50 border border-gray-700 rounded-lg shadow-lg shadow-gray-900/50 p-6 backdrop-blur-sm">
         <div className="text-center py-8">
-          <UserIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Wallet Required</h3>
-          <p className="text-gray-600 mb-6">This feature requires a connected wallet</p>
+          <UserIcon className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">Wallet Required</h3>
+          <p className="text-gray-400 mb-6">This feature requires a connected wallet</p>
           <WalletConnect />
         </div>
       </div>
@@ -39,23 +39,23 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   // If we require contract interaction capability
   if (requireContract && !contractAuth.canInteract) {
     return fallback || (
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+      <div className="bg-gray-800/50 border border-gray-700 rounded-lg shadow-lg shadow-gray-900/50 p-6 backdrop-blur-sm">
         <div className="text-center py-8">
-          <LinkIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <LinkIcon className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">
             {contractAuth.getConnectionMessage()}
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-gray-400 mb-6">
             Blockchain interactions require a connected wallet
           </p>
           
           {/* Show current Farcaster auth if available */}
           {profile.isFarcasterAuthenticated && showFarcasterAuth && (
-            <div className="mb-4 p-3 bg-purple-50 rounded-lg">
-              <p className="text-sm text-purple-700 mb-2">
+            <div className="mb-4 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg backdrop-blur-sm">
+              <p className="text-sm text-purple-300 mb-2">
                 ✅ Authenticated as @{profile.farcasterUser?.username}
               </p>
-              <p className="text-xs text-purple-600">
+              <p className="text-xs text-purple-400">
                 Link a wallet to make blockchain transactions
               </p>
             </div>
@@ -70,11 +70,11 @@ export const AuthGuard: React.FC<AuthGuardProps> = ({
   // If no authentication at all
   if (!profile.isAuthenticated) {
     return fallback || (
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+      <div className="bg-gray-800/50 border border-gray-700 rounded-lg shadow-lg shadow-gray-900/50 p-6 backdrop-blur-sm">
         <div className="text-center py-8">
-          <UserIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Authentication Required</h3>
-          <p className="text-gray-600 mb-6">
+          <UserIcon className="mx-auto h-12 w-12 text-gray-500 mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">Authentication Required</h3>
+          <p className="text-gray-400 mb-6">
             {profile.isInFarcaster ? 
               "Please authenticate to continue" : 
               "Connect your wallet to access this feature"
@@ -117,22 +117,22 @@ export const AuthStatusBadge: React.FC = () => {
   if (!profile.isAuthenticated) {
     return (
       <div className="flex items-center space-x-2 text-xs">
-        <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-        <span className="text-red-600">Not authenticated</span>
+        <div className="w-2 h-2 bg-red-400 rounded-full animate-pulse"></div>
+        <span className="text-red-400">Not authenticated</span>
       </div>
     );
   }
 
   return (
     <div className="flex items-center space-x-2 text-xs">
-      <div className={`w-2 h-2 rounded-full ${contractAuth.canInteract ? 'bg-green-500' : 'bg-yellow-500'}`}></div>
-      <span className={contractAuth.canInteract ? 'text-green-600' : 'text-yellow-600'}>
+      <div className={`w-2 h-2 rounded-full animate-pulse ${contractAuth.canInteract ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+      <span className={contractAuth.canInteract ? 'text-green-400' : 'text-yellow-400'}>
         {profile.authMethod === 'both' ? 'Farcaster + Wallet' :
          profile.authMethod === 'farcaster' ? 'Farcaster only' :
          profile.authMethod === 'wallet' ? 'Wallet only' : 'Unknown'}
       </span>
       {profile.isInFarcaster && (
-        <span className="text-purple-600">📱</span>
+        <span className="text-purple-400">📱</span>
       )}
     </div>
   );

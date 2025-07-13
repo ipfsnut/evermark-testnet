@@ -1,4 +1,4 @@
-// src/components/sharing/ShareButton.tsx - ✅ ENHANCED with variants and mobile optimization
+// src/components/sharing/ShareButton.tsx - Dark Cyber Theme
 import React, { useState } from 'react';
 import { 
   ShareIcon, 
@@ -62,7 +62,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   
   const config = sizeConfig[size];
   
-  // Share platforms
+  // Share platforms with cyber styling
   const sharePlatforms = [
     {
       name: 'Twitter',
@@ -72,7 +72,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, '_blank');
         trackShare('twitter');
       },
-      color: 'hover:bg-blue-50 hover:text-blue-600'
+      color: 'hover:bg-blue-900/30 hover:text-blue-400 hover:border-blue-500/30'
     },
     {
       name: 'Farcaster',
@@ -82,13 +82,13 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         window.open(`https://farcaster.xyz/~/compose?text=${castText}`, '_blank');
         trackShare('farcaster');
       },
-      color: 'hover:bg-purple-50 hover:text-purple-600'
+      color: 'hover:bg-purple-900/30 hover:text-purple-400 hover:border-purple-500/30'
     },
     {
       name: 'Copy Link',
       icon: copySuccess === 'link' ? CheckIcon : CopyIcon,
       action: () => copyToClipboard(evermarkUrl, 'link'),
-      color: 'hover:bg-green-50 hover:text-green-600'
+      color: 'hover:bg-green-900/30 hover:text-green-400 hover:border-green-500/30'
     }
   ];
   
@@ -157,14 +157,16 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     }
   };
   
-  // Button variant
+  // Button variant with cyber styling
   if (variant === 'button') {
     return (
       <div className="relative">
         <button
           onClick={navigator.share && typeof navigator.share === 'function' && isMobile ? handleNativeShare : () => setIsOpen(!isOpen)}
           className={cn(
-            "inline-flex items-center bg-gray-100 text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors rounded-lg font-medium",
+            "inline-flex items-center font-medium rounded-lg transition-all duration-200 backdrop-blur-sm",
+            "bg-gray-700/30 border border-gray-600/50 text-gray-300",
+            "hover:bg-cyan-600/20 hover:border-cyan-500/30 hover:text-cyan-300",
             config.button,
             touchFriendly.button,
             className
@@ -174,12 +176,12 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
           Share
         </button>
         
-        {/* Desktop share menu */}
+        {/* Desktop share menu with cyber styling */}
         {isOpen && !isMobile && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
             <div className={cn(
-              "absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-20 py-2",
+              "absolute top-full right-0 mt-2 bg-gray-800/90 border border-gray-600/50 rounded-lg shadow-lg z-20 py-2 backdrop-blur-sm",
               config.menuWidth
             )}>
               <ShareMenu 
@@ -194,13 +196,15 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     );
   }
   
-  // Icon variant
+  // Icon variant with cyber styling
   return (
     <div className="relative">
       <button
         onClick={navigator.share && typeof navigator.share === 'function' && isMobile ? handleNativeShare : () => setIsOpen(!isOpen)}
         className={cn(
-          "rounded-full bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 border border-gray-300 transition-all shadow-sm",
+          "rounded-full transition-all border backdrop-blur-sm",
+          "bg-gray-700/30 border-gray-600/50 text-gray-400",
+          "hover:bg-cyan-600/20 hover:border-cyan-500/30 hover:text-cyan-300",
           config.icon,
           touchFriendly.button,
           className
@@ -215,7 +219,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className={cn(
-            "absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 z-20 py-2",
+            "absolute top-full right-0 mt-2 bg-gray-800/90 border border-gray-600/50 rounded-lg shadow-lg z-20 py-2 backdrop-blur-sm",
             config.menuWidth
           )}>
             <ShareMenu 
@@ -230,7 +234,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   );
 };
 
-// Share menu component
+// Share menu component with cyber styling
 const ShareMenu: React.FC<{
   platforms: Array<{
     name: string;
@@ -243,8 +247,8 @@ const ShareMenu: React.FC<{
 }> = ({ platforms, config, onClose }) => {
   return (
     <>
-      <div className="px-4 py-2 border-b border-gray-100">
-        <h3 className="text-sm font-medium text-gray-900">Share Evermark</h3>
+      <div className="px-4 py-2 border-b border-gray-700">
+        <h3 className="text-sm font-medium text-white">Share Evermark</h3>
       </div>
       {platforms.map((platform) => {
         const IconComponent = platform.icon;
@@ -256,7 +260,7 @@ const ShareMenu: React.FC<{
               onClose();
             }}
             className={cn(
-              "w-full text-left px-4 py-3 text-sm text-gray-700 transition-colors flex items-center",
+              "w-full text-left px-4 py-3 text-sm text-gray-300 transition-all flex items-center border border-transparent",
               platform.color
             )}
           >
@@ -296,8 +300,8 @@ export const ShareRedirect: React.FC = () => {
   }, [evermarkId]);
   
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+    <div className="flex items-center justify-center min-h-screen bg-black">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
     </div>
   );
 };
