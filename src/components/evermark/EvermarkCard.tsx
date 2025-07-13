@@ -15,7 +15,6 @@ import { useProfile } from '../../hooks/useProfile';
 import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
 import { formatDistanceToNow } from 'date-fns';
 import { cn, useIsMobile } from '../../utils/responsive';
-import { DelegationModal } from './DelegationModal';
 
 // Hi-tech neon design tokens
 const NEON_TOKENS = {
@@ -110,9 +109,6 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
   const { primaryAddress } = useProfile();
   const { viewStats } = useViewTracking(id);
   const isMobile = useIsMobile();
-  
-  // ✅ NEW: Delegation modal state
-  const [showDelegationModal, setShowDelegationModal] = useState(false);
   
   // Variant configurations
   const getVariantConfig = () => {
@@ -248,24 +244,21 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
     );
   };
 
-  // ✅ CLEAN: $WEMARK Button Component - simple and focused
+  // ✅ SIMPLIFIED: $WEMARK Button Component - now just shows current votes
   const WemarkButton = () => {
     if (!showWemark) return null;
 
     return (
-      <button
-        onClick={() => setShowDelegationModal(true)}
-        className={cn(
-          'px-4 py-2 bg-gradient-to-r from-green-400 to-green-600 text-black font-bold rounded',
-          'hover:from-green-300 hover:to-green-500 transition-all duration-200',
-          'shadow-lg shadow-green-500/30 hover:shadow-green-500/50',
-          'flex items-center gap-2 text-sm',
-          isMobile ? 'flex-1' : ''
-        )}
-      >
+      <div className={cn(
+        'px-4 py-2 bg-gradient-to-r from-green-400 to-green-600 text-black font-bold rounded',
+        'shadow-lg shadow-green-500/30',
+        'flex items-center gap-2 text-sm',
+        'cursor-default', // Not clickable anymore
+        isMobile ? 'flex-1' : ''
+      )}>
         <ZapIcon className="h-4 w-4" />
-        <span>$WEMARK</span>
-      </button>
+        <span>{votes ? formatVotes(votes) : '0'} $WEMARK</span>
+      </div>
     );
   };
 
@@ -331,14 +324,7 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
           </div>
         </div>
         
-        {/* ✅ Delegation Modal */}
-        <DelegationModal
-          isOpen={showDelegationModal}
-          onClose={() => setShowDelegationModal(false)}
-          evermarkId={id}
-          evermarkTitle={title}
-          currentVotes={votes}
-        />
+        {/* ✅ REMOVED: Delegation Modal - now integrated in detail view */}
       </>
     );
   }
@@ -431,14 +417,7 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
         </div>
       </div>
       
-      {/* ✅ Delegation Modal */}
-      <DelegationModal
-        isOpen={showDelegationModal}
-        onClose={() => setShowDelegationModal(false)}
-        evermarkId={id}
-        evermarkTitle={title}
-        currentVotes={votes}
-      />
+      {/* ✅ REMOVED: Delegation Modal - now integrated in detail view */}
     </>
   );
 };
