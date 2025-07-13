@@ -4,7 +4,7 @@ import { useProfile } from '../hooks/useProfile';
 import { useDelegationHistory } from '../hooks/useDelegationHistory';
 import { VotingPanel } from '../components/voting/VotingPanel';
 import { LeaderboardEvermarkCard } from '../components/evermark/EvermarkCard';
-import { EvermarkDetailModal } from '../components/evermark/EvermarkDetailModal';
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal'; // ✅ CHANGED: Use unified modal
 import { toEther } from 'thirdweb/utils';
 import { 
   TrophyIcon, 
@@ -17,12 +17,17 @@ import {
 } from 'lucide-react';
 import { cn, useIsMobile } from '../utils/responsive';
 
+// ✅ ADDED: Modal options interface
+interface ModalOptions {
+  autoExpandDelegation?: boolean;
+  initialExpandedSection?: 'delegation' | 'rewards' | 'history';
+}
+
 type LeaderboardTab = 'current' | 'previous' | 'delegate';
 
 export default function LeaderboardPage() {
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('current');
   const [selectedEvermarkId, setSelectedEvermarkId] = useState<string | null>(null);
-  const [modalEvermarkId, setModalEvermarkId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   
   const { primaryAddress } = useProfile();
@@ -35,17 +40,37 @@ export default function LeaderboardPage() {
   
   const activeLeaderboard = activeTab === 'current' ? currentWeek : previousWeek;
 
-  const handleWemark = (evermarkId: string) => {
-    setSelectedEvermarkId(evermarkId);
-    setActiveTab('delegate');
-  };
+  // ✅ CHANGED: Unified modal state management
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    evermarkId: string;
+    options: ModalOptions;
+  }>({
+    isOpen: false,
+    evermarkId: '',
+    options: {}
+  });
 
-  const handleOpenModal = (evermarkId: string) => {
-    setModalEvermarkId(evermarkId);
+  // ✅ CHANGED: Unified modal handlers
+  const handleOpenModal = (evermarkId: string, options: ModalOptions = {}) => {
+    setModalState({
+      isOpen: true,
+      evermarkId,
+      options
+    });
   };
 
   const handleCloseModal = () => {
-    setModalEvermarkId(null);
+    setModalState({
+      isOpen: false,
+      evermarkId: '',
+      options: {}
+    });
+  };
+
+  // ✅ CHANGED: Convert wemark action to modal delegation
+  const handleWemark = (evermarkId: string) => {
+    handleOpenModal(evermarkId, { autoExpandDelegation: true });
   };
 
   return (
@@ -259,8 +284,7 @@ export default function LeaderboardPage() {
                       evermark={entry.evermark}
                       rank={entry.rank}
                       votes={entry.votes}
-                      onOpenModal={() => handleOpenModal(entry.evermark.id)}
-                      onWemark={() => handleWemark(entry.evermark.id)}
+                      onOpenModal={handleOpenModal} // ✅ CHANGED: Use unified modal handler
                     />
                   ))}
                 </div>
@@ -326,7 +350,7 @@ export default function LeaderboardPage() {
                       Select an Evermark to Support
                     </h3>
                     <p className="text-gray-400 mb-6">
-                      Click the $WEMARK button next to any Evermark above to delegate your voting power.
+                      Click any Evermark above to open its details and delegate your voting power.
                     </p>
                     <div className="flex gap-3 justify-center">
                       <button
@@ -350,13 +374,14 @@ export default function LeaderboardPage() {
         )}
       </div>
 
-      {/* Detail Modal */}
-      {modalEvermarkId && (
-        <EvermarkDetailModal
-          evermarkId={modalEvermarkId}
-          isOpen={true}
+      {/* ✅ CHANGED: Use EnhancedEvermarkModal instead of EvermarkDetailModal */}
+      {modalState.isOpen && (
+        <EnhancedEvermarkModal
+          evermarkId={modalState.evermarkId}
+          isOpen={modalState.isOpen}
           onClose={handleCloseModal}
-          onWemark={() => handleWemark(modalEvermarkId)}
+          autoExpandDelegation={modalState.options.autoExpandDelegation}
+          initialExpandedSection={modalState.options.initialExpandedSection}
         />
       )}
     </div>

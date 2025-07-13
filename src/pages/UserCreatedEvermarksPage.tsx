@@ -2,8 +2,15 @@ import React, { useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ArrowLeftIcon, GridIcon, ListIcon, UserIcon, ZapIcon, SortAscIcon, ClockIcon, CalendarIcon } from 'lucide-react';
 import { useUserEvermarks } from '../hooks/useEvermarks';
-import { PublicEvermarkCard } from '../components/evermark/PublicEvermarkCard';
+import { EvermarkCard } from '../components/evermark/EvermarkCard'; // ✅ CHANGED: Use unified card component
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal'; // ✅ ADDED: Import unified modal
 import { cn, useIsMobile } from '../utils/responsive';
+
+// ✅ ADDED: Modal options interface
+interface ModalOptions {
+  autoExpandDelegation?: boolean;
+  initialExpandedSection?: 'delegation' | 'rewards' | 'history';
+}
 
 const UserCreatedEvermarksPage: React.FC = () => {
   const { address: profileAddress } = useParams<{ address: string }>();
@@ -12,6 +19,34 @@ const UserCreatedEvermarksPage: React.FC = () => {
   const isMobile = useIsMobile();
   
   const { evermarks: allEvermarks, isLoading } = useUserEvermarks(profileAddress);
+
+  // ✅ ADDED: Unified modal state management
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    evermarkId: string;
+    options: ModalOptions;
+  }>({
+    isOpen: false,
+    evermarkId: '',
+    options: {}
+  });
+
+  // ✅ ADDED: Unified modal handlers
+  const handleOpenModal = (evermarkId: string, options: ModalOptions = {}) => {
+    setModalState({
+      isOpen: true,
+      evermarkId,
+      options
+    });
+  };
+
+  const handleCloseModal = () => {
+    setModalState({
+      isOpen: false,
+      evermarkId: '',
+      options: {}
+    });
+  };
   
   // Filter to only evermarks created by this user
   const userCreatedEvermarks = useMemo(() => {
@@ -158,11 +193,12 @@ const UserCreatedEvermarksPage: React.FC = () => {
                   : "space-y-4"
               }>
                 {sortedEvermarks.map(evermark => (
-                  <PublicEvermarkCard
+                  <EvermarkCard
                     key={evermark.id}
                     evermark={evermark}
-                    viewMode={viewMode}
-                    showCreator={false}
+                    variant={viewMode === 'list' ? 'list' : 'standard'}
+                    showDescription={viewMode === 'grid'}
+                    onOpenModal={handleOpenModal} // ✅ CHANGED: Use unified modal handler
                   />
                 ))}
               </div>
@@ -170,6 +206,17 @@ const UserCreatedEvermarksPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* ✅ ADDED: EnhancedEvermarkModal */}
+      {modalState.isOpen && (
+        <EnhancedEvermarkModal
+          evermarkId={modalState.evermarkId}
+          isOpen={modalState.isOpen}
+          onClose={handleCloseModal}
+          autoExpandDelegation={modalState.options.autoExpandDelegation}
+          initialExpandedSection={modalState.options.initialExpandedSection}
+        />
+      )}
     </div>
   );
 };
