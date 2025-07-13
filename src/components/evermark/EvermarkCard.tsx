@@ -15,6 +15,7 @@ import { useProfile } from '../../hooks/useProfile';
 import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
 import { formatDistanceToNow } from 'date-fns';
 import { cn, useIsMobile } from '../../utils/responsive';
+import { DelegationModal } from './DelegationModal';
 
 // Hi-tech neon design tokens
 const NEON_TOKENS = {
@@ -109,6 +110,9 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
   const { primaryAddress } = useProfile();
   const { viewStats } = useViewTracking(id);
   const isMobile = useIsMobile();
+  
+  // ✅ NEW: Delegation modal state
+  const [showDelegationModal, setShowDelegationModal] = useState(false);
   
   // Variant configurations
   const getVariantConfig = () => {
@@ -244,16 +248,19 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
     );
   };
 
-  // $WEMARK Button Component
+  // ✅ UPDATED: $WEMARK Button Component with modal
   const WemarkButton = () => {
-    if (!showWemark || !onWemark) return null;
+    if (!showWemark) return null;
+
+    const handleWemarkClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      // Open delegation modal instead of calling onWemark
+      setShowDelegationModal(true);
+    };
 
     return (
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onWemark();
-        }}
+        onClick={handleWemarkClick}
         className={cn(
           'px-4 py-2 bg-gradient-to-r from-green-400 to-green-600 text-black font-bold rounded',
           'hover:from-green-300 hover:to-green-500 transition-all duration-200',
@@ -419,6 +426,15 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
           )}
         </div>
       </div>
+      
+      {/* ✅ NEW: Delegation Modal */}
+      <DelegationModal
+        isOpen={showDelegationModal}
+        onClose={() => setShowDelegationModal(false)}
+        evermarkId={id}
+        evermarkTitle={title}
+        currentVotes={votes}
+      />
     </div>
   );
 };
