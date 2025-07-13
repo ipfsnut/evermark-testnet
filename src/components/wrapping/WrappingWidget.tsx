@@ -4,6 +4,7 @@ import { LockIcon, UnlockIcon, CoinsIcon, AlertCircleIcon, CheckCircleIcon, Cloc
 import { useWrapping } from "../../hooks/useWrapping";
 import { useRewards } from "../../hooks/useRewards";
 import { formatDistanceToNow } from "date-fns";
+import { cn, useIsMobile } from "../../utils/responsive";
 
 interface WrappingWidgetProps {
   userAddress?: string;
@@ -15,8 +16,9 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
   const [activeTab, setActiveTab] = useState<"wrap" | "unwrap">("wrap");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const isMobile = useIsMobile();
   
-  // ✅ Use core wrapping hook
+  // Use core wrapping hook
   const {
     emarkBalance,
     wEmarkBalance,
@@ -33,7 +35,7 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
     refetch
   } = useWrapping(userAddress);
   
-  // ✅ Use core rewards hook
+  // Use core rewards hook
   const {
     pendingRewards,
     isClaimingRewards,
@@ -70,7 +72,6 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
       
       await wrapTokens(toWei(wrapAmount));
       
-      // ✅ Simplified - let the hook handle success/error states
       setSuccess("Wrap transaction submitted!");
       setWrapAmount("");
       setTimeout(() => refetch(), 2000);
@@ -89,7 +90,6 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
       
       await requestUnwrap(toWei(unwrapAmount));
       
-      // ✅ Simplified - let the hook handle success/error states  
       setSuccess("Unwrap request submitted!");
       setUnwrapAmount("");
       setTimeout(() => refetch(), 2000);
@@ -106,7 +106,6 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
       
       await completeUnwrap();
       
-      // ✅ Simplified - let the hook handle success/error states
       setSuccess("Complete unwrap transaction submitted!");
       setTimeout(() => refetch(), 2000);
     } catch (error: any) {
@@ -122,7 +121,6 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
       
       await cancelUnbonding();
       
-      // ✅ Simplified - let the hook handle success/error states
       setSuccess("Cancel unbonding transaction submitted!");
       setTimeout(() => refetch(), 2000);
     } catch (error: any) {
@@ -146,53 +144,55 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
   
   if (!hasWalletAccess) {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-        <div className="text-center py-8">
-          <LockIcon className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Connect Wallet</h3>
-          <p className="text-gray-600">Connect your wallet to wrap and unwrap tokens</p>
+      <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 border border-gray-200">
+        <div className="text-center py-6 sm:py-8">
+          <LockIcon className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-gray-300 mb-4" />
+          <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Connect Wallet</h3>
+          <p className="text-sm sm:text-base text-gray-600">Connect your wallet to wrap and unwrap tokens</p>
         </div>
       </div>
     );
   }
   
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h2 className="text-xl font-serif font-bold text-gray-900 mb-4">Wrapping & Rewards</h2>
+    <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+      <h2 className="text-lg sm:text-xl font-serif font-bold text-gray-900 mb-4 sm:mb-6">Wrapping & Rewards</h2>
       
-      {/* Status Messages */}
+      {/* Status Messages - Mobile optimized */}
       {(error || rewardsError) && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center">
-          <AlertCircleIcon className="h-4 w-4 text-red-600 mr-2 flex-shrink-0" />
-          <span className="text-red-700 text-sm">{error || rewardsError}</span>
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start">
+          <AlertCircleIcon className="h-4 w-4 text-red-600 mr-2 mt-0.5 flex-shrink-0" />
+          <span className="text-red-700 text-sm leading-relaxed">{error || rewardsError}</span>
         </div>
       )}
       
       {(success || rewardsSuccess) && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center">
-          <CheckCircleIcon className="h-4 w-4 text-green-600 mr-2 flex-shrink-0" />
-          <span className="text-green-700 text-sm">{success || rewardsSuccess}</span>
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-start">
+          <CheckCircleIcon className="h-4 w-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" />
+          <span className="text-green-700 text-sm leading-relaxed">{success || rewardsSuccess}</span>
         </div>
       )}
       
-      {/* Tabs */}
-      <div className="flex border-b border-gray-200 mb-6">
+      {/* Tabs - Mobile friendly */}
+      <div className="flex border-b border-gray-200 mb-4 sm:mb-6">
         <button
-          className={`px-4 py-2 font-medium text-sm ${
+          className={cn(
+            "px-4 py-2 sm:py-3 font-medium text-sm sm:text-base flex-1 sm:flex-none transition-colors touch-manipulation",
             activeTab === "wrap"
-              ? "text-purple-600 border-b-2 border-purple-600"
+              ? "text-purple-600 border-b-2 border-purple-600 bg-purple-50"
               : "text-gray-500 hover:text-gray-700"
-          }`}
+          )}
           onClick={() => setActiveTab("wrap")}
         >
           Wrap
         </button>
         <button
-          className={`px-4 py-2 font-medium text-sm ${
+          className={cn(
+            "px-4 py-2 sm:py-3 font-medium text-sm sm:text-base flex-1 sm:flex-none transition-colors touch-manipulation",
             activeTab === "unwrap"
-              ? "text-purple-600 border-b-2 border-purple-600"
+              ? "text-purple-600 border-b-2 border-purple-600 bg-purple-50"
               : "text-gray-500 hover:text-gray-700"
-          }`}
+          )}
           onClick={() => setActiveTab("unwrap")}
         >
           Unwrap
@@ -214,21 +214,27 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
               type="number"
               value={wrapAmount}
               onChange={(e) => setWrapAmount(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base"
               placeholder="0.0"
               min="0"
               step="0.01"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
               You'll receive wEMARK tokens for voting and governance
             </p>
           </div>
           
-          <div className="flex space-x-3">
+          <div className={cn(
+            "flex gap-3",
+            isMobile ? "flex-col" : "flex-row"
+          )}>
             <button
               onClick={handleWrap}
               disabled={isWrapping || !wrapAmount || parseFloat(wrapAmount) <= 0}
-              className="flex-1 flex items-center justify-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={cn(
+                "flex items-center justify-center px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium",
+                isMobile ? "w-full" : "flex-1"
+              )}
             >
               {isWrapping ? (
                 <>
@@ -246,7 +252,10 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
             <button
               onClick={handleClaimRewards}
               disabled={isClaimingRewards || !pendingRewards || pendingRewards === BigInt(0)}
-              className="flex-1 flex items-center justify-center px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={cn(
+                "flex items-center justify-center px-4 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium",
+                isMobile ? "w-full" : "flex-1"
+              )}
             >
               {isClaimingRewards ? (
                 <>
@@ -263,7 +272,7 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
           </div>
           
           <div className="bg-blue-50 p-3 rounded-lg">
-            <p className="text-xs text-blue-800">
+            <p className="text-xs text-blue-800 leading-relaxed">
               <strong>Two-step process:</strong> First approve $EMARK spending, then wrap to receive wEMARK voting tokens.
             </p>
           </div>
@@ -285,12 +294,12 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
               type="number"
               value={unwrapAmount}
               onChange={(e) => setUnwrapAmount(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-base"
               placeholder="0.0"
               min="0"
               step="0.01"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
               You'll receive $EMARK back after the unbonding period
             </p>
           </div>
@@ -304,7 +313,7 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
               !totalWrapped || 
               toWei(unwrapAmount) > totalWrapped
             }
-            className="w-full flex items-center justify-center px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full flex items-center justify-center px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium touch-manipulation"
           >
             {isUnwrapping ? (
               <>
@@ -319,24 +328,27 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
             )}
           </button>
           
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 leading-relaxed">
             Unwrapping requires a waiting period before your $EMARK tokens are available again.
           </p>
           
-          {/* Pending Unbonding Request */}
+          {/* Pending Unbonding Request - Mobile optimized */}
           {unbondingAmount > BigInt(0) && (
             <div className="mt-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">Pending Unbonding Request</h3>
-              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Pending Unbonding Request</h3>
+              <div className="p-3 sm:p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div className={cn(
+                  "flex justify-between",
+                  isMobile ? "flex-col space-y-3" : "items-center"
+                )}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm sm:text-base font-medium text-gray-900">
                       {toEther(unbondingAmount)} $EMARK
                     </p>
                     <div className="flex items-center text-xs text-gray-500 mt-1">
-                      <ClockIcon className="h-3 w-3 mr-1" />
+                      <ClockIcon className="h-3 w-3 mr-1 flex-shrink-0" />
                       {isUnbondingReady() ? (
-                        <span className="text-green-600">Ready to claim</span>
+                        <span className="text-green-600 font-medium">Ready to claim</span>
                       ) : (
                         <span>
                           Ready {formatDistanceToNow(new Date(Number(unbondingReleaseTime) * 1000), { addSuffix: true })}
@@ -344,12 +356,18 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
                       )}
                     </div>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className={cn(
+                    "flex gap-2",
+                    isMobile ? "w-full" : "flex-shrink-0"
+                  )}>
                     {isUnbondingReady() ? (
                       <button
                         onClick={handleCompleteUnwrap}
                         disabled={isUnwrapping}
-                        className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors disabled:opacity-50"
+                        className={cn(
+                          "px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors disabled:opacity-50 font-medium touch-manipulation",
+                          isMobile ? "flex-1" : ""
+                        )}
                       >
                         Claim $EMARK
                       </button>
@@ -357,7 +375,7 @@ export function WrappingWidget({ userAddress }: WrappingWidgetProps) {
                       <button
                         onClick={handleCancelUnbonding}
                         disabled={isUnwrapping}
-                        className="p-1 text-gray-500 hover:text-red-600 transition-colors disabled:opacity-50"
+                        className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 rounded touch-manipulation"
                         title="Cancel unbonding"
                       >
                         <XIcon className="h-4 w-4" />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
   PlusIcon, 
@@ -14,14 +14,9 @@ import {
 import { useTrendingEvermarks, useRecentEvermarks } from '../hooks/useEvermarkFeed';
 import { useWalletAuth } from '../providers/WalletProvider';
 import { HeroEvermarkCard, ExploreEvermarkCard } from '../components/evermark/EvermarkCard';
-import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal'; // ✅ CHANGED: Use unified modal
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal';
+import { useModal } from '../hooks/useModal';
 import { cn, useIsMobile } from '../utils/responsive';
-
-// ✅ ADDED: Modal options interface
-interface ModalOptions {
-  autoExpandDelegation?: boolean;
-  initialExpandedSection?: 'delegation' | 'rewards' | 'history';
-}
 
 // Quick stats component
 const CyberStats: React.FC = () => {
@@ -118,38 +113,8 @@ export default function EnhancedHomePage() {
   const { recentEvermarks, isLoading: isLoadingRecent } = useRecentEvermarks(6);
   const isMobile = useIsMobile();
 
-  // ✅ CHANGED: Unified modal state management
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean;
-    evermarkId: string;
-    options: ModalOptions;
-  }>({
-    isOpen: false,
-    evermarkId: '',
-    options: {}
-  });
-
-  // ✅ CHANGED: Unified modal handlers
-  const handleOpenModal = (evermarkId: string, options: ModalOptions = {}) => {
-    setModalState({
-      isOpen: true,
-      evermarkId,
-      options
-    });
-  };
-
-  const handleCloseModal = () => {
-    setModalState({
-      isOpen: false,
-      evermarkId: '',
-      options: {}
-    });
-  };
-
-  // ✅ CHANGED: Convert wemark action to modal delegation
-  const handleWemark = (evermarkId: string) => {
-    handleOpenModal(evermarkId, { autoExpandDelegation: true });
-  };
+  // Use the unified modal hook
+  const { modalState, openModal, closeModal } = useModal();
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -268,7 +233,7 @@ export default function EnhancedHomePage() {
           <div className="max-w-2xl mx-auto">
             <HeroEvermarkCard
               evermark={trendingEvermarks[0]}
-              onOpenModal={handleOpenModal} // ✅ CHANGED: Use unified modal handler
+              onOpenModal={openModal}
             />
           </div>
         </div>
@@ -321,7 +286,7 @@ export default function EnhancedHomePage() {
               <ExploreEvermarkCard 
                 key={evermark.id} 
                 evermark={evermark}
-                onOpenModal={handleOpenModal} // ✅ CHANGED: Use unified modal handler
+                onOpenModal={openModal}
               />
             ))}
           </div>
@@ -375,7 +340,7 @@ export default function EnhancedHomePage() {
               <ExploreEvermarkCard 
                 key={evermark.id} 
                 evermark={evermark}
-                onOpenModal={handleOpenModal} // ✅ CHANGED: Use unified modal handler
+                onOpenModal={openModal}
               />
             ))}
           </div>
@@ -417,12 +382,12 @@ export default function EnhancedHomePage() {
         </div>
       </div>
 
-      {/* ✅ CHANGED: Use EnhancedEvermarkModal instead of EvermarkDetailModal */}
+      {/* Enhanced Evermark Modal */}
       {modalState.isOpen && (
         <EnhancedEvermarkModal
           evermarkId={modalState.evermarkId}
           isOpen={modalState.isOpen}
-          onClose={handleCloseModal}
+          onClose={closeModal}
           autoExpandDelegation={modalState.options.autoExpandDelegation}
           initialExpandedSection={modalState.options.initialExpandedSection}
         />

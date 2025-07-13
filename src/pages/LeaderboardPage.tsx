@@ -4,7 +4,8 @@ import { useProfile } from '../hooks/useProfile';
 import { useDelegationHistory } from '../hooks/useDelegationHistory';
 import { VotingPanel } from '../components/voting/VotingPanel';
 import { LeaderboardEvermarkCard } from '../components/evermark/EvermarkCard';
-import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal'; // ✅ CHANGED: Use unified modal
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal';
+import { useModal } from '../hooks/useModal';
 import { toEther } from 'thirdweb/utils';
 import { 
   TrophyIcon, 
@@ -16,12 +17,6 @@ import {
   CoinsIcon
 } from 'lucide-react';
 import { cn, useIsMobile } from '../utils/responsive';
-
-// ✅ ADDED: Modal options interface
-interface ModalOptions {
-  autoExpandDelegation?: boolean;
-  initialExpandedSection?: 'delegation' | 'rewards' | 'history';
-}
 
 type LeaderboardTab = 'current' | 'previous' | 'delegate';
 
@@ -40,38 +35,8 @@ export default function LeaderboardPage() {
   
   const activeLeaderboard = activeTab === 'current' ? currentWeek : previousWeek;
 
-  // ✅ CHANGED: Unified modal state management
-  const [modalState, setModalState] = useState<{
-    isOpen: boolean;
-    evermarkId: string;
-    options: ModalOptions;
-  }>({
-    isOpen: false,
-    evermarkId: '',
-    options: {}
-  });
-
-  // ✅ CHANGED: Unified modal handlers
-  const handleOpenModal = (evermarkId: string, options: ModalOptions = {}) => {
-    setModalState({
-      isOpen: true,
-      evermarkId,
-      options
-    });
-  };
-
-  const handleCloseModal = () => {
-    setModalState({
-      isOpen: false,
-      evermarkId: '',
-      options: {}
-    });
-  };
-
-  // ✅ CHANGED: Convert wemark action to modal delegation
-  const handleWemark = (evermarkId: string) => {
-    handleOpenModal(evermarkId, { autoExpandDelegation: true });
-  };
+  // Use the unified modal hook
+  const { modalState, openModal, closeModal } = useModal();
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -284,7 +249,7 @@ export default function LeaderboardPage() {
                       evermark={entry.evermark}
                       rank={entry.rank}
                       votes={entry.votes}
-                      onOpenModal={handleOpenModal} // ✅ CHANGED: Use unified modal handler
+                      onOpenModal={openModal}
                     />
                   ))}
                 </div>
@@ -374,12 +339,12 @@ export default function LeaderboardPage() {
         )}
       </div>
 
-      {/* ✅ CHANGED: Use EnhancedEvermarkModal instead of EvermarkDetailModal */}
+      {/* Enhanced Evermark Modal */}
       {modalState.isOpen && (
         <EnhancedEvermarkModal
           evermarkId={modalState.evermarkId}
           isOpen={modalState.isOpen}
-          onClose={handleCloseModal}
+          onClose={closeModal}
           autoExpandDelegation={modalState.options.autoExpandDelegation}
           initialExpandedSection={modalState.options.initialExpandedSection}
         />
