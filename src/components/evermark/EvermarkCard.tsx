@@ -82,7 +82,7 @@ export interface UnifiedEvermarkCardProps {
   showWemark?: boolean;
   
   onOpenModal?: () => void;
-  onWemark?: () => void;
+  onWemark?: () => void; // ✅ DEPRECATED: Will be replaced by internal delegation modal
   
   priority?: boolean;
   className?: string;
@@ -248,19 +248,21 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
     );
   };
 
-  // ✅ UPDATED: $WEMARK Button Component with modal
+  // ✅ UPDATED: $WEMARK Button Component with modal (no longer uses onWemark prop)
   const WemarkButton = () => {
     if (!showWemark) return null;
 
     const handleWemarkClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      // Open delegation modal instead of calling onWemark
+      e.preventDefault(); // Prevent any event bubbling
+      // Always use our internal delegation modal, ignore onWemark prop
       setShowDelegationModal(true);
     };
 
     return (
       <button
         onClick={handleWemarkClick}
+        type="button" // Ensure it's not a submit button
         className={cn(
           'px-4 py-2 bg-gradient-to-r from-green-400 to-green-600 text-black font-bold rounded',
           'hover:from-green-300 hover:to-green-500 transition-all duration-200',
@@ -445,7 +447,7 @@ export const LeaderboardEvermarkCard: React.FC<{
   rank: number;
   votes: bigint;
   onOpenModal: () => void;
-  onWemark: () => void;
+  onWemark?: () => void; // ✅ DEPRECATED: Modal now handled internally
 }> = ({ evermark, rank, votes, onOpenModal, onWemark }) => (
   <EvermarkCard
     evermark={evermark}
@@ -457,29 +459,29 @@ export const LeaderboardEvermarkCard: React.FC<{
     showWemark={true}
     showDescription={false}
     onOpenModal={onOpenModal}
-    onWemark={onWemark}
+    // ✅ Don't pass onWemark - handled internally now
   />
 );
 
 export const ExploreEvermarkCard: React.FC<{
   evermark: any;
   onOpenModal: () => void;
-  onWemark?: () => void;
+  onWemark?: () => void; // ✅ DEPRECATED: Modal now handled internally
   compact?: boolean;
 }> = ({ evermark, onOpenModal, onWemark, compact = false }) => (
   <EvermarkCard
     evermark={evermark}
     variant={compact ? 'compact' : 'card'}
-    showWemark={!!onWemark}
+    showWemark={!!onWemark} // Show if onWemark was provided (for backward compatibility)
     onOpenModal={onOpenModal}
-    onWemark={onWemark}
+    // ✅ Don't pass onWemark - handled internally now
   />
 );
 
 export const HeroEvermarkCard: React.FC<{
   evermark: any;
   onOpenModal: () => void;
-  onWemark: () => void;
+  onWemark?: () => void; // ✅ DEPRECATED: Modal now handled internally
 }> = ({ evermark, onOpenModal, onWemark }) => (
   <EvermarkCard
     evermark={evermark}
@@ -487,7 +489,7 @@ export const HeroEvermarkCard: React.FC<{
     showWemark={true}
     priority={true}
     onOpenModal={onOpenModal}
-    onWemark={onWemark}
+    // ✅ Don't pass onWemark - handled internally now
   />
 );
 
