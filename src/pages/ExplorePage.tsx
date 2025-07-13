@@ -18,13 +18,18 @@ import {
 } from 'lucide-react';
 import { useEvermarkFeed, SortOption, FilterOption } from '../hooks/useEvermarkFeed';
 import { ExploreEvermarkCard } from '../components/evermark/EvermarkCard';
-import { EvermarkDetailModal } from '../components/evermark/EvermarkDetailModal';
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal'; // ✅ CHANGED: Use unified modal
 import { cn, useIsMobile } from '../utils/responsive';
+
+// ✅ ADDED: Modal options interface
+interface ModalOptions {
+  autoExpandDelegation?: boolean;
+  initialExpandedSection?: 'delegation' | 'rewards' | 'history';
+}
 
 export default function ExplorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [modalEvermarkId, setModalEvermarkId] = useState<string | null>(null);
   const isMobile = useIsMobile();
   
   // Initialize from URL params
@@ -43,6 +48,36 @@ export default function ExplorePage() {
     setPage,
     refresh
   } = useEvermarkFeed();
+
+  // ✅ CHANGED: Unified modal state management
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    evermarkId: string;
+    options: ModalOptions;
+  }>({
+    isOpen: false,
+    evermarkId: '',
+    options: {}
+  });
+
+  // ✅ CHANGED: Unified modal handlers
+  const handleOpenModal = (evermarkId: string, options: ModalOptions = {}) => {
+    setModalState({
+      isOpen: true,
+      evermarkId,
+      options
+    });
+  };
+
+  const handleCloseModal = () => {
+    setModalState({
+      isOpen: false,
+      evermarkId: '',
+      options: {}
+    });
+  };
+
+  // ✅ REMOVED: Wemark handler no longer needed - delegation handled in modal
 
   // Update URL when filters change
   React.useEffect(() => {
@@ -93,19 +128,6 @@ export default function ExplorePage() {
       filter: 'all',
       search: ''
     });
-  };
-
-  const handleOpenModal = (evermarkId: string) => {
-    setModalEvermarkId(evermarkId);
-  };
-
-  const handleCloseModal = () => {
-    setModalEvermarkId(null);
-  };
-
-  const handleWemark = (evermarkId: string) => {
-    // TODO: Implement delegation logic
-    console.log('Wemark:', evermarkId);
   };
 
   // Filter options configuration
@@ -361,8 +383,7 @@ export default function ExplorePage() {
                   key={evermark.id} 
                   evermark={evermark}
                   compact={viewMode === 'list'}
-                  onOpenModal={() => handleOpenModal(evermark.id)}
-                  onWemark={() => handleWemark(evermark.id)}
+                  onOpenModal={handleOpenModal} // ✅ CHANGED: Use unified modal handler only
                 />
               ))}
             </div>
@@ -432,13 +453,14 @@ export default function ExplorePage() {
         )}
       </div>
 
-      {/* Detail Modal */}
-      {modalEvermarkId && (
-        <EvermarkDetailModal
-          evermarkId={modalEvermarkId}
-          isOpen={true}
+      {/* ✅ CHANGED: Use EnhancedEvermarkModal instead of EvermarkDetailModal */}
+      {modalState.isOpen && (
+        <EnhancedEvermarkModal
+          evermarkId={modalState.evermarkId}
+          isOpen={modalState.isOpen}
           onClose={handleCloseModal}
-          onWemark={() => handleWemark(modalEvermarkId)}
+          autoExpandDelegation={modalState.options.autoExpandDelegation}
+          initialExpandedSection={modalState.options.initialExpandedSection}
         />
       )}
     </div>

@@ -21,7 +21,15 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
+import { EvermarkCard } from '../components/evermark/EvermarkCard';
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal';
 import { cn, useIsMobile } from '../utils/responsive';
+
+// Modal options interface
+interface ModalOptions {
+  autoExpandDelegation?: boolean;
+  initialExpandedSection?: 'delegation' | 'rewards' | 'history';
+}
 
 interface Collection {
   id: string;
@@ -49,7 +57,8 @@ const BookshelfEvermarkCard: React.FC<{
   onRemove: () => void;
   onUpdateNotes: (notes: string) => void;
   category: 'favorite' | 'currentReading';
-}> = ({ evermark, bookshelfItem, onRemove, onUpdateNotes, category }) => {
+  onOpenModal: (evermarkId: string, options?: ModalOptions) => void;
+}> = ({ evermark, bookshelfItem, onRemove, onUpdateNotes, category, onOpenModal }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [showNotesEdit, setShowNotesEdit] = useState(false);
@@ -111,7 +120,8 @@ const BookshelfEvermarkCard: React.FC<{
         <XIcon className="h-3 w-3" />
       </button>
 
-      <Link to={`/evermark/${evermark.id}`} className="block">
+      {/* Main content - clickable to open modal */}
+      <button onClick={() => onOpenModal(evermark.id)} className="block w-full text-left">
         {/* Image section */}
         <div className="w-full h-40 bg-gray-700 overflow-hidden relative">
           {evermark.image && !imageError ? (
@@ -158,12 +168,12 @@ const BookshelfEvermarkCard: React.FC<{
             </p>
           )}
         </div>
-      </Link>
+      </button>
 
-      {/* Notes section */}
+      {/* Notes section - separate from main clickable area */}
       <div className="p-4 pt-0 border-t border-gray-700">
         {showNotesEdit ? (
-          <div className="space-y-2">
+          <div className="space-y-2" onClick={e => e.stopPropagation()}>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -188,7 +198,10 @@ const BookshelfEvermarkCard: React.FC<{
           </div>
         ) : (
           <button
-            onClick={() => setShowNotesEdit(true)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowNotesEdit(true);
+            }}
             className="w-full text-left"
           >
             <div className="flex items-start gap-2 text-xs text-gray-400 hover:text-gray-300 transition-colors">
@@ -205,7 +218,10 @@ const BookshelfEvermarkCard: React.FC<{
 };
 
 // Quick Add Section
-const QuickAddSection: React.FC<{ userAddress: string }> = ({ userAddress }) => {
+const QuickAddSection: React.FC<{ 
+  userAddress: string;
+  onOpenModal: (evermarkId: string, options?: ModalOptions) => void;
+}> = ({ userAddress, onOpenModal }) => {
   const { evermarks, isLoading } = useUserEvermarks(userAddress);
   const { addToFavorites, addToCurrentReading, getBookshelfStatus, getStats } = useBookshelf(userAddress);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -266,7 +282,10 @@ const QuickAddSection: React.FC<{ userAddress: string }> = ({ userAddress }) => 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
           {availableEvermarks.map(evermark => (
             <div key={evermark.id} className="flex items-center p-3 border border-gray-600 bg-gray-700/50 rounded-lg">
-              <div className="w-12 h-12 bg-gray-600 rounded mr-3 overflow-hidden flex-shrink-0">
+              <button 
+                onClick={() => onOpenModal(evermark.id)}
+                className="w-12 h-12 bg-gray-600 rounded mr-3 overflow-hidden flex-shrink-0 hover:ring-2 hover:ring-cyan-400 transition-all"
+              >
                 {evermark.image ? (
                   <img src={evermark.image} alt={evermark.title} className="w-full h-full object-cover" />
                 ) : (
@@ -274,11 +293,16 @@ const QuickAddSection: React.FC<{ userAddress: string }> = ({ userAddress }) => 
                     <ImageIcon className="h-4 w-4 text-gray-400" />
                   </div>
                 )}
-              </div>
+              </button>
               
               <div className="flex-1 min-w-0 mr-3">
-                <h4 className="text-sm font-medium text-white truncate">{evermark.title}</h4>
-                <p className="text-xs text-gray-400">by {evermark.author}</p>
+                <button 
+                  onClick={() => onOpenModal(evermark.id)}
+                  className="text-left w-full hover:text-cyan-400 transition-colors"
+                >
+                  <h4 className="text-sm font-medium text-white truncate">{evermark.title}</h4>
+                  <p className="text-xs text-gray-400">by {evermark.author}</p>
+                </button>
               </div>
               
               <div className="flex gap-1">
@@ -315,10 +339,34 @@ const EnhancedBookshelfPage: React.FC = () => {
   
   const [collections, setCollections] = useState<Collection[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newCollectionName, setNewCollectionName] = useState('');
-  const [newCollectionDescription, setNewCollectionDescription] = useState('');
-  const [newCollectionIsPublic, setNewCollectionIsPublic] = useState(false);
+
+  // Unified modal state management
+  const [modalState, setModalState] = useState<{
+    isOpen: boolean;
+    evermarkId: string;
+    options: ModalOptions;
+  }>({
+    isOpen: false,
+    evermarkId: '',
+    options: {}
+  });
+
+  // Unified modal handlers
+  const handleOpenModal = (evermarkId: string, options: ModalOptions = {}) => {
+    setModalState({
+      isOpen: true,
+      evermarkId,
+      options
+    });
+  };
+
+  const handleCloseModal = () => {
+    setModalState({
+      isOpen: false,
+      evermarkId: '',
+      options: {}
+    });
+  };
 
   // Load collections from localStorage
   React.useEffect(() => {
@@ -364,6 +412,7 @@ const EnhancedBookshelfPage: React.FC = () => {
           <div className="w-16 h-16 bg-gradient-to-r from-purple-400 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <BookOpenIcon className="h-8 w-8 text-black" />
           </div>
+          <h3 className="text-lg font-medium text-white mb-2">Connect Wallet</h3>
           <p className="text-gray-400">Connect your wallet to view your bookshelf</p>
         </div>
       </div>
@@ -451,7 +500,7 @@ const EnhancedBookshelfPage: React.FC = () => {
       <div className="container mx-auto px-4 pb-8">
         <div className="space-y-8">
           {/* Quick Add Section */}
-          <QuickAddSection userAddress={address!} />
+          <QuickAddSection userAddress={address!} onOpenModal={handleOpenModal} />
 
           {/* Favorites Section */}
           <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
@@ -500,6 +549,7 @@ const EnhancedBookshelfPage: React.FC = () => {
                     category="favorite"
                     onRemove={() => removeFromBookshelf(evermark.id)}
                     onUpdateNotes={(notes) => updateNotes(evermark.id, notes)}
+                    onOpenModal={handleOpenModal}
                   />
                 ))}
               </div>
@@ -553,6 +603,7 @@ const EnhancedBookshelfPage: React.FC = () => {
                     category="currentReading"
                     onRemove={() => removeFromBookshelf(evermark.id)}
                     onUpdateNotes={(notes) => updateNotes(evermark.id, notes)}
+                    onOpenModal={handleOpenModal}
                   />
                 ))}
               </div>
@@ -560,6 +611,17 @@ const EnhancedBookshelfPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Enhanced Evermark Modal */}
+      {modalState.isOpen && (
+        <EnhancedEvermarkModal
+          evermarkId={modalState.evermarkId}
+          isOpen={modalState.isOpen}
+          onClose={handleCloseModal}
+          autoExpandDelegation={modalState.options.autoExpandDelegation}
+          initialExpandedSection={modalState.options.initialExpandedSection}
+        />
+      )}
     </div>
   );
 };
