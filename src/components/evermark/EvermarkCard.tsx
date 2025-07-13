@@ -248,21 +248,13 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
     );
   };
 
-  // ✅ UPDATED: $WEMARK Button Component with modal (no longer uses onWemark prop)
+  // ✅ CLEAN: $WEMARK Button Component - simple and focused
   const WemarkButton = () => {
     if (!showWemark) return null;
 
-    const handleWemarkClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      e.preventDefault(); // Prevent any event bubbling
-      // Always use our internal delegation modal, ignore onWemark prop
-      setShowDelegationModal(true);
-    };
-
     return (
       <button
-        onClick={handleWemarkClick}
-        type="button" // Ensure it's not a submit button
+        onClick={() => setShowDelegationModal(true)}
         className={cn(
           'px-4 py-2 bg-gradient-to-r from-green-400 to-green-600 text-black font-bold rounded',
           'hover:from-green-300 hover:to-green-500 transition-all duration-200',
@@ -280,21 +272,99 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
   // List variant (horizontal layout)
   if (config.isList) {
     return (
+      <>
+        <div 
+          className={cn(config.container, 'cursor-pointer', className)}
+          onClick={onOpenModal}
+        >
+          {/* Image */}
+          {showImage && (
+            <div className={cn('relative flex-shrink-0', config.imageHeight)}>
+              <EvermarkImage
+                src={image}
+                alt={title}
+                aspectRatio="square"
+                rounded="lg"
+                priority={priority}
+                className="w-full h-full"
+              />
+              <RankBadge />
+              <VoteBadge />
+              <BookshelfBadge />
+            </div>
+          )}
+
+          {/* Content */}
+          <div className={cn('flex-1 min-w-0 flex flex-col justify-between', config.spacing)}>
+            <div>
+              <h3 className={config.titleSize}>{title}</h3>
+              <div className="flex items-center mt-1 mb-2 text-gray-400">
+                <UserIcon className="h-3 w-3 mr-1" />
+                <span className="text-sm truncate">{author}</span>
+              </div>
+              <div className="flex items-center gap-3 text-xs text-gray-500">
+                <span>{formatDistanceToNow(creationTime, { addSuffix: true })}</span>
+                {showViews && viewStats && (
+                  <span className="flex items-center text-cyan-400">
+                    <EyeIcon className="h-3 w-3 mr-1" />
+                    {formatViewCount(viewStats.totalViews)}
+                  </span>
+                )}
+                {/* ✅ ADDED: Show votes in list view */}
+                {showVotes && votes !== undefined && votes !== null && (
+                  <span className="flex items-center text-green-400">
+                    <ZapIcon className="h-3 w-3 mr-1" />
+                    {formatVotes(votes)} $WEMARK
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {showActions && (
+              <div className="flex gap-2 mt-3">
+                <WemarkButton />
+                <button className="px-3 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors text-sm">
+                  <ShareIcon className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* ✅ Delegation Modal */}
+        <DelegationModal
+          isOpen={showDelegationModal}
+          onClose={() => setShowDelegationModal(false)}
+          evermarkId={id}
+          evermarkTitle={title}
+          currentVotes={votes}
+        />
+      </>
+    );
+  }
+
+  // Standard card layout (vertical)
+  return (
+    <>
       <div 
-        className={cn(config.container, 'cursor-pointer', className)}
+        className={cn(config.container, 'cursor-pointer flex flex-col h-full group', className)}
         onClick={onOpenModal}
       >
         {/* Image */}
         {showImage && (
-          <div className={cn('relative flex-shrink-0', config.imageHeight)}>
+          <div className={cn('relative', config.imageHeight)}>
             <EvermarkImage
               src={image}
               alt={title}
-              aspectRatio="square"
-              rounded="lg"
+              aspectRatio="video"
+              rounded="none"
               priority={priority}
-              className="w-full h-full"
+              className="w-full h-full group-hover:scale-105 transition-transform duration-500"
             />
+            
+            {/* Gradient overlay for better text readability */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+            
             <RankBadge />
             <VoteBadge />
             <BookshelfBadge />
@@ -302,134 +372,66 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
         )}
 
         {/* Content */}
-        <div className={cn('flex-1 min-w-0 flex flex-col justify-between', config.spacing)}>
-          <div>
-            <h3 className={config.titleSize}>{title}</h3>
-            <div className="flex items-center mt-1 mb-2 text-gray-400">
-              <UserIcon className="h-3 w-3 mr-1" />
-              <span className="text-sm truncate">{author}</span>
+        <div className={cn('flex-1 flex flex-col', config.spacing)}>
+          {/* Title */}
+          <h3 className={cn(config.titleSize, 'mb-2 line-clamp-2 group-hover:text-green-400 transition-colors')}>
+            {title}
+          </h3>
+
+          {/* Author & Meta */}
+          <div className="flex items-center justify-between text-sm text-gray-400 mb-3">
+            <div className="flex items-center min-w-0">
+              <UserIcon className="h-4 w-4 mr-1 flex-shrink-0" />
+              <span className="truncate">{author}</span>
             </div>
+            <div className="flex items-center flex-shrink-0 ml-2">
+              <CalendarIcon className="h-4 w-4 mr-1" />
+              <span className="text-xs">{formatDistanceToNow(creationTime, { addSuffix: true })}</span>
+            </div>
+          </div>
+
+          {/* Description */}
+          {showDescription && description && !config.isCompact && (
+            <p className="text-sm text-gray-300 line-clamp-3 flex-1 mb-4">
+              {description}
+            </p>
+          )}
+
+          {/* Footer */}
+          <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-700">
+            {/* Views and Votes */}
             <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span>{formatDistanceToNow(creationTime, { addSuffix: true })}</span>
               {showViews && viewStats && (
                 <span className="flex items-center text-cyan-400">
                   <EyeIcon className="h-3 w-3 mr-1" />
                   {formatViewCount(viewStats.totalViews)}
                 </span>
               )}
-              {/* ✅ ADDED: Show votes in list view */}
+              {/* ✅ ADDED: Show votes in card footer */}
               {showVotes && votes !== undefined && votes !== null && (
                 <span className="flex items-center text-green-400">
                   <ZapIcon className="h-3 w-3 mr-1" />
-                  {formatVotes(votes)} $WEMARK
+                  {formatVotes(votes)}
                 </span>
               )}
             </div>
-          </div>
 
-          {showActions && (
-            <div className="flex gap-2 mt-3">
-              <WemarkButton />
-              <button className="px-3 py-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors text-sm">
-                <ShareIcon className="h-4 w-4" />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Standard card layout (vertical)
-  return (
-    <div 
-      className={cn(config.container, 'cursor-pointer flex flex-col h-full group', className)}
-      onClick={onOpenModal}
-    >
-      {/* Image */}
-      {showImage && (
-        <div className={cn('relative', config.imageHeight)}>
-          <EvermarkImage
-            src={image}
-            alt={title}
-            aspectRatio="video"
-            rounded="none"
-            priority={priority}
-            className="w-full h-full group-hover:scale-105 transition-transform duration-500"
-          />
-          
-          {/* Gradient overlay for better text readability */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-          
-          <RankBadge />
-          <VoteBadge />
-          <BookshelfBadge />
-        </div>
-      )}
-
-      {/* Content */}
-      <div className={cn('flex-1 flex flex-col', config.spacing)}>
-        {/* Title */}
-        <h3 className={cn(config.titleSize, 'mb-2 line-clamp-2 group-hover:text-green-400 transition-colors')}>
-          {title}
-        </h3>
-
-        {/* Author & Meta */}
-        <div className="flex items-center justify-between text-sm text-gray-400 mb-3">
-          <div className="flex items-center min-w-0">
-            <UserIcon className="h-4 w-4 mr-1 flex-shrink-0" />
-            <span className="truncate">{author}</span>
-          </div>
-          <div className="flex items-center flex-shrink-0 ml-2">
-            <CalendarIcon className="h-4 w-4 mr-1" />
-            <span className="text-xs">{formatDistanceToNow(creationTime, { addSuffix: true })}</span>
-          </div>
-        </div>
-
-        {/* Description */}
-        {showDescription && description && !config.isCompact && (
-          <p className="text-sm text-gray-300 line-clamp-3 flex-1 mb-4">
-            {description}
-          </p>
-        )}
-
-        {/* Footer */}
-        <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-700">
-          {/* Views and Votes */}
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            {showViews && viewStats && (
-              <span className="flex items-center text-cyan-400">
-                <EyeIcon className="h-3 w-3 mr-1" />
-                {formatViewCount(viewStats.totalViews)}
-              </span>
-            )}
-            {/* ✅ ADDED: Show votes in card footer */}
-            {showVotes && votes !== undefined && votes !== null && (
-              <span className="flex items-center text-green-400">
-                <ZapIcon className="h-3 w-3 mr-1" />
-                {formatVotes(votes)}
-              </span>
+            {/* Actions */}
+            {showActions && (
+              <div className={cn('flex items-center gap-2', isMobile && showWemark && 'flex-1 ml-4')}>
+                <WemarkButton />
+                {!isMobile && (
+                  <button className="p-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 hover:text-white transition-colors">
+                    <ShareIcon className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             )}
           </div>
-
-          {/* Actions */}
-          {showActions && (
-            <div className={cn('flex items-center gap-2', isMobile && showWemark && 'flex-1 ml-4')}>
-              <WemarkButton />
-              {!isMobile && (
-                <button 
-                  onClick={(e) => e.stopPropagation()}
-                  className="p-2 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 hover:text-white transition-colors"
-                >
-                  <ShareIcon className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
       
-      {/* ✅ NEW: Delegation Modal */}
+      {/* ✅ Delegation Modal */}
       <DelegationModal
         isOpen={showDelegationModal}
         onClose={() => setShowDelegationModal(false)}
@@ -437,7 +439,7 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
         evermarkTitle={title}
         currentVotes={votes}
       />
-    </div>
+    </>
   );
 };
 
