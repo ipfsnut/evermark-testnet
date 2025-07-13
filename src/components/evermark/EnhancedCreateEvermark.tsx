@@ -210,7 +210,24 @@ export function EnhancedCreateEvermark() {
         if (castInput) {
           const validation = validateFarcasterInput(castInput);
           if (validation.isValid) {
-            return `Farcaster Cast (${validation.hash?.substring(0, 10)}...)`;
+            // Extract hash from the URL if possible, otherwise use a placeholder
+            let hashPreview = '';
+            try {
+              if (castInput.includes('/0x')) {
+                // Extract hash from Warpcast URL
+                const hashMatch = castInput.match(/\/0x[a-fA-F0-9]+/);
+                if (hashMatch) {
+                  hashPreview = hashMatch[0].substring(1, 11) + '...'; // Remove / and take first 10 chars
+                }
+              } else if (castInput.startsWith('0x')) {
+                // Direct hash input
+                hashPreview = castInput.substring(0, 10) + '...';
+              }
+            } catch (error) {
+              console.warn('Could not extract hash from cast URL:', error);
+            }
+            
+            return hashPreview ? `Farcaster Cast (${hashPreview})` : 'Farcaster Cast';
           }
         }
         return 'Farcaster Cast';

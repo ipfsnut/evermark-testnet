@@ -36,6 +36,26 @@ const NEON_TOKENS = {
   }
 };
 
+// ✅ FIXED: Proper vote formatting function
+const formatVotes = (votes: bigint): string => {
+  // Convert bigint to number, assuming 18 decimal places (standard ERC20)
+  const voteNumber = Number(votes) / 1e18;
+  
+  if (voteNumber >= 1000000) {
+    return `${(voteNumber / 1000000).toFixed(1)}M`;
+  } else if (voteNumber >= 1000) {
+    return `${(voteNumber / 1000).toFixed(1)}K`;
+  } else if (voteNumber >= 1) {
+    return voteNumber.toFixed(0);
+  } else if (voteNumber >= 0.1) {
+    return voteNumber.toFixed(1);
+  } else if (voteNumber > 0) {
+    return voteNumber.toFixed(2);
+  } else {
+    return '0';
+  }
+};
+
 export interface UnifiedEvermarkCardProps {
   evermark: {
     id: string;
@@ -180,15 +200,11 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
     );
   };
 
-  // Vote count overlay
+  // ✅ FIXED: Vote count overlay with proper formatting
   const VoteBadge = () => {
-    if (!showVotes || !votes) return null;
+    if (!showVotes || votes === undefined || votes === null) return null;
 
-    const formattedVotes = Number(votes) >= 1000000 
-      ? `${(Number(votes) / 1000000).toFixed(1)}M`
-      : Number(votes) >= 1000 
-      ? `${(Number(votes) / 1000).toFixed(1)}K`
-      : Number(votes).toString();
+    const formattedVotes = formatVotes(votes);
 
     return (
       <div className="absolute top-2 right-2 z-20 bg-black/80 text-green-400 px-2 py-1 rounded border border-green-400/50 text-xs font-bold flex items-center backdrop-blur-sm">
@@ -292,6 +308,13 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
                   {formatViewCount(viewStats.totalViews)}
                 </span>
               )}
+              {/* ✅ ADDED: Show votes in list view */}
+              {showVotes && votes !== undefined && votes !== null && (
+                <span className="flex items-center text-green-400">
+                  <ZapIcon className="h-3 w-3 mr-1" />
+                  {formatVotes(votes)} $WEMARK
+                </span>
+              )}
             </div>
           </div>
 
@@ -363,12 +386,19 @@ export const EvermarkCard: React.FC<UnifiedEvermarkCardProps> = ({
 
         {/* Footer */}
         <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-700">
-          {/* Views */}
+          {/* Views and Votes */}
           <div className="flex items-center gap-3 text-xs text-gray-500">
             {showViews && viewStats && (
               <span className="flex items-center text-cyan-400">
                 <EyeIcon className="h-3 w-3 mr-1" />
                 {formatViewCount(viewStats.totalViews)}
+              </span>
+            )}
+            {/* ✅ ADDED: Show votes in card footer */}
+            {showVotes && votes !== undefined && votes !== null && (
+              <span className="flex items-center text-green-400">
+                <ZapIcon className="h-3 w-3 mr-1" />
+                {formatVotes(votes)}
               </span>
             )}
           </div>
