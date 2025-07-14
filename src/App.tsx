@@ -17,6 +17,7 @@ import WrappingPage from './pages/WrappingPage';
 import BookshelfPage from './pages/BookshelfPage'; // ✅ UPDATED: Use actual bookshelf page
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import EvermarkDetailPage from './pages/EvermarkDetailPage';
+import TestPage from './pages/TestPage';
 import { ShareRedirect } from './components/sharing/ShareButton';
 import AboutPage from './pages/AboutPage';
 import UserCreatedEvermarksPage from './pages/UserCreatedEvermarksPage';
@@ -216,7 +217,7 @@ function AppContent() {
   <Route path="/leaderboard" element={<LeaderboardPage />} />
   <Route path="/my-evermarks" element={<MyEvermarksPage />} />
   <Route path="/create" element={<EnhancedCreateEvermark />} />
-  <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
+  <Route path="/evermark/:id" element={<TestPage />} />
   <Route path="/about" element={<AboutPage />} />
   
   {/* Bookshelf routes */}

@@ -140,7 +140,7 @@ const EvermarkDetailPage: React.FC<EvermarkDetailProps> = ({ id: propId }) => {
     if (evermark && id) {
       trackView();
     }
-  }, [evermark, id, trackView]);
+  }, [evermark, id, trackView]); // Keep trackView in dependencies as it's stable
 
   if (loading) {
     return (

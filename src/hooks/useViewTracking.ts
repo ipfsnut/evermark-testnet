@@ -138,7 +138,7 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
       
       return () => clearTimeout(timer);
     }
-  }, [evermarkId, viewStats, trackView]);
+  }, [evermarkId, viewStats]); // Remove trackView from dependencies to prevent infinite loop
 
   return {
     viewStats,
