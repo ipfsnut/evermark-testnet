@@ -55,18 +55,45 @@ export default async (request: Request, context: Context) => {
   }
 };
 
-// You'll need to implement this function based on your data source
+// Fetch real Evermark data from your API
 async function fetchEvermarkData(evermarkId: string) {
-  // This should fetch from your Supabase or blockchain
-  // For now, returning a mock response
-  return {
-    id: evermarkId,
-    title: 'Sample Evermark',
-    author: 'Test Author',
-    description: 'This is a sample Evermark for testing',
-    image: 'https://evermarks.net/og-image.png',
-    creationTime: Date.now()
-  };
+  try {
+    // Try to fetch from your Supabase API first
+    const supabaseResponse = await fetch(`https://evermarks.net/api/evermarks/${evermarkId}`);
+    if (supabaseResponse.ok) {
+      const data = await supabaseResponse.json();
+      return {
+        id: data.id,
+        title: data.title,
+        author: data.author,
+        description: data.description,
+        image: data.image,
+        creationTime: data.creationTime
+      };
+    }
+    
+    // Fallback to blockchain if needed
+    console.log('Supabase failed, using fallback data for evermark:', evermarkId);
+    return {
+      id: evermarkId,
+      title: `Evermark #${evermarkId}`,
+      author: 'Evermark Creator',
+      description: 'A permanently preserved piece of content on the blockchain',
+      image: null, // Will use generated OG image
+      creationTime: Date.now()
+    };
+  } catch (error) {
+    console.error('Error fetching evermark data:', error);
+    // Return fallback data
+    return {
+      id: evermarkId,
+      title: `Evermark #${evermarkId}`,
+      author: 'Evermark Creator',
+      description: 'A permanently preserved piece of content on the blockchain',
+      image: null,
+      creationTime: Date.now()
+    };
+  }
 }
 
 function generateMetaTags(evermark: any) {

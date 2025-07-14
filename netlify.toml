@@ -10,6 +10,11 @@
   status = 200
 
 [[redirects]]
+  from = "/api/evermarks/:id"
+  to = "/.netlify/functions/evermarks"
+  status = 200
+
+[[redirects]]
   from = "/frame/:id"
   to = "/.netlify/functions/frame"
   status = 200

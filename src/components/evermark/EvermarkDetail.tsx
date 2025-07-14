@@ -69,6 +69,19 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
   const { primaryAddress, isAuthenticated } = useProfile();
   const isMobile = useIsMobile();
   
+  // Debug logging for Farcaster context
+  useEffect(() => {
+    console.log('🔍 EvermarkDetail Debug:', {
+      id,
+      params,
+      url: window.location.href,
+      isInFarcaster: window.parent !== window,
+      evermark,
+      isLoading,
+      error
+    });
+  }, [id, params, evermark, isLoading, error]);
+  
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [enhancedMetadata, setEnhancedMetadata] = useState<EnhancedMetadata | null>(null);
@@ -194,15 +207,18 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
   if (isLoading) {
     return (
       <PageContainer>
-        <div className="mb-4">
-          <Link 
-            to="/" 
-            className="inline-flex items-center text-sm text-gray-600 hover:text-purple-600 transition-colors"
-          >
-            <ArrowLeftIcon className="w-4 h-4 mr-1" />
-            Back to Home
-          </Link>
-        </div>
+        {/* Only show navigation outside of Farcaster */}
+        {window.parent === window && (
+          <div className="mb-4">
+            <Link 
+              to="/" 
+              className="inline-flex items-center text-sm text-gray-600 hover:text-purple-600 transition-colors"
+            >
+              <ArrowLeftIcon className="w-4 h-4 mr-1" />
+              Back to Home
+            </Link>
+          </div>
+        )}
         
         <div className="animate-pulse space-y-6">
           <div className="w-full h-48 md:h-64 lg:h-80 bg-gray-200 rounded-lg"></div>
@@ -224,20 +240,33 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
   if (error || !evermark) {
     return (
       <PageContainer>
-        <div className="mb-4">
-          <Link 
-            to="/" 
-            className="inline-flex items-center text-sm text-gray-600 hover:text-purple-600 transition-colors"
-          >
-            <ArrowLeftIcon className="w-4 h-4 mr-1" />
-            Back to Home
-          </Link>
-        </div>
+        {/* Only show navigation outside of Farcaster */}
+        {window.parent === window && (
+          <div className="mb-4">
+            <Link 
+              to="/" 
+              className="inline-flex items-center text-sm text-gray-600 hover:text-purple-600 transition-colors"
+            >
+              <ArrowLeftIcon className="w-4 h-4 mr-1" />
+              Back to Home
+            </Link>
+          </div>
+        )}
         
         <div className="bg-white rounded-lg shadow-sm p-6 text-center">
           <BookmarkIcon className="mx-auto h-12 w-12 text-red-300 mb-4" />
           <h2 className="text-xl font-medium text-gray-900 mb-2">Error Loading Evermark</h2>
           <p className="text-gray-600">{error || "This Evermark could not be found"}</p>
+          
+          {/* Debug info in Farcaster */}
+          {window.parent !== window && (
+            <div className="mt-4 p-3 bg-gray-100 rounded text-left text-xs">
+              <p><strong>Debug info:</strong></p>
+              <p>ID: {id}</p>
+              <p>URL: {window.location.href}</p>
+              <p>Error: {error}</p>
+            </div>
+          )}
         </div>
       </PageContainer>
     );
@@ -250,16 +279,18 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
       {/* ✅ Meta tags for rich sharing */}
       {evermarkMetadata && <EvermarkMetaTags evermark={evermarkMetadata} />}
       
-      {/* Navigation */}
-      <div className="mb-6">
-        <Link 
-          to="/" 
-          className="inline-flex items-center text-sm text-gray-600 hover:text-purple-600 transition-colors"
-        >
-          <ArrowLeftIcon className="w-4 h-4 mr-1" />
-          Back to Home
-        </Link>
-      </div>
+      {/* Navigation - only show outside of Farcaster */}
+      {window.parent === window && (
+        <div className="mb-6">
+          <Link 
+            to="/" 
+            className="inline-flex items-center text-sm text-gray-600 hover:text-purple-600 transition-colors"
+          >
+            <ArrowLeftIcon className="w-4 h-4 mr-1" />
+            Back to Home
+          </Link>
+        </div>
+      )}
       
       {/* Main Content Card */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden mb-6">
