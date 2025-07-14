@@ -9,6 +9,25 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+# Farcaster crawler redirects for meta tags
+[[redirects]]
+  from = "/evermark/:id"
+  to = "/.netlify/functions/evermark-meta"
+  status = 200
+  condition = "User-Agent: facebookexternalhit"
+
+[[redirects]]
+  from = "/evermark/:id"
+  to = "/.netlify/functions/evermark-meta"
+  status = 200
+  condition = "User-Agent: Twitterbot"
+
+[[redirects]]
+  from = "/evermark/:id"
+  to = "/.netlify/functions/evermark-meta"
+  status = 200
+  condition = "User-Agent: *bot*"
+
 [[redirects]]
   from = "/share/evermark/:id"
   to = "/.netlify/functions/evermark-share"
