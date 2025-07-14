@@ -74,6 +74,34 @@ function generateMetaTags(evermark: any) {
   const evermarkUrl = `${baseUrl}/evermark/${evermark.id}`;
   const imageUrl = evermark.image || `${baseUrl}/.netlify/functions/og-image?title=${encodeURIComponent(evermark.title)}&author=${encodeURIComponent(evermark.author)}`;
   
+  // Create Mini App embed JSON
+  const miniAppEmbed = {
+    version: "1",
+    imageUrl: imageUrl,
+    button: {
+      title: "📖 View Evermark",
+      action: {
+        type: "launch_miniapp",
+        url: evermarkUrl,
+        name: "Evermark",
+        splashImageUrl: "https://evermarks.net/icon.png",
+        splashBackgroundColor: "#7c3aed"
+      }
+    }
+  };
+
+  // For backward compatibility, also create frame version
+  const frameEmbed = {
+    ...miniAppEmbed,
+    button: {
+      ...miniAppEmbed.button,
+      action: {
+        ...miniAppEmbed.button.action,
+        type: "launch_frame" // For backward compatibility
+      }
+    }
+  };
+  
   return `
     <!-- Basic Meta Tags -->
     <title>${evermark.title} | Evermark</title>
@@ -96,17 +124,9 @@ function generateMetaTags(evermark: any) {
     <meta name="twitter:description" content="${evermark.description}" />
     <meta name="twitter:image" content="${imageUrl}" />
     
-    <!-- Farcaster Frame Tags -->
-    <meta property="fc:frame" content="vNext" />
-    <meta property="fc:frame:image" content="${imageUrl}" />
-    <meta property="fc:frame:image:aspect_ratio" content="1.91:1" />
-    <meta property="fc:frame:button:1" content="View Evermark" />
-    <meta property="fc:frame:button:1:action" content="link" />
-    <meta property="fc:frame:button:1:target" content="${evermarkUrl}" />
-    
-    <!-- Farcaster Mini App -->
-    <meta property="fc:miniapp:manifest" content="${baseUrl}/.well-known/farcaster.json" />
-    <meta property="fc:miniapp:url" content="${evermarkUrl}" />
-    <meta property="fc:miniapp:name" content="Evermark" />
+    <!-- Farcaster Mini App Embed -->
+    <meta name="fc:miniapp" content='${JSON.stringify(miniAppEmbed)}' />
+    <!-- For backward compatibility -->
+    <meta name="fc:frame" content='${JSON.stringify(frameEmbed)}' />
   `;
 }

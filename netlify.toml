@@ -9,6 +9,11 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+[[redirects]]
+  from = "/frame/:id"
+  to = "/.netlify/functions/frame"
+  status = 200
+
 # Farcaster crawler redirects for meta tags
 [[redirects]]
   from = "/evermark/:id"

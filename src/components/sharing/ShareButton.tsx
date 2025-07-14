@@ -62,17 +62,9 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   const generateFarcasterUniversalLink = () => {
     console.log('🔍 Farcaster env vars:', { FARCASTER_APP_ID, FARCASTER_APP_SLUG });
     
-    // Generate direct mini-app URL with Farcaster context
-    // This should open your mini-app directly in Farcaster, not a compose window
-    const miniAppParams = new URLSearchParams({
-      inFeed: 'true',
-      action_type: 'share',
-      action_sub_type: 'default'
-    });
-    
-    const miniAppUrl = `${evermarkUrl}?${miniAppParams.toString()}`;
-    console.log('✅ Generated Mini-App URL:', miniAppUrl);
-    return miniAppUrl;
+    // Just return the evermark URL - it will have proper fc:miniapp meta tags
+    console.log('✅ Using Evermark URL with mini-app meta tags:', evermarkUrl);
+    return evermarkUrl;
   };
   
   // Size configurations
@@ -126,7 +118,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         trackShare('farcaster_embed');
       },
       color: 'hover:bg-purple-900/30 hover:text-purple-400 hover:border-purple-500/30',
-      description: 'Share with rich preview'
+      description: 'Share with rich mini-app preview'
     },
     {
       name: 'Twitter',
