@@ -1,4 +1,4 @@
-// Minimal EvermarkDetail Page - no wallet dependencies
+// Fixed EvermarkDetailPage.tsx - Prevents infinite loops
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
@@ -98,51 +98,84 @@ interface EvermarkData {
   updated_at: string;
 }
 
-// Minimal hook for fetching Evermark data without wallet dependencies
+// FIXED: Hook with proper error handling and retry logic
 function useEvermarkDetailMinimal(id?: string) {
   const [data, setData] = useState<EvermarkData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  const maxRetries = 3;
 
   useEffect(() => {
-    if (!id) return;
+    if (!id) {
+      setLoading(false);
+      setError('No Evermark ID provided');
+      return;
+    }
 
     const fetchEvermark = async () => {
       try {
         setLoading(true);
-        const response = await fetch(`/api/evermarks/${id}`);
+        setError(null);
+        
+        console.log(`🔍 Fetching Evermark ${id}, attempt ${retryCount + 1}`);
+        
+        // FIXED: Use the correct API endpoint that matches your Netlify functions
+        const response = await fetch(`/.netlify/functions/evermarks?id=${id}`);
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch Evermark');
+          if (response.status === 404) {
+            throw new Error('Evermark not found');
+          }
+          throw new Error(`Failed to fetch Evermark: ${response.status}`);
         }
+        
         const evermark = await response.json();
+        console.log('✅ Evermark data fetched:', evermark);
+        
         setData(evermark);
+        setRetryCount(0); // Reset retry count on success
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        console.error('❌ Error fetching Evermark:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setError(errorMessage);
+        
+        // Retry logic for network errors (but not 404s)
+        if (retryCount < maxRetries && !errorMessage.includes('not found')) {
+          console.log(`🔄 Retrying in 2 seconds... (${retryCount + 1}/${maxRetries})`);
+          setTimeout(() => {
+            setRetryCount(prev => prev + 1);
+          }, 2000);
+          return; // Don't set loading to false yet
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchEvermark();
-  }, [id]);
+  }, [id, retryCount]); // Include retryCount in dependencies
 
-  return { data, loading, error };
+  return { data, loading, error, retryCount };
 }
 
 const EvermarkDetailPage: React.FC<EvermarkDetailProps> = ({ id: propId }) => {
   const { id: paramId } = useParams<{ id: string }>();
   const id = propId || paramId;
   
-  const { data: evermark, loading, error } = useEvermarkDetailMinimal(id);
+  const { data: evermark, loading, error, retryCount } = useEvermarkDetailMinimal(id);
   const { trackView } = useViewTracking(id || '');
 
+  // FIXED: Only track view once when evermark is loaded
   useEffect(() => {
-    if (evermark && id) {
+    if (evermark && id && !loading && !error) {
+      console.log('📊 Tracking view for Evermark:', id);
       trackView();
     }
-  }, [evermark, id]); // Remove trackView from dependencies to prevent infinite loop
+  }, [evermark?.id, trackView]); // Use evermark.id instead of evermark to prevent excessive calls
 
-  if (loading) {
+  // FIXED: Better loading state
+  if (loading && retryCount === 0) {
     return (
       <div className="max-w-4xl mx-auto p-4">
         <div className="animate-pulse">
@@ -155,24 +188,53 @@ const EvermarkDetailPage: React.FC<EvermarkDetailProps> = ({ id: propId }) => {
             <div className="h-4 bg-gray-200 rounded w-4/6"></div>
           </div>
         </div>
+        <div className="text-center mt-4 text-gray-500">
+          Loading Evermark {id}...
+        </div>
       </div>
     );
   }
 
+  // FIXED: Better retry state
+  if (loading && retryCount > 0) {
+    return (
+      <div className="max-w-4xl mx-auto p-4">
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">
+            Retrying... (Attempt {retryCount + 1}/{3})
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // FIXED: Better error handling
   if (error || !evermark) {
     return (
       <div className="max-w-4xl mx-auto p-4">
         <div className="text-center py-12">
           <div className="text-red-500 text-xl mb-4">⚠️ Error Loading Evermark</div>
-          <p className="text-gray-600">
+          <p className="text-gray-600 mb-4">
             {error || 'Evermark not found'}
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
-          >
-            Retry
-          </button>
+          <p className="text-sm text-gray-500 mb-6">
+            Evermark ID: {id}
+          </p>
+          <div className="space-y-2">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 mr-2"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => window.history.back()}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     );

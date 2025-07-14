@@ -19,7 +19,7 @@
   to = "/.netlify/functions/frame"
   status = 200
 
-# Farcaster crawler redirects for meta tags
+# Farcaster crawler redirects for meta tags - THESE ARE THE PROBLEMATIC ONES
 [[redirects]]
   from = "/evermark/:id"
   to = "/.netlify/functions/evermark-meta"
@@ -32,6 +32,19 @@
   status = 200
   condition = "User-Agent: Twitterbot"
 
+# ADD THESE NEW CONDITIONS FOR OTHER CRAWLERS
+[[redirects]]
+  from = "/evermark/:id"
+  to = "/.netlify/functions/evermark-meta"
+  status = 200
+  condition = "User-Agent: *farcaster*"
+
+[[redirects]]
+  from = "/evermark/:id"
+  to = "/.netlify/functions/evermark-meta"
+  status = 200
+  condition = "User-Agent: *bot*"
+
 [[redirects]]
   from = "/share/evermark/:id"
   to = "/.netlify/functions/evermark-share"
@@ -42,6 +55,22 @@
   to = "/.netlify/functions/shares"
   status = 200
 
+[[redirects]]
+  from = "/webhook"
+  to = "/.netlify/functions/webhook"
+  status = 200
+
+[[redirects]]
+  from = "/webhook/*"
+  to = "/.netlify/functions/webhook"
+  status = 200
+
+[[redirects]]
+  from = "/api/shares/*"
+  to = "/.netlify/functions/shares"
+  status = 200
+
+# IMPORTANT: This catch-all must be LAST
 [[redirects]]
   from = "/*"
   to = "/index.html"
@@ -97,7 +126,6 @@
     Content-Type = "application/json"
     Access-Control-Allow-Origin = "*"
     Cache-Control = "public, max-age=300"
-    # Remove frame restrictions for mobile compatibility
     
 [[headers]]
   for = "/.well-known/farcaster.json"
@@ -105,23 +133,3 @@
     Content-Type = "application/json"
     Access-Control-Allow-Origin = "*"
     Cache-Control = "public, max-age=300"
-
-  [[redirects]]
-  from = "/webhook"
-  to = "/.netlify/functions/webhook"
-  status = 200
-
-[[redirects]]
-  from = "/webhook/*"
-  to = "/.netlify/functions/webhook"
-  status = 200
-
-[[redirects]]
-  from = "/api/shares"
-  to = "/.netlify/functions/shares"
-  status = 200
-
-[[redirects]]
-  from = "/api/shares/*"
-  to = "/.netlify/functions/shares"
-  status = 200
