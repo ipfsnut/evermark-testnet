@@ -216,7 +216,7 @@ function AppContent() {
   <Route path="/leaderboard" element={<LeaderboardPage />} />
   <Route path="/my-evermarks" element={<MyEvermarksPage />} />
   <Route path="/create" element={<EnhancedCreateEvermark />} />
-
+  <Route path="/evermark/:id" element={<EvermarkDetailMinimal />} />
   <Route path="/about" element={<AboutPage />} />
   
   {/* Bookshelf routes */}
