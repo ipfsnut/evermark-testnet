@@ -22,6 +22,8 @@ export default async (request: Request, context: Context) => {
       throw new Error('Missing Supabase configuration');
     }
 
+    console.log(`Fetching evermark ${evermarkId} from Supabase...`);
+
     // Fetch from Supabase
     const response = await fetch(`${supabaseUrl}/rest/v1/evermarks?id=eq.${evermarkId}`, {
       headers: {
@@ -31,13 +33,17 @@ export default async (request: Request, context: Context) => {
       }
     });
 
+    console.log(`Supabase response status: ${response.status}`);
+
     if (!response.ok) {
       throw new Error(`Supabase error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log(`Supabase data:`, data);
     
     if (!data || data.length === 0) {
+      console.log('No data found in Supabase, returning 404');
       return new Response(JSON.stringify({ error: 'Evermark not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' }
@@ -46,18 +52,26 @@ export default async (request: Request, context: Context) => {
 
     const evermark = data[0];
     
-    // Format the response
+    // Format the response to match EvermarkDetailPage expectations
     const formattedEvermark = {
       id: evermark.id,
-      title: evermark.title,
-      author: evermark.author,
+      name: evermark.title || evermark.name,
       description: evermark.description,
-      image: evermark.metadata?.image,
-      sourceUrl: evermark.metadata?.sourceUrl,
-      metadataURI: evermark.metadata?.metadataURI,
-      creator: evermark.metadata?.creator || evermark.author,
-      creationTime: evermark.metadata?.creationTime || new Date(evermark.created_at).getTime(),
-      verified: evermark.verified
+      content: evermark.description || evermark.content,
+      image: evermark.metadata?.image || evermark.image,
+      external_url: evermark.metadata?.sourceUrl || evermark.external_url,
+      author: evermark.author,
+      timestamp: evermark.created_at,
+      tx_hash: evermark.tx_hash,
+      block_number: evermark.block_number,
+      metadata: evermark.metadata || {},
+      evermark_type: evermark.evermark_type || 'farcaster',
+      source_platform: evermark.source_platform || 'farcaster',
+      voting_power: evermark.voting_power || 0,
+      view_count: evermark.view_count || 0,
+      tags: evermark.tags || [],
+      created_at: evermark.created_at,
+      updated_at: evermark.updated_at
     };
 
     return new Response(JSON.stringify(formattedEvermark), {

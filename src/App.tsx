@@ -5,7 +5,7 @@ import { AppThirdwebProvider } from './lib/thirdweb';
 import { FarcasterProvider, useFarcasterUser } from './lib/farcaster';
 import Layout from './components/layout/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
-import { WalletProvider } from './providers/WalletProvider';
+
 import sdk from '@farcaster/frame-sdk';
 
 // Core pages
@@ -17,7 +17,7 @@ import WrappingPage from './pages/WrappingPage';
 import BookshelfPage from './pages/BookshelfPage'; // ✅ UPDATED: Use actual bookshelf page
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import EvermarkDetailPage from './pages/EvermarkDetailPage';
-import TestPage from './pages/TestPage';
+
 import { ShareRedirect } from './components/sharing/ShareButton';
 import AboutPage from './pages/AboutPage';
 import UserCreatedEvermarksPage from './pages/UserCreatedEvermarksPage';
@@ -217,7 +217,7 @@ function AppContent() {
   <Route path="/leaderboard" element={<LeaderboardPage />} />
   <Route path="/my-evermarks" element={<MyEvermarksPage />} />
   <Route path="/create" element={<EnhancedCreateEvermark />} />
-  <Route path="/evermark/:id" element={<TestPage />} />
+  <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
   <Route path="/about" element={<AboutPage />} />
   
   {/* Bookshelf routes */}
@@ -444,10 +444,8 @@ function App() {
     <ErrorBoundary>
       <FarcasterProvider>
         <AppThirdwebProvider>
-          <WalletProvider>
-            <DebugInfo />
-            <AppContent />
-          </WalletProvider>
+          <DebugInfo />
+          <AppContent />
         </AppThirdwebProvider>
       </FarcasterProvider>
     </ErrorBoundary>

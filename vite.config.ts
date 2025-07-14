@@ -14,4 +14,7 @@ export default defineConfig({
   esbuild: {
     target: 'es2020',
   },
+  resolve: {
+    dedupe: ['@emotion/react', '@emotion/styled', 'react', 'react-dom']
+  },
 });
