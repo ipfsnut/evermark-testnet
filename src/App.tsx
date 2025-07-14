@@ -17,6 +17,7 @@ import WrappingPage from './pages/WrappingPage';
 import BookshelfPage from './pages/BookshelfPage'; // ✅ UPDATED: Use actual bookshelf page
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import { EvermarkDetail } from './components/evermark/EvermarkDetail';
+import EvermarkDetailMinimal from './components/evermark/EvermarkDetailMinimal';
 import { ShareRedirect } from './components/sharing/ShareButton';
 import AboutPage from './pages/AboutPage';
 import UserCreatedEvermarksPage from './pages/UserCreatedEvermarksPage';
@@ -257,7 +258,7 @@ function AppContent() {
 
 // ✅ UPDATED: Enhanced coming soon page with bookshelf integration
 function ComingSoonPage({ feature }: { feature: string }) {
-  const { isInFarcaster, isAuthenticated, hasVerifiedAddress } = useFarcasterUser();
+  const { isAuthenticated, hasVerifiedAddress } = useFarcasterUser();
   const farcasterContext = useFarcasterContext();
   
   return (
@@ -350,7 +351,7 @@ function FarcasterMinimalApp() {
     <BrowserRouter>
       <div className="min-h-screen bg-gray-50">
         <Routes>
-          <Route path="/evermark/:id" element={<EvermarkDetail />} />
+          <Route path="/evermark/:id" element={<EvermarkDetailMinimal />} />
           <Route path="/" element={<MinimalHomePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
