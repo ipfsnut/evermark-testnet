@@ -26,9 +26,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <WagmiProvider config={wagmiConfig}>
           <ThirdwebProvider>
             <FarcasterProvider>
-              <BrowserRouter>
                 <App />
-              </BrowserRouter>
             </FarcasterProvider>
           </ThirdwebProvider>
         </WagmiProvider>
