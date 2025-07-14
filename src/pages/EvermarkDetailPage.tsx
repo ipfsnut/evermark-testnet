@@ -1,4 +1,4 @@
-// Minimal EvermarkDetail for Farcaster - no wallet dependencies
+// Minimal EvermarkDetail Page - no wallet dependencies
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
@@ -10,9 +10,9 @@ import {
   EyeIcon,
   TagIcon
 } from 'lucide-react';
-import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
-import { EvermarkMetaTags } from '../meta/EvermarkMetaTags';
-import { cn, textSizes } from '../../utils/responsive';
+import { useViewTracking, formatViewCount } from '../hooks/useViewTracking';
+import { EvermarkMetaTags } from '../components/meta/EvermarkMetaTags';
+import { cn, textSizes } from '../utils/responsive';
 
 interface EvermarkDetailProps {
   id?: string;
@@ -129,7 +129,7 @@ function useEvermarkDetailMinimal(id?: string) {
   return { data, loading, error };
 }
 
-const EvermarkDetailMinimal: React.FC<EvermarkDetailProps> = ({ id: propId }) => {
+const EvermarkDetailPage: React.FC<EvermarkDetailProps> = ({ id: propId }) => {
   const { id: paramId } = useParams<{ id: string }>();
   const id = propId || paramId;
   
@@ -311,4 +311,4 @@ const EvermarkDetailMinimal: React.FC<EvermarkDetailProps> = ({ id: propId }) =>
   );
 };
 
-export default EvermarkDetailMinimal;
+export default EvermarkDetailPage;

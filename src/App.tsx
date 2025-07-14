@@ -16,7 +16,7 @@ import MyEvermarksPage from './pages/MyEvermarksPage';
 import WrappingPage from './pages/WrappingPage';
 import BookshelfPage from './pages/BookshelfPage'; // ✅ UPDATED: Use actual bookshelf page
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
-import EvermarkDetailMinimal from './components/evermark/EvermarkDetailMinimal';
+import EvermarkDetailPage from './pages/EvermarkDetailPage';
 import { ShareRedirect } from './components/sharing/ShareButton';
 import AboutPage from './pages/AboutPage';
 import UserCreatedEvermarksPage from './pages/UserCreatedEvermarksPage';
@@ -216,7 +216,7 @@ function AppContent() {
   <Route path="/leaderboard" element={<LeaderboardPage />} />
   <Route path="/my-evermarks" element={<MyEvermarksPage />} />
   <Route path="/create" element={<EnhancedCreateEvermark />} />
-  <Route path="/evermark/:id" element={<EvermarkDetailMinimal />} />
+  <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
   <Route path="/about" element={<AboutPage />} />
   
   {/* Bookshelf routes */}
@@ -350,7 +350,7 @@ function FarcasterMinimalApp() {
     <BrowserRouter>
       <div className="min-h-screen bg-gray-50">
         <Routes>
-          <Route path="/evermark/:id" element={<EvermarkDetailMinimal />} />
+          <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
           <Route path="/" element={<MinimalHomePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
