@@ -1,135 +1,80 @@
-[build]
-  command = "vite build"
-  publish = "dist"
-  environment = { NODE_VERSION = "20" }
-  functions = "netlify/functions"
+// src/components/meta/EvermarkMetaTags.tsx - Client-side meta tag generation
+import React, { useEffect } from 'react';
 
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+interface EvermarkMetaTagsProps {
+  evermark: {
+    id: string;
+    name: string;
+    description: string;
+    author: string;
+    image?: string;
+  };
+}
 
-[[redirects]]
-  from = "/api/evermarks/:id"
-  to = "/.netlify/functions/evermarks"
-  status = 200
-
-[[redirects]]
-  from = "/frame/:id"
-  to = "/.netlify/functions/frame"
-  status = 200
-
-# Farcaster crawler redirects for meta tags - THESE ARE THE PROBLEMATIC ONES
-[[redirects]]
-  from = "/evermark/:id"
-  to = "/.netlify/functions/evermark-meta"
-  status = 200
-  condition = "User-Agent: facebookexternalhit"
-
-[[redirects]]
-  from = "/evermark/:id"
-  to = "/.netlify/functions/evermark-meta"
-  status = 200
-  condition = "User-Agent: Twitterbot"
-
-# ADD THESE NEW CONDITIONS FOR OTHER CRAWLERS
-[[redirects]]
-  from = "/evermark/:id"
-  to = "/.netlify/functions/evermark-meta"
-  status = 200
-  condition = "User-Agent: *farcaster*"
-
-[[redirects]]
-  from = "/evermark/:id"
-  to = "/.netlify/functions/evermark-meta"
-  status = 200
-  condition = "User-Agent: *bot*"
-
-[[redirects]]
-  from = "/share/evermark/:id"
-  to = "/.netlify/functions/evermark-share"
-  status = 200
-
-[[redirects]]
-  from = "/api/shares"
-  to = "/.netlify/functions/shares"
-  status = 200
-
-[[redirects]]
-  from = "/webhook"
-  to = "/.netlify/functions/webhook"
-  status = 200
-
-[[redirects]]
-  from = "/webhook/*"
-  to = "/.netlify/functions/webhook"
-  status = 200
-
-[[redirects]]
-  from = "/api/shares/*"
-  to = "/.netlify/functions/shares"
-  status = 200
-
-# IMPORTANT: This catch-all must be LAST
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-
-# MOBILE-OPTIMIZED HEADERS - REMOVED CSP CONFLICTS
-[[headers]]
-  for = "/*"
-  [headers.values]
-    # Security headers (REMOVED CSP to avoid conflicts with HTML)
-    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
-    X-Content-Type-Options = "nosniff"
-    X-XSS-Protection = "1; mode=block"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+export const EvermarkMetaTags: React.FC<EvermarkMetaTagsProps> = ({ evermark }) => {
+  useEffect(() => {
+    // Update document title
+    document.title = `${evermark.name} | Evermark`;
     
-    # MOBILE FRAME SUPPORT - Allow all frame embedding
-    # X-Frame-Options removed to avoid conflicts with CSP frame-ancestors
+    // Update meta description
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', evermark.description);
+    } else {
+      const meta = document.createElement('meta');
+      meta.name = 'description';
+      meta.content = evermark.description;
+      document.head.appendChild(meta);
+    }
     
-    # CORS for mobile webviews
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With"
+    // Update Open Graph tags
+    const updateOGTag = (property: string, content: string) => {
+      let tag = document.querySelector(`meta[property="${property}"]`);
+      if (tag) {
+        tag.setAttribute('content', content);
+      } else {
+        tag = document.createElement('meta');
+        tag.setAttribute('property', property);
+        tag.setAttribute('content', content);
+        document.head.appendChild(tag);
+      }
+    };
     
-    # Mobile-specific optimizations
-    X-UA-Compatible = "IE=edge"
-    Vary = "Accept-Encoding, User-Agent"
-
-# Add CSP for Farcaster embedded content - READ-ONLY MODE
-[[headers]]
-  for = "/evermark/*"
-  [headers.values]
-    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://farcaster.xyz https://client.farcaster.xyz https://warpcast.com https://client.warpcast.com https://wrpcd.net https://*.wrpcd.net; frame-ancestors *;"
-
-# Static assets caching
-[[headers]]
-  for = "/assets/*"
-  [headers.values]
-    Cache-Control = "public, max-age=31536000, immutable"
-
-# API function headers
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
-    Access-Control-Allow-Headers = "Content-Type, Authorization, X-Requested-With, x-farcaster-signature"
-    Cache-Control = "no-cache"
-
-# Farcaster well-known files - MOBILE OPTIMIZED
-[[headers]]
-  for = "/.well-known/*"
-  [headers.values]
-    Content-Type = "application/json"
-    Access-Control-Allow-Origin = "*"
-    Cache-Control = "public, max-age=300"
+    updateOGTag('og:title', evermark.name);
+    updateOGTag('og:description', evermark.description);
+    updateOGTag('og:type', 'article');
+    updateOGTag('og:url', window.location.href);
     
-[[headers]]
-  for = "/.well-known/farcaster.json"
-  [headers.values]
-    Content-Type = "application/json"
-    Access-Control-Allow-Origin = "*"
-    Cache-Control = "public, max-age=300"
+    if (evermark.image) {
+      updateOGTag('og:image', evermark.image);
+    } else {
+      // Generate dynamic OG image
+      const ogImageUrl = `${window.location.origin}/.netlify/functions/og-image?title=${encodeURIComponent(evermark.name)}&author=${encodeURIComponent(evermark.author)}`;
+      updateOGTag('og:image', ogImageUrl);
+    }
+    
+    // Twitter Card tags
+    const updateTwitterTag = (name: string, content: string) => {
+      let tag = document.querySelector(`meta[name="${name}"]`);
+      if (tag) {
+        tag.setAttribute('content', content);
+      } else {
+        tag = document.createElement('meta');
+        tag.setAttribute('name', name);
+        tag.setAttribute('content', content);
+        document.head.appendChild(tag);
+      }
+    };
+    
+    updateTwitterTag('twitter:card', 'summary_large_image');
+    updateTwitterTag('twitter:title', evermark.name);
+    updateTwitterTag('twitter:description', evermark.description);
+    
+    if (evermark.image) {
+      updateTwitterTag('twitter:image', evermark.image);
+    }
+    
+  }, [evermark]);
+  
+  return null; // This component doesn't render anything
+};
