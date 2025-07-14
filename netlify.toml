@@ -33,12 +33,6 @@
   condition = "User-Agent: Twitterbot"
 
 [[redirects]]
-  from = "/evermark/:id"
-  to = "/.netlify/functions/evermark-meta"
-  status = 200
-  condition = "User-Agent: *bot*"
-
-[[redirects]]
   from = "/share/evermark/:id"
   to = "/.netlify/functions/evermark-share"
   status = 200

@@ -29,6 +29,7 @@ import { CreateFromCast } from './components/sharing/CreateFromCast';
 // ✅ NEW: Public bookshelf component
 import { PublicBookshelfView } from './components/bookshelf/PublicBookshelfView';
 import ExplorePage from './pages/ExplorePage';
+import { BrowserRouter } from 'react-router-dom';
 
 // Farcaster context types
 interface FarcasterContext {
@@ -343,7 +344,35 @@ function ComingSoonPage({ feature }: { feature: string }) {
   );
 }
 
+// Minimal Farcaster app - no wallet providers, just read-only content
+function FarcasterMinimalApp() {
+  return (
+    <BrowserRouter>
+      <div className="min-h-screen bg-gray-50">
+        <Routes>
+          <Route path="/evermark/:id" element={<EvermarkDetail />} />
+          <Route path="/" element={<EnhancedHomePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </BrowserRouter>
+  );
+}
+
 function App() {
+  // Detect if we're in Farcaster environment
+  const isInFarcaster = window.parent !== window || window.self !== window.top;
+  
+  if (isInFarcaster) {
+    // Minimal mode for Farcaster - no wallet providers
+    return (
+      <ErrorBoundary>
+        <FarcasterMinimalApp />
+      </ErrorBoundary>
+    );
+  }
+  
+  // Full mode for regular web
   return (
     <ErrorBoundary>
       <FarcasterProvider>

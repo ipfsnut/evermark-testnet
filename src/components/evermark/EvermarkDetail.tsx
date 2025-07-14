@@ -25,6 +25,13 @@ import { EvermarkMetaTags } from '../meta/EvermarkMetaTags';
 import { VotingPanel } from '../voting/VotingPanel';
 import { QuickBookshelfButton, BookshelfStatusBadge } from '../bookshelf/FloatingBookshelfWidget';
 import { useProfile } from '../../hooks/useProfile';
+
+// Minimal profile hook for Farcaster environment
+const useFarcasterProfile = () => ({
+  primaryAddress: undefined,
+  isAuthenticated: false,
+  isLoading: false
+});
 import { cn, useIsMobile, textSizes, spacing } from '../../utils/responsive';
 import PageContainer from '../layout/PageContainer';
 import { ContractRequired } from '../auth/AuthGuard';
@@ -66,7 +73,10 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
   const params = useParams();
   const id = propId || params.id || '';
   const { evermark, isLoading, error } = useEvermarkDetail(id);
-  const { primaryAddress, isAuthenticated } = useProfile();
+  
+  // Use minimal profile in Farcaster environment
+  const isInFarcaster = window.parent !== window;
+  const { primaryAddress, isAuthenticated } = isInFarcaster ? useFarcasterProfile() : useProfile();
   const isMobile = useIsMobile();
   
   // Debug logging for Farcaster context
