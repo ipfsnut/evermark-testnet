@@ -1,325 +1,336 @@
-// src/utils/evermark-meta.ts - Generate meta tags for Evermark sharing
+// src/utils/evermark-meta.ts - Enhanced metadata generation for Evermarks
 import React from 'react';
-import { type FarcasterCast } from '../lib/farcaster-api';
+import type { FarcasterCast } from '../lib/farcaster-api';
 
 export interface EvermarkMetadata {
   id: string;
   title: string;
   description: string;
   author: string;
-  authorAddress?: string;
-  category: string;
+  creator: string;
+  creationTime: number;
+  image?: string;
+  sourceUrl?: string;
   tags: string[];
-  createdAt: string;
-  engagement?: {
-    likes: number;
-    collects: number;
-    shares: number;
+  category?: string;
+  farcasterData?: {
+    castHash: string;
+    authorFid: number;
+    authorUsername: string;
+    engagement: {
+      likes: number;
+      recasts: number;
+      replies: number;
+    };
+    qualityScore: number;
   };
-  sourceData?: {
-    type: 'farcaster_cast' | 'user_created';
-    castHash?: string;
-    richCastData?: any;
-  };
+}
+
+export interface MetaTagConfig {
+  title: string;
+  description: string;
+  image?: string;
+  url: string;
+  type?: string;
+  siteName?: string;
 }
 
 export class EvermarkMetaGenerator {
   private baseUrl: string;
+  private defaultImage: string;
+  private siteName: string;
 
-  constructor(baseUrl: string = window.location.origin) {
-    this.baseUrl = baseUrl;
+  constructor(baseUrl?: string) {
+    this.baseUrl = baseUrl || window.location.origin;
+    this.defaultImage = `${this.baseUrl}/og-default.png`;
+    this.siteName = 'Evermark';
   }
 
-  // Generate Farcaster Mini App embed meta tag
-  generateFarcasterEmbed(evermark: EvermarkMetadata): string {
-    const imageUrl = this.generateOGImageUrl(evermark);
-    const evermarkUrl = `${this.baseUrl}/evermark/${evermark.id}`;
-    
-    const miniAppEmbed = {
-      version: "1",
-      imageUrl,
-      button: {
-        title: "📖 Read on Evermark",
-        action: {
-          type: "launch_miniapp",
-          url: evermarkUrl,
-          name: "Evermark",
-          splashImageUrl: `${this.baseUrl}/logo.png`,
-          splashBackgroundColor: "#7c3aed"
-        }
-      }
+  /**
+   * Generate comprehensive meta tags for an Evermark
+   */
+  generateMetaTags(evermark: EvermarkMetadata): string {
+    const config: MetaTagConfig = {
+      title: `${evermark.title} | ${this.siteName}`,
+      description: this.generateMetaDescription(evermark),
+      image: this.generateOGImageUrl(evermark),
+      url: `${this.baseUrl}/evermark/${evermark.id}`,
+      type: 'article',
+      siteName: this.siteName
     };
 
-    return JSON.stringify(miniAppEmbed);
+    return this.buildMetaTagsHTML(config, evermark);
   }
 
-  // Generate all meta tags for an Evermark page
-  generateMetaTags(evermark: EvermarkMetadata): string {
-    const ogImageUrl = this.generateOGImageUrl(evermark);
-    const evermarkUrl = `${this.baseUrl}/evermark/${evermark.id}`;
-    const farcasterEmbed = this.generateFarcasterEmbed(evermark);
+  /**
+   * Generate meta description with rich context
+   */
+  generateMetaDescription(evermark: EvermarkMetadata): string {
+    const baseDescription = evermark.description?.slice(0, 120) || 
+                           `An Evermark by ${evermark.author}`;
     
-    const description = this.truncateDescription(evermark.description, 160);
-    const title = `${evermark.title} by ${evermark.author} | Evermark`;
-
-    return `
-    <!-- Basic Meta Tags -->
-    <title>${title}</title>
-    <meta name="description" content="${description}" />
-    <meta name="keywords" content="${evermark.tags.join(', ')}, evermark, farcaster, web3, blockchain" />
-    <meta name="author" content="${evermark.author}" />
+    const contextParts: string[] = [baseDescription];
     
-    <!-- Open Graph Meta Tags -->
-    <meta property="og:type" content="article" />
-    <meta property="og:title" content="${title}" />
-    <meta property="og:description" content="${description}" />
-    <meta property="og:image" content="${ogImageUrl}" />
-    <meta property="og:url" content="${evermarkUrl}" />
-    <meta property="og:site_name" content="Evermark" />
-    <meta property="article:author" content="${evermark.author}" />
-    <meta property="article:published_time" content="${evermark.createdAt}" />
-    <meta property="article:section" content="${evermark.category}" />
-    ${evermark.tags.map(tag => `<meta property="article:tag" content="${tag}" />`).join('\n    ')}
+    // Add Farcaster context
+    if (evermark.farcasterData) {
+      contextParts.push(`Originally shared on Farcaster by @${evermark.farcasterData.authorUsername}`);
+      
+      // Add engagement if significant
+      const totalEngagement = evermark.farcasterData.engagement.likes + 
+                             evermark.farcasterData.engagement.recasts + 
+                             evermark.farcasterData.engagement.replies;
+      
+      if (totalEngagement > 10) {
+        contextParts.push(`${totalEngagement} engagements`);
+      }
+    }
     
-    <!-- Twitter Card Meta Tags -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="${title}" />
-    <meta name="twitter:description" content="${description}" />
-    <meta name="twitter:image" content="${ogImageUrl}" />
-    <meta name="twitter:creator" content="@evermarkapp" />
-    <meta name="twitter:site" content="@evermarkapp" />
+    // Add category context
+    if (evermark.category && evermark.category !== 'other') {
+      contextParts.push(`#${evermark.category}`);
+    }
     
-    <!-- Farcaster Mini App Meta Tags -->
-    <meta name="fc:miniapp" content='${farcasterEmbed}' />
-    <!-- For backward compatibility -->
-    <meta name="fc:frame" content='${farcasterEmbed.replace('"launch_miniapp"', '"launch_frame"')}' />
-    
-    <!-- Additional Structured Data -->
-    <script type="application/ld+json">
-    ${this.generateStructuredData(evermark)}
-    </script>
-    `.trim();
+    return contextParts.join(' • ').slice(0, 155);
   }
 
-  // Generate OG image URL with parameters
+  /**
+   * Generate dynamic OG image URL with parameters
+   */
   generateOGImageUrl(evermark: EvermarkMetadata): string {
+    if (evermark.image) {
+      return evermark.image;
+    }
+
     const params = new URLSearchParams({
-      id: evermark.id,
-      title: evermark.title.slice(0, 100),
+      title: evermark.title.slice(0, 60),
       author: evermark.author,
-      category: evermark.category,
-      // Include engagement data if available
-      ...(evermark.engagement && {
-        likes: evermark.engagement.likes.toString(),
-        collects: evermark.engagement.collects.toString()
-      }),
-      // Include source type for styling
-      ...(evermark.sourceData?.type && {
-        source: evermark.sourceData.type
-      })
+      type: evermark.farcasterData ? 'farcaster' : 'evermark',
+      category: evermark.category || 'general'
     });
 
-    return `${this.baseUrl}/api/og/evermark?${params.toString()}`;
+    // Add engagement data for Farcaster casts
+    if (evermark.farcasterData) {
+      params.set('likes', evermark.farcasterData.engagement.likes.toString());
+      params.set('recasts', evermark.farcasterData.engagement.recasts.toString());
+      params.set('quality', Math.round(evermark.farcasterData.qualityScore).toString());
+    }
+
+    return `${this.baseUrl}/.netlify/functions/og-image?${params.toString()}`;
   }
 
-  // Generate structured data for SEO
-  private generateStructuredData(evermark: EvermarkMetadata): string {
-    const structuredData = {
-      "@context": "https://schema.org",
-      "@type": "CreativeWork",
-      "name": evermark.title,
-      "description": this.truncateDescription(evermark.description, 200),
-      "author": {
-        "@type": "Person",
-        "name": evermark.author,
-        ...(evermark.authorAddress && {
-          "identifier": evermark.authorAddress
-        })
-      },
-      "dateCreated": evermark.createdAt,
-      "category": evermark.category,
-      "keywords": evermark.tags.join(', '),
-      "url": `${this.baseUrl}/evermark/${evermark.id}`,
-      "image": this.generateOGImageUrl(evermark),
-      "publisher": {
-        "@type": "Organization",
-        "name": "Evermark",
-        "url": this.baseUrl,
-        "logo": `${this.baseUrl}/logo.png`
-      },
-      "mainEntityOfPage": {
-        "@type": "WebPage",
-        "@id": `${this.baseUrl}/evermark/${evermark.id}`
-      },
-      ...(evermark.engagement && {
-        "interactionStatistic": [
-          {
-            "@type": "InteractionCounter",
-            "interactionType": "https://schema.org/LikeAction",
-            "userInteractionCount": evermark.engagement.likes
-          },
-          {
-            "@type": "InteractionCounter", 
-            "interactionType": "https://schema.org/ShareAction",
-            "userInteractionCount": evermark.engagement.shares
-          }
-        ]
-      })
-    };
-
-    return JSON.stringify(structuredData, null, 2);
-  }
-
-  // Truncate description to specified length
-  private truncateDescription(description: string, maxLength: number): string {
-    if (description.length <= maxLength) return description;
+  /**
+   * Generate Farcaster-specific embed tags
+   */
+  generateFarcasterEmbed(evermark: EvermarkMetadata): string {
+    const frameUrl = `${this.baseUrl}/evermark/${evermark.id}`;
     
-    const truncated = description.slice(0, maxLength - 3);
-    const lastSpace = truncated.lastIndexOf(' ');
+    return `
+    <!-- Farcaster Frame/Mini App Tags -->
+    <meta property="fc:frame" content="vNext" />
+    <meta property="fc:frame:image" content="${this.generateOGImageUrl(evermark)}" />
+    <meta property="fc:frame:image:aspect_ratio" content="1.91:1" />
+    <meta property="fc:frame:button:1" content="View Evermark" />
+    <meta property="fc:frame:button:1:action" content="link" />
+    <meta property="fc:frame:button:1:target" content="${frameUrl}" />
     
-    return lastSpace > 0 ? truncated.slice(0, lastSpace) + '...' : truncated + '...';
+    <!-- Farcaster Mini App Integration -->
+    <meta property="fc:miniapp:manifest" content="${this.baseUrl}/.well-known/farcaster.json" />
+    <meta property="fc:miniapp:url" content="${frameUrl}" />
+    <meta property="fc:miniapp:name" content="${this.siteName}" />
+    `;
   }
 
-  // Generate share text for social platforms
-  generateShareText(evermark: EvermarkMetadata, platform: 'twitter' | 'farcaster' = 'farcaster'): string {
-    const baseText = `Check out "${evermark.title}" by ${evermark.author} on Evermark`;
+  /**
+   * Generate share text for different platforms
+   */
+  generateShareText(evermark: EvermarkMetadata, platform: 'twitter' | 'farcaster' | 'generic' = 'generic'): string {
+    const baseText = `"${evermark.title}" by ${evermark.author}`;
     const url = `${this.baseUrl}/evermark/${evermark.id}`;
     
-    const hashtags = platform === 'twitter' 
-      ? evermark.tags.slice(0, 3).map(tag => `#${tag.replace(/\s+/g, '')}`).join(' ')
-      : '';
-
     switch (platform) {
       case 'twitter':
-        return `${baseText}\n\n${url} ${hashtags}`.trim();
+        const hashtags = ['#Evermark', '#Web3'];
+        if (evermark.farcasterData) hashtags.push('#Farcaster');
+        if (evermark.category) hashtags.push(`#${evermark.category}`);
+        
+        return `${baseText}\n\n${url}\n\n${hashtags.join(' ')}`;
+        
       case 'farcaster':
-        return `${baseText}\n\n${url}`;
+        const castText = evermark.farcasterData 
+          ? `Check out this preserved cast: ${baseText}`
+          : `Discover: ${baseText}`;
+          
+        return `${castText}\n\n${url}`;
+        
       default:
         return `${baseText}\n\n${url}`;
     }
   }
 
-  // Generate cast context for Farcaster sharing when created from cast
-  generateCastContext(evermark: EvermarkMetadata): string | null {
-    if (evermark.sourceData?.type === 'farcaster_cast' && evermark.sourceData.castHash) {
-      const castHash = evermark.sourceData.castHash;
-      const richData = evermark.sourceData.richCastData;
-      
-      let context = `This Evermark preserves a Farcaster cast (${castHash.slice(0, 8)}...)`;
-      
-      if (richData?.author) {
-        context += ` by ${richData.author.displayName} (@${richData.author.username})`;
+  /**
+   * Generate structured data for SEO
+   */
+  generateStructuredData(evermark: EvermarkMetadata): string {
+    const structuredData = {
+      "@context": "https://schema.org",
+      "@type": "CreativeWork",
+      "name": evermark.title,
+      "description": evermark.description,
+      "author": {
+        "@type": "Person",
+        "name": evermark.author
+      },
+      "creator": {
+        "@type": "Person",
+        "name": evermark.creator
+      },
+      "dateCreated": new Date(evermark.creationTime).toISOString(),
+      "url": `${this.baseUrl}/evermark/${evermark.id}`,
+      "image": this.generateOGImageUrl(evermark),
+      "publisher": {
+        "@type": "Organization",
+        "name": this.siteName,
+        "url": this.baseUrl
+      },
+      "mainEntityOfPage": {
+        "@type": "WebPage",
+        "@id": `${this.baseUrl}/evermark/${evermark.id}`
       }
-      
-      if (richData?.channel) {
-        context += ` from /${richData.channel}`;
-      }
-      
-      return context;
+    };
+
+    // Add category/genre if available
+    if (evermark.category) {
+      (structuredData as any).genre = evermark.category;
     }
+
+    // Add Farcaster-specific data
+    if (evermark.farcasterData) {
+      (structuredData as any).isBasedOn = {
+        "@type": "SocialMediaPosting",
+        "identifier": evermark.farcasterData.castHash,
+        "author": {
+          "@type": "Person",
+          "identifier": evermark.farcasterData.authorFid.toString(),
+          "alternateName": evermark.farcasterData.authorUsername
+        }
+      };
+    }
+
+    return `<script type="application/ld+json">${JSON.stringify(structuredData, null, 2)}</script>`;
+  }
+
+  /**
+   * Build complete HTML meta tags
+   */
+  private buildMetaTagsHTML(config: MetaTagConfig, evermark: EvermarkMetadata): string {
+    return `
+    <!-- Basic Meta Tags -->
+    <title>${config.title}</title>
+    <meta name="description" content="${config.description}" />
+    <meta name="author" content="${evermark.author}" />
+    <meta name="creator" content="${evermark.creator}" />
+    <link rel="canonical" href="${config.url}" />
     
-    return null;
+    <!-- Open Graph Tags -->
+    <meta property="og:type" content="${config.type}" />
+    <meta property="og:title" content="${config.title}" />
+    <meta property="og:description" content="${config.description}" />
+    <meta property="og:image" content="${config.image}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="${evermark.title} - ${this.siteName}" />
+    <meta property="og:url" content="${config.url}" />
+    <meta property="og:site_name" content="${config.siteName}" />
+    <meta property="article:author" content="${evermark.author}" />
+    <meta property="article:published_time" content="${new Date(evermark.creationTime).toISOString()}" />
+    ${evermark.category ? `<meta property="article:section" content="${evermark.category}" />` : ''}
+    ${evermark.tags.map(tag => `<meta property="article:tag" content="${tag}" />`).join('\n    ')}
+    
+    <!-- Twitter Card Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${config.title}" />
+    <meta name="twitter:description" content="${config.description}" />
+    <meta name="twitter:image" content="${config.image}" />
+    <meta name="twitter:image:alt" content="${evermark.title} - ${this.siteName}" />
+    <meta name="twitter:creator" content="@evermark_app" />
+    <meta name="twitter:site" content="@evermark_app" />
+    
+    ${this.generateFarcasterEmbed(evermark)}
+    
+    <!-- Additional Meta -->
+    <meta name="robots" content="index, follow" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#8B5CF6" />
+    
+    ${this.generateStructuredData(evermark)}
+    `;
+  }
+
+  /**
+   * Extract enhanced metadata from a Farcaster cast
+   */
+  static fromFarcasterCast(
+    cast: FarcasterCast, 
+    evermarkId: string, 
+    creator: string,
+    creationTime: number,
+    userTitle?: string,
+    userDescription?: string,
+    userTags?: string[]
+  ): EvermarkMetadata {
+    const engagement = {
+      likes: cast.reactions.likes_count,
+      recasts: cast.reactions.recasts_count,
+      replies: cast.replies.count
+    };
+
+    // Calculate quality score
+    const qualityScore = (engagement.likes * 1) + (engagement.recasts * 3) + (engagement.replies * 2);
+
+    return {
+      id: evermarkId,
+      title: userTitle || `"${cast.text.slice(0, 50)}..." by ${cast.author.display_name}`,
+      description: userDescription || 
+                  `Evermark preserving a Farcaster cast by ${cast.author.display_name} (@${cast.author.username}): "${cast.text}"`,
+      author: cast.author.display_name,
+      creator,
+      creationTime,
+      sourceUrl: `https://warpcast.com/~/conversations/${cast.hash}`,
+      tags: userTags || ['farcaster', 'cast', 'social', cast.channel?.name].filter((tag): tag is string => Boolean(tag)),
+      category: cast.channel?.name || 'social',
+      farcasterData: {
+        castHash: cast.hash,
+        authorFid: cast.author.fid,
+        authorUsername: cast.author.username,
+        engagement,
+        qualityScore
+      }
+    };
   }
 }
 
-// React component for injecting meta tags
-export const EvermarkMetaTags: React.FC<{ evermark: EvermarkMetadata }> = ({ evermark }) => {
-  const metaGenerator = new EvermarkMetaGenerator();
+// React hook for generating Evermark metadata
+export function useEvermarkSharing(evermark: EvermarkMetadata | null) {
+  const [metaGenerator] = React.useState(() => new EvermarkMetaGenerator());
   
-  React.useEffect(() => {
-    // Update document title
-    document.title = `${evermark.title} by ${evermark.author} | Evermark`;
-    
-    // Generate and inject meta tags
-    const metaTags = metaGenerator.generateMetaTags(evermark);
-    
-    // Create a temporary container to parse the HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = metaTags;
-    
-    // Extract and inject meta tags
-    const metaElements = tempDiv.querySelectorAll('meta, script');
-    metaElements.forEach(element => {
-      const clone = element.cloneNode(true) as HTMLElement;
-      
-      if (element.tagName === 'META') {
-        const property = clone.getAttribute('property') || clone.getAttribute('name');
-        if (property) {
-          // Remove existing meta tag with same property/name
-          const existing = document.querySelector(`meta[property="${property}"], meta[name="${property}"]`);
-          if (existing) {
-            existing.remove();
-          }
-          // Add new meta tag
-          document.head.appendChild(clone);
-        }
-      } else if (element.tagName === 'SCRIPT') {
-        // Handle structured data
-        const existing = document.querySelector('script[type="application/ld+json"]');
-        if (existing) {
-          existing.remove();
-        }
-        document.head.appendChild(clone);
-      }
-    });
-    
-    // Cleanup function to remove meta tags when component unmounts
-    return () => {
-      metaElements.forEach(element => {
-        const property = element.getAttribute('property') || element.getAttribute('name');
-        if (property) {
-          const existing = document.querySelector(`meta[property="${property}"], meta[name="${property}"]`);
-          if (existing) {
-            existing.remove();
-          }
-        }
-      });
-    };
+  const metaTags = React.useMemo(() => {
+    return evermark ? metaGenerator.generateMetaTags(evermark) : null;
   }, [evermark, metaGenerator]);
   
-  return null; // This component doesn't render anything visible
-};
-
-// Hook for generating share URLs and text
-export const useEvermarkSharing = (evermark: EvermarkMetadata) => {
-  const metaGenerator = new EvermarkMetaGenerator();
-  
-  const shareUrls = React.useMemo(() => {
-    const baseUrl = `${window.location.origin}/evermark/${evermark.id}`;
-    const twitterText = encodeURIComponent(metaGenerator.generateShareText(evermark, 'twitter'));
-    const farcasterText = encodeURIComponent(metaGenerator.generateShareText(evermark, 'farcaster'));
-    
-    return {
-      direct: baseUrl,
-      twitter: `https://twitter.com/intent/tweet?text=${twitterText}`,
-      farcaster: `https://warpcast.com/~/compose?text=${farcasterText}`,
-      universal: `https://farcaster.xyz/miniapps/evermark/${evermark.id}`
-    };
+  const shareText = React.useCallback((platform: 'twitter' | 'farcaster' | 'generic' = 'generic') => {
+    return evermark ? metaGenerator.generateShareText(evermark, platform) : '';
   }, [evermark, metaGenerator]);
   
-  const shareText = React.useMemo(() => ({
-    twitter: metaGenerator.generateShareText(evermark, 'twitter'),
-    farcaster: metaGenerator.generateShareText(evermark, 'farcaster'),
-    context: metaGenerator.generateCastContext(evermark)
-  }), [evermark, metaGenerator]);
-  
-  return { shareUrls, shareText };
-};
+  const ogImageUrl = React.useMemo(() => {
+    return evermark ? metaGenerator.generateOGImageUrl(evermark) : null;
+  }, [evermark, metaGenerator]);
 
-// Export singleton instance
-export const evermarkMeta = new EvermarkMetaGenerator();
+  return {
+    metaTags,
+    shareText,
+    ogImageUrl,
+    generator: metaGenerator
+  };
+}
 
-// Utility functions
-export const metaUtils = {
-  generateShareText: (evermark: EvermarkMetadata, platform: 'twitter' | 'farcaster' = 'farcaster') => 
-    new EvermarkMetaGenerator().generateShareText(evermark, platform),
-  
-  generateOGImageUrl: (evermark: EvermarkMetadata) => 
-    new EvermarkMetaGenerator().generateOGImageUrl(evermark),
-    
-  generateFarcasterEmbed: (evermark: EvermarkMetadata) => 
-    new EvermarkMetaGenerator().generateFarcasterEmbed(evermark),
-    
-  getCastContext: (evermark: EvermarkMetadata) => 
-    new EvermarkMetaGenerator().generateCastContext(evermark)
-};
+export default EvermarkMetaGenerator;

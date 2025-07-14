@@ -1,4 +1,4 @@
-// src/components/evermark/EvermarkDetail.tsx - ✅ COMPLETE from scratch
+// src/components/evermark/EvermarkDetail.tsx - ✅ FIXED imports and dependencies
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { 
@@ -20,13 +20,15 @@ import {
 } from 'lucide-react';
 import { useEvermarkDetail } from '../../hooks/useEvermarks';
 import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
-import { ShareButton } from '../sharing/ShareButton';
+import { ShareButton, ShareButtonWithMetadata } from '../sharing/ShareButton';
+import { EvermarkMetaTags } from '../meta/EvermarkMetaTags';
 import { VotingPanel } from '../voting/VotingPanel';
 import { QuickBookshelfButton, BookshelfStatusBadge } from '../bookshelf/FloatingBookshelfWidget';
 import { useProfile } from '../../hooks/useProfile';
 import { cn, useIsMobile, textSizes, spacing } from '../../utils/responsive';
 import PageContainer from '../layout/PageContainer';
 import { ContractRequired } from '../auth/AuthGuard';
+import type { EvermarkMetadata } from '../../utils/evermark-meta';
 
 interface EvermarkDetailProps {
   id?: string;
@@ -40,8 +42,17 @@ interface EnhancedMetadata {
   farcaster_data?: {
     content?: string;
     author?: string;
+    authorUsername?: string;
+    authorFid?: number;
     timestamp?: number;
     platform?: string;
+    engagement?: {
+      likes: number;
+      recasts: number;
+      replies: number;
+    };
+    qualityScore?: number;
+    castHash?: string;
   };
   tags?: string[];
   contentType?: string;
@@ -62,6 +73,7 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
   const [imageLoading, setImageLoading] = useState(true);
   const [enhancedMetadata, setEnhancedMetadata] = useState<EnhancedMetadata | null>(null);
   const [metadataLoading, setMetadataLoading] = useState(true);
+  const [evermarkMetadata, setEvermarkMetadata] = useState<EvermarkMetadata | null>(null);
   
   // Track views for this Evermark
   const { viewStats, isLoading: isLoadingViews } = useViewTracking(id);
@@ -101,6 +113,44 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
     fetchEnhancedMetadata();
     return () => { isMounted = false; };
   }, [evermark?.metadataURI]);
+  
+  // Generate Evermark metadata for meta tags
+  useEffect(() => {
+    if (!evermark || metadataLoading) return;
+    
+    const displayImage = enhancedMetadata?.image || evermark?.image || '';
+    const displayTitle = enhancedMetadata?.name || evermark?.title || 'Untitled Evermark';
+    const displayDescription = enhancedMetadata?.farcaster_data?.content || 
+                               enhancedMetadata?.description || 
+                               evermark?.description || '';
+    const displaySourceUrl = enhancedMetadata?.external_url || evermark?.sourceUrl || '';
+    
+    const metadata: EvermarkMetadata = {
+      id: evermark.id,
+      title: displayTitle,
+      description: displayDescription,
+      author: evermark.author,
+      creator: evermark.creator,
+      creationTime: evermark.creationTime,
+      image: displayImage,
+      sourceUrl: displaySourceUrl,
+      tags: enhancedMetadata?.tags || [],
+      category: enhancedMetadata?.attributes?.find(attr => attr.trait_type === 'category')?.value || 'general'
+    };
+    
+    // Add Farcaster data if available
+    if (enhancedMetadata?.farcaster_data) {
+      metadata.farcasterData = {
+        castHash: enhancedMetadata.farcaster_data.castHash || '',
+        authorFid: enhancedMetadata.farcaster_data.authorFid || 0,
+        authorUsername: enhancedMetadata.farcaster_data.authorUsername || '',
+        engagement: enhancedMetadata.farcaster_data.engagement || { likes: 0, recasts: 0, replies: 0 },
+        qualityScore: enhancedMetadata.farcaster_data.qualityScore || 0
+      };
+    }
+    
+    setEvermarkMetadata(metadata);
+  }, [evermark, enhancedMetadata, metadataLoading]);
   
   // Format date helper
   const formatDate = (timestamp: number) => {
@@ -197,6 +247,9 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
   
   return (
     <PageContainer>
+      {/* ✅ Meta tags for rich sharing */}
+      {evermarkMetadata && <EvermarkMetaTags evermark={evermarkMetadata} />}
+      
       {/* Navigation */}
       <div className="mb-6">
         <Link 
@@ -349,12 +402,23 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
                     variant="button"
                   />
                 )}
-                <ShareButton 
-                  evermarkId={evermark.id}
-                  title={displayTitle}
-                  description={displayDescription}
-                  author={evermark.author}
-                />
+                {/* ✅ Enhanced: Use new ShareButtonWithMetadata if available, fallback to ShareButton */}
+                {evermarkMetadata ? (
+                  <ShareButtonWithMetadata 
+                    evermark={evermarkMetadata}
+                    variant="button"
+                    size="md"
+                  />
+                ) : (
+                  <ShareButton 
+                    evermarkId={evermark.id}
+                    title={displayTitle}
+                    description={displayDescription}
+                    author={evermark.author}
+                    variant="button"
+                    size="md"
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -366,6 +430,72 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
                 evermarkId={evermark.id}
                 userAddress={primaryAddress}
               />
+            </div>
+          )}
+          
+          {/* Enhanced Farcaster Cast Display */}
+          {enhancedMetadata?.farcaster_data && (
+            <div className="mb-6 bg-purple-50 rounded-lg p-6 border-l-4 border-purple-400">
+              <div className="flex items-center mb-4">
+                <MessageCircleIcon className="h-6 w-6 text-purple-600 mr-3" />
+                <div>
+                  <h3 className="text-lg font-semibold text-purple-900">Original Farcaster Cast</h3>
+                  <p className="text-sm text-purple-700">
+                    by @{enhancedMetadata.farcaster_data.authorUsername} • FID: {enhancedMetadata.farcaster_data.authorFid}
+                  </p>
+                </div>
+              </div>
+              
+              <blockquote className="text-gray-800 italic text-base leading-relaxed mb-4">
+                "{enhancedMetadata.farcaster_data.content}"
+              </blockquote>
+              
+              {/* Engagement stats */}
+              {enhancedMetadata.farcaster_data.engagement && (
+                <div className="flex items-center space-x-6 text-sm text-purple-700 mb-4">
+                  <div className="flex items-center space-x-1">
+                    <HeartIcon className="w-4 h-4" />
+                    <span>{enhancedMetadata.farcaster_data.engagement.likes.toLocaleString()} likes</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <MessageCircleIcon className="w-4 h-4" />
+                    <span>{enhancedMetadata.farcaster_data.engagement.recasts.toLocaleString()} recasts</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <MessageCircleIcon className="w-4 h-4" />
+                    <span>{enhancedMetadata.farcaster_data.engagement.replies.toLocaleString()} replies</span>
+                  </div>
+                  
+                  {enhancedMetadata.farcaster_data.qualityScore && (
+                    <div className="ml-auto">
+                      <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-medium">
+                        Quality Score: {Math.round(enhancedMetadata.farcaster_data.qualityScore)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Cast hash */}
+              {enhancedMetadata.farcaster_data.castHash && (
+                <div className="text-xs text-purple-600 font-mono bg-purple-100 px-2 py-1 rounded">
+                  Cast: {enhancedMetadata.farcaster_data.castHash.slice(0, 16)}...
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Regular description for non-Farcaster content */}
+          {displayDescription && !enhancedMetadata?.farcaster_data && (
+            <div className="mb-6">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">Description</h3>
+                <div className="prose prose-sm max-w-none text-gray-700">
+                  <p className="whitespace-pre-line leading-relaxed">
+                    {displayDescription}
+                  </p>
+                </div>
+              </div>
             </div>
           )}
           
@@ -390,37 +520,6 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
                   <div className="text-blue-600">This Week</div>
                 </div>
               </div>
-            </div>
-          )}
-          
-          {/* Content Display */}
-          {displayDescription && (
-            <div className="mb-6">
-              {isFarcasterCast() ? (
-                <div className="bg-purple-50 rounded-lg p-4 border-l-4 border-purple-400">
-                  <div className="flex items-center mb-3">
-                    <MessageCircleIcon className="h-5 w-5 text-purple-600 mr-2" />
-                    <h3 className="text-lg font-medium text-purple-900">Farcaster Cast Content</h3>
-                  </div>
-                  <blockquote className="text-gray-800 italic text-base leading-relaxed">
-                    "{displayDescription}"
-                  </blockquote>
-                  {enhancedMetadata?.farcaster_data?.author && (
-                    <div className="mt-3 text-sm text-purple-700">
-                      — @{enhancedMetadata.farcaster_data.author}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Description</h3>
-                  <div className="prose prose-sm max-w-none text-gray-700">
-                    <p className="whitespace-pre-line leading-relaxed">
-                      {displayDescription}
-                    </p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           
