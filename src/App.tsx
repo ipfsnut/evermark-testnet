@@ -1,4 +1,4 @@
-// Updated App.tsx - Cleaned routing with better UX
+// Fixed App.tsx - More conservative Farcaster detection
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppThirdwebProvider } from './lib/thirdweb';
@@ -14,7 +14,7 @@ import ProfilePage from './pages/ProfilePage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import MyEvermarksPage from './pages/MyEvermarksPage';
 import WrappingPage from './pages/WrappingPage';
-import BookshelfPage from './pages/BookshelfPage'; // ✅ UPDATED: Use actual bookshelf page
+import BookshelfPage from './pages/BookshelfPage';
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
 import EvermarkDetailPage from './pages/EvermarkDetailPage';
 
@@ -27,10 +27,8 @@ import PublicProfilePage from './pages/PublicProfilePage';
 import { ShareHandler } from './components/sharing/ShareHandler';
 import { CreateFromCast } from './components/sharing/CreateFromCast';
 
-// ✅ NEW: Public bookshelf component
 import { PublicBookshelfView } from './components/bookshelf/PublicBookshelfView';
 import ExplorePage from './pages/ExplorePage';
-import { BrowserRouter } from 'react-router-dom';
 
 // Farcaster context types
 interface FarcasterContext {
@@ -55,26 +53,22 @@ function useFarcasterContext(): FarcasterContext {
   useEffect(() => {
     const initializeFarcasterContext = async () => {
       try {
-        // Check if we're in Farcaster environment
-        const isInFarcaster = window.parent !== window || 
-                             window.self !== window.top ||
-                             !!(window as any).__farcaster_detected ||
-                             window.location.href.includes('farcaster');
+        // FIXED: More conservative Farcaster detection
+        const isInFarcaster = !!(window as any).__farcaster_detected ||
+                             !!(window as any).farcaster ||
+                             window.location.search.includes('inFeed=true') ||
+                             window.location.search.includes('action_type=share');
 
         // Initialize SDK if in Farcaster
         if (isInFarcaster && sdk) {
-          // Await the context promise
           const sdkContext = await sdk.context;
           
-          // Check if location exists and handle different location types
           if (sdkContext.location) {
             const location = sdkContext.location;
-            const isMiniApp = true; // We're in some kind of Farcaster context
+            const isMiniApp = true;
             
-            // Check for share context - might be in a different property or type
             const isShareContext = location.type === 'cast_embed' || 
                                  location.type === 'notification' ||
-                                 // Check if there's cast data in any form
                                  !!(location as any).cast;
             
             setContext({
@@ -97,7 +91,6 @@ function useFarcasterContext(): FarcasterContext {
               hasSharedCast: !!(location as any).cast
             });
           } else {
-            // No location context, but still in Farcaster
             setContext({
               isInFarcaster: true,
               isMiniApp: true,
@@ -208,55 +201,53 @@ function AppContent() {
   return (
     <ErrorBoundary>
       <Layout>
-
-<Routes>
-  {/* SPECIFIC ROUTES FIRST - These must come before any dynamic routes */}
-  <Route path="/" element={<EnhancedHomePage />} />
-  <Route path="/explore" element={<ExplorePage />} />
-  <Route path="/profile" element={<ProfilePage />} />
-  <Route path="/leaderboard" element={<LeaderboardPage />} />
-  <Route path="/my-evermarks" element={<MyEvermarksPage />} />
-  <Route path="/create" element={<EnhancedCreateEvermark />} />
-  <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
-  <Route path="/about" element={<AboutPage />} />
-  
-  {/* Bookshelf routes */}
-  <Route path="/bookshelf" element={<BookshelfPage />} />
-  
-  {/* Wrapping route */}
-  <Route path="/wrapping" element={<WrappingPage />} />
-  
-  {/* Share functionality */}
-  <Route path="/share" element={<ShareHandler />} />
-  <Route path="/share/create" element={<CreateFromCast />} />
-  <Route path="/share/:id" element={<ShareRedirect />} />
-  <Route path="/share/evermark/:id" element={<ShareRedirect />} />
-  
-  {/* Redirects */}
-  <Route path="/delegation" element={<Navigate to="/bookshelf" replace />} />
-  
-  {/* Placeholder routes */}
-  <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
-  <Route path="/marketplace" element={<ComingSoonPage feature="Marketplace" />} />
-  
-  {/* Specific nested routes that start with fixed paths */}
-  <Route path="/bookshelf/:address" element={<PublicBookshelfView />} />
-  
-  {/* DYNAMIC ROUTES LAST - These catch remaining patterns */}
-  {/* These MUST come after all specific routes */}
-  <Route path="/:address" element={<PublicProfilePage />} />
-  <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
-  <Route path="/:address/bookshelf" element={<PublicBookshelfView />} />
-  
-  {/* Catch-all for unmatched routes - MUST be last */}
-  <Route path="*" element={<Navigate to="/" replace />} />
-</Routes>
+        <Routes>
+          {/* SPECIFIC ROUTES FIRST - These must come before any dynamic routes */}
+          <Route path="/" element={<EnhancedHomePage />} />
+          <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/my-evermarks" element={<MyEvermarksPage />} />
+          <Route path="/create" element={<EnhancedCreateEvermark />} />
+          <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          
+          {/* Bookshelf routes */}
+          <Route path="/bookshelf" element={<BookshelfPage />} />
+          
+          {/* Wrapping route */}
+          <Route path="/wrapping" element={<WrappingPage />} />
+          
+          {/* Share functionality */}
+          <Route path="/share" element={<ShareHandler />} />
+          <Route path="/share/create" element={<CreateFromCast />} />
+          <Route path="/share/:id" element={<ShareRedirect />} />
+          <Route path="/share/evermark/:id" element={<ShareRedirect />} />
+          
+          {/* Redirects */}
+          <Route path="/delegation" element={<Navigate to="/bookshelf" replace />} />
+          
+          {/* Placeholder routes */}
+          <Route path="/Market" element={<ComingSoonPage feature="Marketplace" />} />
+          <Route path="/marketplace" element={<ComingSoonPage feature="Marketplace" />} />
+          
+          {/* Specific nested routes that start with fixed paths */}
+          <Route path="/bookshelf/:address" element={<PublicBookshelfView />} />
+          
+          {/* DYNAMIC ROUTES LAST - These catch remaining patterns */}
+          {/* These MUST come after all specific routes */}
+          <Route path="/:address" element={<PublicProfilePage />} />
+          <Route path="/:address/created" element={<UserCreatedEvermarksPage />} />
+          <Route path="/:address/bookshelf" element={<PublicBookshelfView />} />
+          
+          {/* Catch-all for unmatched routes - MUST be last */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </Layout>
     </ErrorBoundary>
   );
 }
 
-// ✅ UPDATED: Enhanced coming soon page with bookshelf integration
 function ComingSoonPage({ feature }: { feature: string }) {
   const { isAuthenticated, hasVerifiedAddress } = useFarcasterUser();
   const farcasterContext = useFarcasterContext();
@@ -278,7 +269,6 @@ function ComingSoonPage({ feature }: { feature: string }) {
           </p>
         </div>
 
-        {/* ✅ UPDATED: Bookshelf call-to-action instead of delegation */}
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-6">
           <h3 className="font-medium text-purple-900 mb-2">📚 Available Now: Personal Bookshelf</h3>
           <p className="text-purple-800 text-sm mb-3">
@@ -345,18 +335,16 @@ function ComingSoonPage({ feature }: { feature: string }) {
   );
 }
 
-// Minimal Farcaster app - no wallet providers, just read-only content
+// Minimal Farcaster app - NO BrowserRouter (already in main.tsx)
 function FarcasterMinimalApp() {
   return (
-    <BrowserRouter>
-      <div className="min-h-screen bg-gray-50">
-        <Routes>
-          <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
-          <Route path="/" element={<MinimalHomePage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
-    </BrowserRouter>
+    <div className="min-h-screen bg-gray-50">
+      <Routes>
+        <Route path="/evermark/:id" element={<EvermarkDetailPage />} />
+        <Route path="/" element={<MinimalHomePage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </div>
   );
 }
 
@@ -380,64 +368,42 @@ function MinimalHomePage() {
 }
 
 function App() {
-  // Enhanced Farcaster detection - check multiple indicators
+  // FIXED: Much more conservative Farcaster detection
+  // Only detect as Farcaster if we have strong indicators
   const isInFarcaster = (() => {
-    // Check if we're in an iframe (most reliable indicator)
-    const inIframe = window.parent !== window || window.self !== window.top;
+    // Check for explicit Farcaster globals (most reliable)
+    const farcasterGlobals = !!(window as any).__farcaster_detected ||
+                            !!(window as any).farcaster;
     
-    // Check URL parameters and paths
-    const urlIndicators = window.location.search.includes('inFeed=true') ||
-                         window.location.search.includes('action_type=share') ||
-                         window.location.pathname.includes('/frame/') ||
-                         window.location.pathname.includes('/farcaster/');
+    // Check for explicit Farcaster URL parameters
+    const farcasterParams = window.location.search.includes('inFeed=true') ||
+                           window.location.search.includes('action_type=share') ||
+                           window.location.search.includes('farcaster=true');
     
-    // Check user agent
-    const userAgentIndicators = navigator.userAgent.includes('farcaster') ||
-                               navigator.userAgent.includes('warpcast');
+    // Check for Farcaster-specific user agents (be more specific)
+    const farcasterUserAgent = navigator.userAgent.includes('farcaster-') ||
+                              navigator.userAgent.includes('warpcast-app');
     
-    // Check referrer
-    const referrerIndicators = document.referrer.includes('farcaster') ||
-                              document.referrer.includes('warpcast') ||
-                              document.referrer.includes('warpcast.com');
-    
-    // Check for Farcaster-specific globals
-    const globalIndicators = !!(window as any).__farcaster_detected ||
-                            !!(window as any).farcaster ||
-                            !!(window as any).sdk;
-    
-    // Check hostname
-    const hostnameIndicators = window.location.hostname.includes('farcaster') ||
-                              window.location.hostname.includes('warpcast');
-    
-    return inIframe || urlIndicators || userAgentIndicators || referrerIndicators || globalIndicators || hostnameIndicators;
+    // Only return true if we have strong evidence
+    return farcasterGlobals || farcasterParams || farcasterUserAgent;
   })();
   
-  console.log('🔍 App Detection (Enhanced):', {
+  console.log('🔍 App Detection (Conservative):', {
     isInFarcaster,
-    inIframe: window.parent !== window,
-    selfNotTop: window.self !== window.top,
+    farcasterGlobals: !!(window as any).__farcaster_detected || !!(window as any).farcaster,
+    farcasterParams: window.location.search.includes('inFeed=true') || 
+                    window.location.search.includes('action_type=share') ||
+                    window.location.search.includes('farcaster=true'),
+    farcasterUserAgent: navigator.userAgent.includes('farcaster-') || 
+                       navigator.userAgent.includes('warpcast-app'),
     userAgent: navigator.userAgent.substring(0, 100),
     url: window.location.href,
-    pathname: window.location.pathname,
     search: window.location.search,
-    referrer: document.referrer,
-    hostname: window.location.hostname,
-    farcasterGlobal: !!(window as any).__farcaster_detected,
-    farcasterSDK: !!(window as any).sdk
   });
   
-  // Force minimal mode if any Farcaster indicators are present
-  if (isInFarcaster) {
-    console.log('✅ Loading Farcaster minimal app (NO WALLET PROVIDERS)');
-    // Minimal mode for Farcaster - absolutely no wallet providers
-    return (
-      <ErrorBoundary>
-        <FarcasterMinimalApp />
-      </ErrorBoundary>
-    );
-  }
-  
-  console.log('✅ Loading full app with wallet providers');
+  // TEMPORARILY DISABLE FARCASTER MINIMAL MODE FOR DEBUGGING
+  // Force full app for all contexts to debug the infinite redirect
+  console.log('🚨 DEBUGGING MODE: Loading full app for all contexts');
   
   // Full mode for regular web
   return (
