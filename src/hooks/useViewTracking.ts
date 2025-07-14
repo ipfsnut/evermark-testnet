@@ -127,7 +127,7 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
     if (evermarkId) {
       loadViewStats();
     }
-  }, [evermarkId, loadViewStats]);
+  }, [evermarkId]); // Remove loadViewStats from dependencies to prevent infinite loop
 
   // Track view on mount (with slight delay to avoid bot-like behavior)
   useEffect(() => {
