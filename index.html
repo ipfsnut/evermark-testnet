@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
 <title>Evermark - Content Curation</title>
 
-<!-- FIXED: MOBILE WEBVIEW OPTIMIZED CSP FOR FARCASTER -->
+<!-- FIXED: Simplified CSP - removed conflicting directives -->
 <meta http-equiv="Content-Security-Policy" content="
       default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:;
       connect-src 'self' https: wss: data: blob:;
-      script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net https://esm.sh;
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net;
       img-src 'self' https: data: blob:;
       font-src 'self' data: https:;
       media-src 'self' blob: https:;
@@ -21,15 +21,12 @@
       base-uri 'self';
     ">
 
-<!-- UPDATED: Farcaster Mini App Frame Embed with proper format -->
+<!-- Farcaster Frame Meta Tags -->
 <meta name="fc:frame" content="vNext" />
 <meta name="fc:frame:image" content="https://evermarks.net/og-image.png" />
 <meta name="fc:frame:button:1" content="📖 Open Evermark" />
 <meta name="fc:frame:button:1:action" content="link" />
 <meta name="fc:frame:button:1:target" content="https://evermarks.net" />
-
-<!-- REMOVED: Legacy Farcaster Frame Support (deprecated) -->
-<!-- The old fc:frame:image and fc:frame:button format is no longer needed -->
 
 <!-- Open Graph Meta Tags -->
 <meta property="og:title" content="Evermark - Content Curation on Blockchain" />
@@ -45,142 +42,135 @@
 <meta name="twitter:description" content="Preserve and curate your friendly content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
 <meta name="twitter:image" content="https://evermarks.net/og-image.png" />
 
-<!-- App-specific Meta Tags -->
+<!-- App Meta Tags -->
 <meta name="description" content="Preserve and curate your favorite content on the blockchain. Vote on quality content and participate in community-driven leaderboards." />
 <meta name="keywords" content="blockchain, content curation, voting, farcaster, web3, evermark, mini app" />
 <meta name="author" content="Evermark" />
 
-<!-- Theme and App Icons -->
+<!-- Theme and Icons -->
 <meta name="theme-color" content="#7c3aed" />
 <link rel="icon" type="image/png" href="/icon.png" />
 <link rel="apple-touch-icon" href="/icon.png" />
-
-<!-- PWA Manifest -->
 <link rel="manifest" href="/manifest.json" />
 
-<!-- FIXED: Preload critical resources with crossorigin -->
-<link rel="preload" href="https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js" as="script" crossorigin="anonymous">
+<!-- FIXED: Conditional SDK preload only for Farcaster contexts -->
+<script>
+  // FIXED: Simple, one-time Farcaster detection without infinite loops
+  window.__evermark_farcaster_detected = (() => {
+    const ua = navigator.userAgent.toLowerCase();
+    const url = window.location.href.toLowerCase();
+    
+    // Only detect if we have strong indicators
+    const strongIndicators = 
+      ua.includes('farcaster-') ||
+      ua.includes('warpcast-app') ||
+      url.includes('farcaster.xyz') ||
+      url.includes('warpcast.com') ||
+      window.location.search.includes('inFeed=true') ||
+      window.location.search.includes('action_type=share');
+    
+    console.log('🔍 Farcaster Detection (index.html):', {
+      detected: strongIndicators,
+      userAgent: ua.substring(0, 50),
+      url: url.substring(0, 50)
+    });
+    
+    return strongIndicators;
+  })();
+
+  // FIXED: Only preload SDK if actually in Farcaster
+  if (window.__evermark_farcaster_detected) {
+    console.log('📱 Preloading Farcaster SDK...');
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.href = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
+    link.as = 'script';
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  }
+</script>
 </head>
 <body>
 <div id="root"></div>
 
-<!-- FIXED: Enhanced Mobile WebView-specific SDK initialization -->
+<!-- FIXED: Simplified SDK initialization - no redundant logging -->
 <script>
-// Enhanced mobile WebView detection and SDK initialization
 (function() {
-  console.log('🚀 Mobile WebView SDK initialization starting...');
-  
-  // Enhanced mobile WebView detection
-  const isMobileWebView = (() => {
-    const ua = navigator.userAgent.toLowerCase();
-    const isAndroid = ua.includes('android');
-    const isIOS = ua.includes('iphone') || ua.includes('ipad');
-    const isFarcaster = ua.includes('farcaster') || window.location.href.includes('farcaster.xyz');
-    const isWebView = ua.includes('wv') || ua.includes('webview');
-    
-    // Check for iframe context
-    let isFramed = false;
-    try {
-      isFramed = window.self !== window.top;
-    } catch (e) {
-      isFramed = true; // Cross-origin frame
-    }
-    
-    // Check for mobile app context or Farcaster Mini App
-    const isMobileApp = (isAndroid || isIOS) && (isWebView || isFarcaster || isFramed);
-    
-    console.log('📱 WebView Detection:', {
-      userAgent: ua.substring(0, 100),
-      isAndroid,
-      isIOS,
-      isFarcaster,
-      isWebView,
-      isFramed,
-      isMobileApp,
-      href: window.location.href
-    });
-    
-    return isMobileApp || isFarcaster;
-  })();
-  
-  if (isMobileWebView) {
-    console.log('📱 Mobile WebView/Farcaster Mini App detected - initializing SDK...');
-    
-    // FIXED: Better SDK loading strategy for mobile and Mini Apps
-    const loadSDK = () => {
-      return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
-        script.crossOrigin = 'anonymous';
-        script.async = true;
-        
-        script.onload = () => {
-          console.log('✅ Farcaster SDK script loaded');
-          resolve(true);
-        };
-        
-        script.onerror = (error) => {
-          console.error('❌ Farcaster SDK script failed to load:', error);
-          reject(error);
-        };
-        
-        document.head.appendChild(script);
-      });
-    };
-    
-    const initializeSDK = async () => {
-      try {
-        await loadSDK();
-        
-        // Wait for SDK to be available with timeout
-        let attempts = 0;
-        const maxAttempts = 50;
-        
-        while (!window.FrameSDK && attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          attempts++;
-        }
-        
-        if (!window.FrameSDK) {
-          console.log('⚠️ Farcaster SDK not available after loading - continuing anyway');
-          return;
-        }
-        
-        console.log('✅ Farcaster SDK available, sending ready signal...');
-        
-        // FIXED: Better ready signal handling for Mini Apps
-        try {
-          if (window.FrameSDK?.actions?.ready) {
-            await window.FrameSDK.actions.ready({
-              disableNativeGestures: true // For mobile Mini App experience
-            });
-            console.log('✅ Farcaster Mini App ready signal sent successfully');
-          } else {
-            console.log('⚠️ Farcaster SDK actions not available');
-          }
-        } catch (readyError) {
-          console.log('⚠️ Farcaster ready signal failed:', readyError);
-        }
-        
-      } catch (error) {
-        console.error('❌ Farcaster SDK initialization failed:', error);
-      }
-    };
-    
-    // Initialize after a short delay
-    setTimeout(initializeSDK, 100);
-    
-    // FIXED: Better message handling for Mini App context
-    window.addEventListener('message', function(event) {
-      // Only log non-spam messages
-      if (event.data && typeof event.data === 'object' && event.data.type) {
-        console.log('📨 Farcaster PostMessage received:', event.origin, event.data);
-      }
-    }, false);
-    
-  } else {
-    console.log('🖥️ Desktop/Browser detected - standard initialization');
+  // Only initialize if we detected Farcaster environment
+  if (!window.__evermark_farcaster_detected) {
+    console.log('🖥️ Regular browser - no SDK initialization needed');
+    return;
   }
+  
+  console.log('📱 Farcaster environment - initializing SDK...');
+  
+  // FIXED: Simple SDK loading without excessive logging
+  const loadSDK = () => {
+    return new Promise((resolve, reject) => {
+      // Check if already loaded
+      if (window.FrameSDK) {
+        console.log('✅ SDK already available');
+        resolve(true);
+        return;
+      }
+      
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/@farcaster/frame-sdk@latest/dist/index.min.js';
+      script.crossOrigin = 'anonymous';
+      script.async = true;
+      
+      script.onload = () => {
+        console.log('✅ SDK loaded');
+        resolve(true);
+      };
+      
+      script.onerror = (error) => {
+        console.error('❌ SDK load failed:', error);
+        reject(error);
+      };
+      
+      document.head.appendChild(script);
+    });
+  };
+  
+  // FIXED: Initialize once, with timeout
+  const initSDK = async () => {
+    try {
+      await loadSDK();
+      
+      // Wait for SDK with reasonable timeout
+      let attempts = 0;
+      while (!window.FrameSDK && attempts < 30) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+      
+      if (window.FrameSDK?.actions?.ready) {
+        await window.FrameSDK.actions.ready({ disableNativeGestures: true });
+        console.log('✅ SDK ready');
+      } else {
+        console.log('⚠️ SDK not available');
+      }
+      
+    } catch (error) {
+      console.error('❌ SDK init failed:', error);
+    }
+  };
+  
+  // FIXED: Initialize after DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initSDK);
+  } else {
+    setTimeout(initSDK, 100);
+  }
+  
+  // FIXED: Simple message handler - no spam logging
+  window.addEventListener('message', function(event) {
+    if (event.data?.type === 'frameEvent' || event.data?.source === 'farcaster') {
+      console.log('📨 Farcaster message:', event.data.type);
+    }
+  }, false);
+  
 })();
 </script>
 
