@@ -670,20 +670,22 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
         </div>
       </div>
       
-      {/* Voting Panel */}
-      <div className="mb-6">
-        <ContractRequired fallback={
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-            <VoteIcon className="mx-auto h-8 w-8 text-yellow-600 mb-3" />
-            <h3 className="text-yellow-800 font-medium mb-2">Connect Wallet to Vote</h3>
-            <p className="text-yellow-700 text-sm">
-              Support this Evermark by connecting your wallet and delegating voting power to earn rewards.
-            </p>
-          </div>
-        }>
-          <VotingPanel evermarkId={id} isOwner={isOwner} />
-        </ContractRequired>
-      </div>
+      {/* Voting Panel - only in regular mode */}
+      {!isInFarcaster && (
+        <div className="mb-6">
+          <ContractRequired fallback={
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
+              <VoteIcon className="mx-auto h-8 w-8 text-yellow-600 mb-3" />
+              <h3 className="text-yellow-800 font-medium mb-2">Connect Wallet to Vote</h3>
+              <p className="text-yellow-700 text-sm">
+                Support this Evermark by connecting your wallet and delegating voting power to earn rewards.
+              </p>
+            </div>
+          }>
+            <VotingPanel evermarkId={id} isOwner={isOwner} />
+          </ContractRequired>
+        </div>
+      )}
     </PageContainer>
   );
 }
