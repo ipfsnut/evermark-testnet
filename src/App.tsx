@@ -351,7 +351,7 @@ function FarcasterMinimalApp() {
       <div className="min-h-screen bg-gray-50">
         <Routes>
           <Route path="/evermark/:id" element={<EvermarkDetail />} />
-          <Route path="/" element={<EnhancedHomePage />} />
+          <Route path="/" element={<MinimalHomePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
@@ -359,11 +359,48 @@ function FarcasterMinimalApp() {
   );
 }
 
+// Minimal homepage for Farcaster - no wallet dependencies
+function MinimalHomePage() {
+  return (
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-2xl mx-auto text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">Evermark</h1>
+        <p className="text-gray-600 mb-8">
+          Permanently preserve important content on the blockchain
+        </p>
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <p className="text-sm text-gray-500">
+            Visit <a href="https://evermarks.net" className="text-purple-600 hover:underline">evermarks.net</a> to create and explore Evermarks
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
-  // Detect if we're in Farcaster environment
-  const isInFarcaster = window.parent !== window || window.self !== window.top;
+  // Enhanced Farcaster detection
+  const isInFarcaster = window.parent !== window || 
+                       window.self !== window.top ||
+                       window.location.search.includes('inFeed=true') ||
+                       window.location.search.includes('action_type=share') ||
+                       navigator.userAgent.includes('farcaster') ||
+                       document.referrer.includes('farcaster') ||
+                       document.referrer.includes('warpcast');
+  
+  console.log('🔍 App Detection:', {
+    isInFarcaster,
+    windowParent: window.parent,
+    windowSelf: window.self,
+    windowTop: window.top,
+    userAgent: navigator.userAgent,
+    url: window.location.href,
+    search: window.location.search,
+    referrer: document.referrer
+  });
   
   if (isInFarcaster) {
+    console.log('✅ Loading Farcaster minimal app');
     // Minimal mode for Farcaster - no wallet providers
     return (
       <ErrorBoundary>
@@ -371,6 +408,8 @@ function App() {
       </ErrorBoundary>
     );
   }
+  
+  console.log('✅ Loading full app with wallet providers');
   
   // Full mode for regular web
   return (
