@@ -1,5 +1,5 @@
-// src/hooks/useViewTracking.ts
-import { useState, useEffect, useCallback } from 'react';
+// src/hooks/useViewTracking.ts - FIXED: Remove infinite loops
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface ViewStats {
   totalViews: number;
@@ -15,12 +15,14 @@ interface ViewTrackingResult {
   trackView: () => Promise<void>;
 }
 
-// Simple localStorage-based tracking for now
-// In production, this would be API calls to your backend
+// FIXED: Simple localStorage-based tracking without infinite loops
 export function useViewTracking(evermarkId: string): ViewTrackingResult {
   const [viewStats, setViewStats] = useState<ViewStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // FIXED: Use ref to track if view has been tracked this session
+  const hasTrackedView = useRef(false);
 
   // Generate a simple user fingerprint for basic deduplication
   const getUserFingerprint = useCallback(() => {
@@ -31,40 +33,14 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
     return btoa(fingerprint + navigator.userAgent).slice(0, 32);
   }, []);
 
-  // Load existing view stats
-  const loadViewStats = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // For now, use localStorage. In production, this would be an API call
-      const stored = localStorage.getItem(`evermark_views_${evermarkId}`);
-      if (stored) {
-        const data = JSON.parse(stored);
-        setViewStats({
-          ...data,
-          lastUpdated: new Date(data.lastUpdated)
-        });
-      } else {
-        // Initialize with zero stats
-        const initialStats: ViewStats = {
-          totalViews: 0,
-          viewsToday: 0,
-          viewsThisWeek: 0,
-          lastUpdated: new Date()
-        };
-        setViewStats(initialStats);
-      }
-    } catch (err) {
-      console.error('Error loading view stats:', err);
-      setError('Failed to load view statistics');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [evermarkId]);
-
-  // Track a new view
+  // FIXED: Stable trackView function that doesn't change on every render
   const trackView = useCallback(async () => {
+    // FIXED: Prevent multiple tracking in the same session
+    if (hasTrackedView.current) {
+      console.log('View already tracked this session');
+      return;
+    }
+
     try {
       const fingerprint = getUserFingerprint();
       const viewKey = `view_${evermarkId}_${fingerprint}`;
@@ -79,13 +55,14 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
       
       if (!isNewView) {
         console.log('View already tracked today for this user');
+        hasTrackedView.current = true; // Still mark as tracked to prevent retries
         return;
       }
       
       // Update view tracking
       localStorage.setItem(viewKey, now.toISOString());
       
-      // Update stats
+      // FIXED: Update stats without triggering infinite loop
       setViewStats(prevStats => {
         if (!prevStats) return null;
         
@@ -96,49 +73,74 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
           lastUpdated: now
         };
         
-        // Persist to localStorage (in production, send to API)
+        // Persist to localStorage
         localStorage.setItem(`evermark_views_${evermarkId}`, JSON.stringify(newStats));
         
         console.log(`📊 Tracked view for Evermark ${evermarkId}:`, newStats);
         return newStats;
       });
       
-      // In production, you'd also send this to your backend:
-      // await fetch('/api/views/track', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     evermarkId,
-      //     fingerprint,
-      //     userAgent: navigator.userAgent,
-      //     referrer: document.referrer,
-      //     timestamp: now.toISOString()
-      //   })
-      // });
+      // Mark as tracked
+      hasTrackedView.current = true;
       
     } catch (err) {
       console.error('Error tracking view:', err);
       setError('Failed to track view');
     }
-  }, [evermarkId, getUserFingerprint]);
+  }, [evermarkId, getUserFingerprint]); // FIXED: Stable dependencies
 
-  // Load stats on mount
+  // FIXED: Load stats only once on mount
   useEffect(() => {
-    if (evermarkId) {
-      loadViewStats();
+    if (!evermarkId) {
+      setIsLoading(false);
+      setError('No Evermark ID provided');
+      return;
     }
-  }, [evermarkId]); // Remove loadViewStats from dependencies to prevent infinite loop
 
-  // Track view on mount (with slight delay to avoid bot-like behavior)
+    const loadViewStats = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Load from localStorage
+        const stored = localStorage.getItem(`evermark_views_${evermarkId}`);
+        if (stored) {
+          const data = JSON.parse(stored);
+          setViewStats({
+            ...data,
+            lastUpdated: new Date(data.lastUpdated)
+          });
+        } else {
+          // Initialize with zero stats
+          const initialStats: ViewStats = {
+            totalViews: 0,
+            viewsToday: 0,
+            viewsThisWeek: 0,
+            lastUpdated: new Date()
+          };
+          setViewStats(initialStats);
+        }
+      } catch (err) {
+        console.error('Error loading view stats:', err);
+        setError('Failed to load view statistics');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadViewStats();
+  }, [evermarkId]); // FIXED: Only depend on evermarkId
+
+  // FIXED: Auto-track view once when component is ready (no dependencies on changing values)
   useEffect(() => {
-    if (evermarkId && viewStats) {
+    if (evermarkId && viewStats && !hasTrackedView.current) {
       const timer = setTimeout(() => {
         trackView();
       }, 1000); // 1 second delay
       
       return () => clearTimeout(timer);
     }
-  }, [evermarkId, viewStats]); // Remove trackView from dependencies to prevent infinite loop
+  }, [evermarkId, !!viewStats, trackView]); // FIXED: Use !!viewStats to avoid dependency on object
 
   return {
     viewStats,

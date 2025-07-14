@@ -1,5 +1,5 @@
 // Fixed EvermarkDetailPage.tsx - Prevents infinite loops
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { 
   UserIcon, 
@@ -120,7 +120,7 @@ function useEvermarkDetailMinimal(id?: string) {
         
         console.log(`🔍 Fetching Evermark ${id}, attempt ${retryCount + 1}`);
         
-        // FIXED: Use the correct API endpoint that matches your Netlify functions
+        // Use the correct API endpoint
         const response = await fetch(`/.netlify/functions/evermarks?id=${id}`);
         
         if (!response.ok) {
@@ -165,14 +165,18 @@ const EvermarkDetailPage: React.FC<EvermarkDetailProps> = ({ id: propId }) => {
   
   const { data: evermark, loading, error, retryCount } = useEvermarkDetailMinimal(id);
   const { trackView } = useViewTracking(id || '');
+  
+  // FIXED: Use ref to track if view has been tracked
+  const hasTrackedViewForThisEvermark = useRef<string | null>(null);
 
-  // FIXED: Only track view once when evermark is loaded
+  // FIXED: Track view only once when evermark loads successfully
   useEffect(() => {
-    if (evermark && id && !loading && !error) {
+    if (evermark && id && !loading && !error && hasTrackedViewForThisEvermark.current !== id) {
       console.log('📊 Tracking view for Evermark:', id);
       trackView();
+      hasTrackedViewForThisEvermark.current = id;
     }
-  }, [evermark?.id, trackView]); // Use evermark.id instead of evermark to prevent excessive calls
+  }, [evermark?.id, loading, error]); // FIXED: Remove trackView from dependencies
 
   // FIXED: Better loading state
   if (loading && retryCount === 0) {
@@ -202,7 +206,7 @@ const EvermarkDetailPage: React.FC<EvermarkDetailProps> = ({ id: propId }) => {
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600">
-            Retrying... (Attempt {retryCount + 1}/{3})
+            Retrying... (Attempt {retryCount + 1}/3)
           </p>
         </div>
       </div>
