@@ -1,217 +1,236 @@
-// netlify/functions/evermarks.ts - FIXED to match your working hooks pattern
-import type { Context } from '@netlify/functions';
+// src/hooks/useEvermarks.ts - FIXED with missing exports
+import { useState, useEffect, useCallback } from 'react';
 
-export default async (request: Request, context: Context) => {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
+interface EvermarkData {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  content: string;
+  image?: string;
+  external_url?: string;
+  author: string;
+  creator: string;
+  timestamp: string;
+  created_at: string;
+  updated_at: string;
+  creationTime: number;
+  tx_hash?: string;
+  block_number?: number;
+  metadataURI?: string;
+  evermark_type: string;
+  source_platform: string;
+  sourceUrl?: string;
+  voting_power: number;
+  view_count: number;
+  tags: string[];
+  category?: string;
+  metadata: any;
+}
 
-  if (request.method === 'OPTIONS') {
-    return new Response('', { status: 200, headers });
-  }
+interface UseEvermarkDetailResult {
+  evermark: EvermarkData | null;
+  isLoading: boolean;
+  error: string | null;
+  retry: () => void;
+}
 
-  try {
-    const url = new URL(request.url);
-    let evermarkId = url.searchParams.get('id');
-    
-    if (!evermarkId) {
-      const pathParts = url.pathname.split('/');
-      evermarkId = pathParts[pathParts.length - 1];
-    }
+// Main hook for getting single evermark details
+export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
+  const [evermark, setEvermark] = useState<EvermarkData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
-    const supabaseUrl = process.env.VITE_SUPABASE_URL;
-    const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      return new Response(JSON.stringify({ 
-        error: 'Supabase not configured',
-        message: 'Database connection not available'
-      }), { status: 503, headers });
-    }
-
-    // 🔧 CRITICAL FIX: Use the SAME pattern as your working hooks
-    const cleanUrl = supabaseUrl.replace(/\/$/, '');
-
-    if (!evermarkId || evermarkId === 'evermarks') {
-      // 🔧 Return list of evermarks (like your hooks do)
-      console.log('📋 Getting evermarks list (no specific ID)');
+  const fetchEvermark = useCallback(async (evermarkId: string, attempt: number = 0) => {
+    try {
+      setIsLoading(true);
+      setError(null);
       
-      const response = await fetch(`${cleanUrl}/rest/v1/evermarks?select=*&order=created_at.desc&limit=20`, {
+      console.log(`🔍 Fetching Evermark ${evermarkId}, attempt ${attempt + 1}`);
+      
+      const response = await fetch(`/.netlify/functions/evermarks?id=${encodeURIComponent(evermarkId)}`, {
         method: 'GET',
         headers: {
-          'apikey': supabaseKey,
-          'Authorization': `Bearer ${supabaseKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Accept': 'application/json',
         },
-        signal: AbortSignal.timeout(15000)
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ List evermarks failed:', response.status, errorText);
-        
-        return new Response(JSON.stringify({
-          error: `Database query failed: ${response.status}`,
-          message: errorText,
-          suggestion: 'Check your Supabase table structure and RLS policies'
-        }), { status: response.status, headers });
-      }
-
-      const evermarks = await response.json();
-      console.log('✅ Evermarks list fetched:', {
-        count: Array.isArray(evermarks) ? evermarks.length : 0,
-        isArray: Array.isArray(evermarks)
-      });
-
-      return new Response(JSON.stringify({
-        data: evermarks,
-        count: Array.isArray(evermarks) ? evermarks.length : 0,
-        message: 'Evermarks list retrieved successfully'
-      }), { headers });
-    }
-
-    // 🔧 FIXED: Get single evermark using the exact same pattern as your hooks
-    console.log(`🔍 Getting specific evermark: ${evermarkId}`);
-    
-    // First, try the exact same query pattern your hooks use
-    const response = await fetch(`${cleanUrl}/rest/v1/evermarks?id=eq.${encodeURIComponent(evermarkId)}&select=*`, {
-      method: 'GET',
-      headers: {
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      signal: AbortSignal.timeout(15000)
-    });
-
-    console.log(`📡 Single evermark response:`, {
-      status: response.status,
-      ok: response.ok,
-      statusText: response.statusText
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Single evermark query failed:', {
-        status: response.status,
-        error: errorText,
-        evermarkId
-      });
-
-      // 🔧 If specific query fails, try to get ANY evermark to test connection
-      console.log('🔄 Testing general database access...');
-      try {
-        const testResponse = await fetch(`${cleanUrl}/rest/v1/evermarks?select=id,title&limit=5`, {
-          method: 'GET',
-          headers: {
-            'apikey': supabaseKey,
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json'
-          },
-          signal: AbortSignal.timeout(10000)
-        });
-
-        if (testResponse.ok) {
-          const testData = await testResponse.json();
-          const availableIds = Array.isArray(testData) ? testData.map(e => e.id) : [];
-          
-          return new Response(JSON.stringify({
-            error: 'Evermark not found',
-            id: evermarkId,
-            message: `Evermark "${evermarkId}" does not exist`,
-            available_ids: availableIds,
-            suggestion: availableIds.length > 0 
-              ? `Try one of these IDs: ${availableIds.slice(0, 3).join(', ')}`
-              : 'No evermarks exist in the database yet'
-          }), { status: 404, headers });
-        }
-      } catch (testError) {
-        console.error('❌ Database connection test failed:', testError);
-      }
-
-      return new Response(JSON.stringify({
-        error: 'Database query failed',
-        message: errorText,
-        status: response.status,
-        evermarkId
-      }), { status: response.status, headers });
-    }
-
-    const data = await response.json();
-    console.log('✅ Single evermark data received:', {
-      isArray: Array.isArray(data),
-      length: Array.isArray(data) ? data.length : 'not array',
-      hasData: !!data
-    });
-
-    if (!data || (Array.isArray(data) && data.length === 0)) {
-      return new Response(JSON.stringify({
-        error: 'Evermark not found',
-        id: evermarkId,
-        message: `No evermark found with ID "${evermarkId}"`
-      }), { status: 404, headers });
-    }
-
-    const evermark = Array.isArray(data) ? data[0] : data;
-    
-    // 🔧 Transform to match your hook's Evermark interface exactly
-    const transformedEvermark = {
-      // Match your useSupabaseEvermarks convertToEvermark function
-      id: evermark.id,
-      title: evermark.title,
-      author: evermark.author,
-      description: evermark.description,
-      sourceUrl: evermark.metadata?.sourceUrl,
-      image: evermark.metadata?.image,
-      metadataURI: evermark.metadata?.metadataURI || '',
-      creator: evermark.metadata?.creator || evermark.author,
-      creationTime: evermark.metadata?.creationTime || new Date(evermark.created_at).getTime() / 1000,
-      verified: evermark.verified,
       
-      // Additional fields for compatibility with existing frontend
-      name: evermark.title,
-      content: evermark.content || evermark.description,
-      timestamp: evermark.created_at,
-      created_at: evermark.created_at,
-      updated_at: evermark.updated_at,
-      evermark_type: evermark.evermark_type || 'content',
-      source_platform: evermark.source_platform || 'evermark',
-      voting_power: evermark.voting_power || 0,
-      view_count: evermark.view_count || 0,
-      tags: evermark.tags || [],
-      metadata: evermark.metadata || {},
-      external_url: evermark.metadata?.sourceUrl || null,
-      tx_hash: evermark.tx_hash || null,
-      block_number: evermark.block_number || null
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        
+        if (response.status === 404) {
+          throw new Error(errorData.message || 'Evermark not found');
+        }
+        
+        if (response.status >= 500) {
+          throw new Error(errorData.message || 'Server error - please try again');
+        }
+        
+        throw new Error(errorData.message || `Request failed with status ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Evermark data fetched:', data);
+      
+      if (!data || !data.id) {
+        throw new Error('Invalid response format from server');
+      }
+      
+      setEvermark(data);
+      setRetryCount(0);
+      
+    } catch (err) {
+      console.error('❌ Error fetching Evermark:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+      
+      const maxRetries = 3;
+      const shouldRetry = attempt < maxRetries && 
+                         !errorMessage.includes('not found') && 
+                         !errorMessage.includes('404');
+      
+      if (shouldRetry) {
+        console.log(`🔄 Retrying in 2 seconds... (${attempt + 1}/${maxRetries})`);
+        setTimeout(() => {
+          setRetryCount(attempt + 1);
+        }, 2000);
+        return;
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const retry = useCallback(() => {
+    if (id) {
+      setRetryCount(0);
+      fetchEvermark(id, 0);
+    }
+  }, [id, fetchEvermark]);
+
+  useEffect(() => {
+    if (!id) {
+      setIsLoading(false);
+      setError('No Evermark ID provided');
+      setEvermark(null);
+      return;
+    }
+
+    fetchEvermark(id, retryCount);
+  }, [id, retryCount, fetchEvermark]);
+
+  return {
+    evermark,
+    isLoading,
+    error,
+    retry
+  };
+}
+
+// 🔧 FIXED: Add the missing useUserEvermarks export
+export function useUserEvermarks(userAddress?: string) {
+  const [evermarks, setEvermarks] = useState<EvermarkData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserEvermarks = async () => {
+      if (!userAddress) {
+        setIsLoading(false);
+        setEvermarks([]);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Try to fetch user's evermarks from the API
+        // This would need to be implemented based on your backend
+        const response = await fetch(`/.netlify/functions/evermarks?creator=${encodeURIComponent(userAddress)}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setEvermarks(Array.isArray(data.data) ? data.data : []);
+        } else {
+          // Fallback: return empty array if not implemented yet
+          console.log('User evermarks endpoint not implemented yet');
+          setEvermarks([]);
+        }
+        
+      } catch (err) {
+        console.error('Error fetching user evermarks:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setEvermarks([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    console.log('✅ Evermark transformed successfully:', {
-      id: transformedEvermark.id,
-      title: transformedEvermark.title,
-      author: transformedEvermark.author
-    });
+    fetchUserEvermarks();
+  }, [userAddress]);
 
-    return new Response(JSON.stringify(transformedEvermark), {
-      headers: { 
-        ...headers, 
-        'Cache-Control': 'public, max-age=300',
-        'X-Data-Source': 'supabase-direct'
+  return {
+    evermarks,
+    isLoading,
+    error
+  };
+}
+
+// Hook for listing evermarks with filters
+export function useEvermarksList(filters?: {
+  author?: string;
+  category?: string;
+  limit?: number;
+}) {
+  const [evermarks, setEvermarks] = useState<EvermarkData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchEvermarks = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const params = new URLSearchParams();
+        if (filters?.author) params.set('author', filters.author);
+        if (filters?.category) params.set('category', filters.category);
+        if (filters?.limit) params.set('limit', filters.limit.toString());
+        
+        const queryString = params.toString();
+        const url = `/.netlify/functions/evermarks${queryString ? `?${queryString}` : ''}`;
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch evermarks: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        // Handle both single evermark and array responses
+        const evermarksList = Array.isArray(data) ? data : 
+                             Array.isArray(data.data) ? data.data : 
+                             data ? [data] : [];
+        setEvermarks(evermarksList);
+        
+      } catch (err) {
+        console.error('❌ Error fetching evermarks list:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setEvermarks([]);
+      } finally {
+        setIsLoading(false);
       }
-    });
+    };
 
-  } catch (error) {
-    console.error('💥 Function error:', error);
-    
-    return new Response(JSON.stringify({
-      error: 'Internal server error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      type: 'function_error',
-      timestamp: new Date().toISOString()
-    }), { status: 500, headers });
-  }
-};
+    fetchEvermarks();
+  }, [filters?.author, filters?.category, filters?.limit]);
+
+  return {
+    evermarks,
+    isLoading,
+    error
+  };
+}
