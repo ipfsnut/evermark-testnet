@@ -69,6 +69,12 @@
     X-UA-Compatible = "IE=edge"
     Vary = "Accept-Encoding, User-Agent"
 
+# Add CSP for Farcaster embedded content
+[[headers]]
+  for = "/evermark/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://farcaster.xyz https://client.farcaster.xyz https://warpcast.com https://client.warpcast.com; frame-ancestors *;"
+
 # Static assets caching
 [[headers]]
   for = "/assets/*"
