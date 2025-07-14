@@ -18,12 +18,15 @@ import {
   CopyIcon
 } from 'lucide-react';
 import { cn, useIsMobile } from '../utils/responsive';
+import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal';
+import { useModal } from '../hooks/useModal';
 
 type ProfileTab = 'created' | 'favorites' | 'reading' | 'delegation';
 
 export default function ProfilePage() {
   const [activeTab, setActiveTab] = useState<ProfileTab>('created');
   const isMobile = useIsMobile();
+  const { modalState, openModal, closeModal } = useModal();
   
   const { 
     displayName, 
@@ -233,12 +236,12 @@ export default function ProfilePage() {
                       <span className="text-xs text-gray-500">
                         Created {new Date(evermark.creationTime).toLocaleDateString()}
                       </span>
-                      <a 
-                        href={`/evermark/${evermark.id}`}
+                      <button 
+                        onClick={() => openModal(evermark.id)}
                         className="text-cyan-400 hover:text-cyan-300 text-sm font-medium transition-colors"
                       >
                         View →
-                      </a>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -283,12 +286,12 @@ export default function ProfilePage() {
                       <span className="text-xs text-gray-500">
                         Added {new Date(item.addedAt).toLocaleDateString()}
                       </span>
-                      <a 
-                        href={`/evermark/${item.evermarkId}`}
+                      <button 
+                        onClick={() => openModal(item.evermarkId)}
                         className="text-red-400 hover:text-red-300 text-sm font-medium transition-colors"
                       >
                         View →
-                      </a>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -333,12 +336,12 @@ export default function ProfilePage() {
                       <span className="text-xs text-gray-500">
                         Added {new Date(item.addedAt).toLocaleDateString()}
                       </span>
-                      <a 
-                        href={`/evermark/${item.evermarkId}`}
+                      <button 
+                        onClick={() => openModal(item.evermarkId)}
                         className="text-blue-400 hover:text-blue-300 text-sm font-medium transition-colors"
                       >
                         Read →
-                      </a>
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -405,6 +408,13 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Enhanced Evermark Modal */}
+      <EnhancedEvermarkModal
+        isOpen={modalState.isOpen}
+        onClose={closeModal}
+        evermarkId={modalState.evermarkId}
+      />
     </div>
   );
 }

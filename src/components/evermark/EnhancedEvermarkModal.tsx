@@ -365,15 +365,7 @@ export const EnhancedEvermarkModal: React.FC<EnhancedEvermarkModalProps> = ({
                       variant="button"
                     />
                   )}
-                  <a
-                    href={`/evermark/${evermark.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                  >
-                    <ExternalLinkIcon className="h-4 w-4 mr-2" />
-                    <span>Full Page</span>
-                  </a>
+
                 </div>
               </div>
 

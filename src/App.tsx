@@ -16,7 +16,6 @@ import MyEvermarksPage from './pages/MyEvermarksPage';
 import WrappingPage from './pages/WrappingPage';
 import BookshelfPage from './pages/BookshelfPage'; // ✅ UPDATED: Use actual bookshelf page
 import { EnhancedCreateEvermark } from './components/evermark/EnhancedCreateEvermark';
-import { EvermarkDetail } from './components/evermark/EvermarkDetail';
 import EvermarkDetailMinimal from './components/evermark/EvermarkDetailMinimal';
 import { ShareRedirect } from './components/sharing/ShareButton';
 import AboutPage from './pages/AboutPage';
@@ -217,7 +216,7 @@ function AppContent() {
   <Route path="/leaderboard" element={<LeaderboardPage />} />
   <Route path="/my-evermarks" element={<MyEvermarksPage />} />
   <Route path="/create" element={<EnhancedCreateEvermark />} />
-  <Route path="/evermark/:id" element={<EvermarkDetail />} />
+
   <Route path="/about" element={<AboutPage />} />
   
   {/* Bookshelf routes */}
@@ -380,29 +379,56 @@ function MinimalHomePage() {
 }
 
 function App() {
-  // Enhanced Farcaster detection
-  const isInFarcaster = window.parent !== window || 
-                       window.self !== window.top ||
-                       window.location.search.includes('inFeed=true') ||
-                       window.location.search.includes('action_type=share') ||
-                       navigator.userAgent.includes('farcaster') ||
-                       document.referrer.includes('farcaster') ||
-                       document.referrer.includes('warpcast');
+  // Enhanced Farcaster detection - check multiple indicators
+  const isInFarcaster = (() => {
+    // Check if we're in an iframe (most reliable indicator)
+    const inIframe = window.parent !== window || window.self !== window.top;
+    
+    // Check URL parameters and paths
+    const urlIndicators = window.location.search.includes('inFeed=true') ||
+                         window.location.search.includes('action_type=share') ||
+                         window.location.pathname.includes('/frame/') ||
+                         window.location.pathname.includes('/farcaster/');
+    
+    // Check user agent
+    const userAgentIndicators = navigator.userAgent.includes('farcaster') ||
+                               navigator.userAgent.includes('warpcast');
+    
+    // Check referrer
+    const referrerIndicators = document.referrer.includes('farcaster') ||
+                              document.referrer.includes('warpcast') ||
+                              document.referrer.includes('warpcast.com');
+    
+    // Check for Farcaster-specific globals
+    const globalIndicators = !!(window as any).__farcaster_detected ||
+                            !!(window as any).farcaster ||
+                            !!(window as any).sdk;
+    
+    // Check hostname
+    const hostnameIndicators = window.location.hostname.includes('farcaster') ||
+                              window.location.hostname.includes('warpcast');
+    
+    return inIframe || urlIndicators || userAgentIndicators || referrerIndicators || globalIndicators || hostnameIndicators;
+  })();
   
-  console.log('🔍 App Detection:', {
+  console.log('🔍 App Detection (Enhanced):', {
     isInFarcaster,
-    windowParent: window.parent,
-    windowSelf: window.self,
-    windowTop: window.top,
-    userAgent: navigator.userAgent,
+    inIframe: window.parent !== window,
+    selfNotTop: window.self !== window.top,
+    userAgent: navigator.userAgent.substring(0, 100),
     url: window.location.href,
+    pathname: window.location.pathname,
     search: window.location.search,
-    referrer: document.referrer
+    referrer: document.referrer,
+    hostname: window.location.hostname,
+    farcasterGlobal: !!(window as any).__farcaster_detected,
+    farcasterSDK: !!(window as any).sdk
   });
   
+  // Force minimal mode if any Farcaster indicators are present
   if (isInFarcaster) {
-    console.log('✅ Loading Farcaster minimal app');
-    // Minimal mode for Farcaster - no wallet providers
+    console.log('✅ Loading Farcaster minimal app (NO WALLET PROVIDERS)');
+    // Minimal mode for Farcaster - absolutely no wallet providers
     return (
       <ErrorBoundary>
         <FarcasterMinimalApp />

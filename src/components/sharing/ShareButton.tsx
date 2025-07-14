@@ -446,7 +446,7 @@ export const ShareRedirect: React.FC = () => {
         })
       }).catch(() => {});
       
-      window.location.href = `/evermark/${evermarkId}`;
+      window.location.href = `/`;
     }
   }, [evermarkId]);
   
