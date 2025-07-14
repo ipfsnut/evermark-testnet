@@ -60,19 +60,19 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   
   // Generate Universal Link for Farcaster
   const generateFarcasterUniversalLink = () => {
-    if (FARCASTER_APP_ID && FARCASTER_APP_SLUG) {
-      // Use Universal Link format when app is registered
-      return `https://farcaster.xyz/miniapps/${FARCASTER_APP_ID}/${FARCASTER_APP_SLUG}/evermark/${evermarkId}`;
-    }
+    console.log('🔍 Farcaster env vars:', { FARCASTER_APP_ID, FARCASTER_APP_SLUG });
     
-    // Fallback to web sharing with enhanced embed
-    const shareText = getShareText('farcaster');
-    const params = new URLSearchParams({
-      text: shareText,
-      'embeds[]': evermarkUrl
+    // Generate direct mini-app URL with Farcaster context
+    // This should open your mini-app directly in Farcaster, not a compose window
+    const miniAppParams = new URLSearchParams({
+      inFeed: 'true',
+      action_type: 'share',
+      action_sub_type: 'default'
     });
     
-    return `https://warpcast.com/~/compose?${params.toString()}`;
+    const miniAppUrl = `${evermarkUrl}?${miniAppParams.toString()}`;
+    console.log('✅ Generated Mini-App URL:', miniAppUrl);
+    return miniAppUrl;
   };
   
   // Size configurations
