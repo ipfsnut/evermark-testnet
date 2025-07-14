@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useEvermarkDetail } from '../../hooks/useEvermarks';
 import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
-import { ShareButton, ShareButtonWithMetadata } from '../sharing/ShareButton';
+import { ShareButton } from '../sharing/ShareButton';
 import { EvermarkMetaTags } from '../meta/EvermarkMetaTags';
 import { VotingPanel } from '../voting/VotingPanel';
 import { QuickBookshelfButton, BookshelfStatusBadge } from '../bookshelf/FloatingBookshelfWidget';
@@ -402,23 +402,15 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
                     variant="button"
                   />
                 )}
-                {/* ✅ Enhanced: Use new ShareButtonWithMetadata if available, fallback to ShareButton */}
-                {evermarkMetadata ? (
-                  <ShareButtonWithMetadata 
-                    evermark={evermarkMetadata}
-                    variant="button"
-                    size="md"
-                  />
-                ) : (
-                  <ShareButton 
-                    evermarkId={evermark.id}
-                    title={displayTitle}
-                    description={displayDescription}
-                    author={evermark.author}
-                    variant="button"
-                    size="md"
-                  />
-                )}
+                <ShareButton 
+                  evermarkId={evermark.id}
+                  title={displayTitle}
+                  description={displayDescription}
+                  author={evermark.author}
+                  evermarkData={evermarkMetadata || undefined}
+                  variant="button"
+                  size="md"
+                />
               </div>
             </div>
           </div>

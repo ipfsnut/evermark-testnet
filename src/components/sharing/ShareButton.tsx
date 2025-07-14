@@ -1,4 +1,4 @@
-// src/components/sharing/ShareButton.tsx - Enhanced with Universal Links (Backward Compatible)
+// src/components/sharing/ShareButton.tsx - Enhanced with EvermarkMetadata Support
 import React, { useState } from 'react';
 import { 
   ShareIcon, 
@@ -12,12 +12,12 @@ import {
 } from 'lucide-react';
 import { cn, useIsMobile, touchFriendly } from '../../utils/responsive';
 import type { EvermarkMetadata } from '../../utils/evermark-meta';
-
+import { EvermarkMetaGenerator } from '../../utils/evermark-meta';
 // Environment variables for Farcaster Universal Links
 const FARCASTER_APP_ID = import.meta.env.VITE_FARCASTER_APP_ID;
 const FARCASTER_APP_SLUG = import.meta.env.VITE_FARCASTER_APP_SLUG;
 
-// Legacy interface for backward compatibility
+// Updated interface with evermarkData support
 export interface ShareButtonProps {
   evermarkId: string;
   title: string;
@@ -26,17 +26,11 @@ export interface ShareButtonProps {
   variant?: 'button' | 'icon';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
+  // New prop for enhanced sharing
+  evermarkData?: EvermarkMetadata;
 }
 
-// New enhanced interface
-export interface EnhancedShareButtonProps {
-  evermark: EvermarkMetadata;
-  variant?: 'button' | 'icon';
-  size?: 'sm' | 'md' | 'lg';
-  className?: string;
-}
-
-// Main ShareButton component (backward compatible)
+// Main ShareButton component
 export const ShareButton: React.FC<ShareButtonProps> = ({
   evermarkId,
   title,
@@ -44,7 +38,8 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   author,
   variant = 'button',
   size = 'md',
-  className = ''
+  className = '',
+  evermarkData
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [copySuccess, setCopySuccess] = useState<string | null>(null);
@@ -52,22 +47,32 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   
   const baseUrl = window.location.origin;
   const evermarkUrl = `${baseUrl}/evermark/${evermarkId}`;
-  const shareText = `Check out "${title}" by ${author} on Evermark`;
+  
+  // Use enhanced share text if metadata available
+  const getShareText = (platform: 'twitter' | 'farcaster' | 'generic' = 'generic') => {
+    if (evermarkData) {
+      const metaGenerator = new EvermarkMetaGenerator();
+      return metaGenerator.generateShareText(evermarkData, platform);
+    }
+    // Fallback to simple share text
+    return `Check out "${title}" by ${author} on Evermark\n\n${evermarkUrl}`;
+  };
   
   // Generate Universal Link for Farcaster
   const generateFarcasterUniversalLink = () => {
-    if (!FARCASTER_APP_ID || !FARCASTER_APP_SLUG) {
-      // Fallback to web sharing
-      return `https://warpcast.com/~/compose?text=${encodeURIComponent(`${shareText}\n\n${evermarkUrl}`)}`;
+    if (FARCASTER_APP_ID && FARCASTER_APP_SLUG) {
+      // Use Universal Link format when app is registered
+      return `https://farcaster.xyz/miniapps/${FARCASTER_APP_ID}/${FARCASTER_APP_SLUG}/evermark/${evermarkId}`;
     }
     
-    // Universal Link format
+    // Fallback to web sharing with enhanced embed
+    const shareText = getShareText('farcaster');
     const params = new URLSearchParams({
-      text: `${shareText}\n\n${evermarkUrl}`,
+      text: shareText,
       'embeds[]': evermarkUrl
     });
     
-    return `https://warpcast.com/~/add-cast-intent?${params.toString()}`;
+    return `https://warpcast.com/~/compose?${params.toString()}`;
   };
   
   // Size configurations
@@ -94,7 +99,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   
   const config = sizeConfig[size];
   
-  // Enhanced share platforms with Universal Links
+  // Enhanced share platforms with Universal Links and rich metadata
   const sharePlatforms = [
     ...(FARCASTER_APP_ID ? [{
       name: 'Share to Farcaster',
@@ -105,27 +110,33 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         trackShare('farcaster_universal');
       },
       color: 'hover:bg-purple-900/30 hover:text-purple-400 hover:border-purple-500/30',
-      recommended: true
+      recommended: true,
+      description: 'Opens directly in Farcaster app'
     }] : []),
+    {
+      name: 'Cast with Embed',
+      icon: MessageCircleIcon,
+      action: () => {
+        const shareText = getShareText('farcaster');
+        const params = new URLSearchParams({
+          text: shareText,
+          'embeds[]': evermarkUrl
+        });
+        window.open(`https://warpcast.com/~/compose?${params.toString()}`, '_blank');
+        trackShare('farcaster_embed');
+      },
+      color: 'hover:bg-purple-900/30 hover:text-purple-400 hover:border-purple-500/30',
+      description: 'Share with rich preview'
+    },
     {
       name: 'Twitter',
       icon: TwitterIcon,
       action: () => {
-        const tweetText = encodeURIComponent(`${shareText}\n\n${evermarkUrl}`);
+        const tweetText = encodeURIComponent(getShareText('twitter'));
         window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, '_blank');
         trackShare('twitter');
       },
       color: 'hover:bg-blue-900/30 hover:text-blue-400 hover:border-blue-500/30'
-    },
-    {
-      name: 'Farcaster',
-      icon: MessageCircleIcon,
-      action: () => {
-        const castText = encodeURIComponent(`${shareText}\n\n${evermarkUrl}`);
-        window.open(`https://warpcast.com/~/compose?text=${castText}`, '_blank');
-        trackShare('farcaster_web');
-      },
-      color: 'hover:bg-purple-900/30 hover:text-purple-400 hover:border-purple-500/30'
     },
     {
       name: 'Copy Universal Link',
@@ -134,13 +145,14 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         const universalLink = generateFarcasterUniversalLink();
         copyToClipboard(universalLink, 'universal');
       },
-      color: 'hover:bg-green-900/30 hover:text-green-400 hover:border-green-500/30'
+      color: 'hover:bg-green-900/30 hover:text-green-400 hover:border-green-500/30',
+      description: 'Best for Farcaster sharing'
     },
     {
-      name: 'Copy Link',
+      name: 'Copy Direct Link',
       icon: copySuccess === 'link' ? CheckIcon : CopyIcon,
       action: () => copyToClipboard(evermarkUrl, 'link'),
-      color: 'hover:bg-green-900/30 hover:text-green-400 hover:border-green-500/30'
+      color: 'hover:bg-gray-600/30 hover:text-gray-300 hover:border-gray-500/30'
     }
   ];
   
@@ -165,10 +177,9 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     }
   };
   
-  // Track share analytics
+  // Track share analytics with enhanced metadata
   const trackShare = async (platform: string) => {
     try {
-      // Track share analytics
       await fetch('/.netlify/functions/shares', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -181,32 +192,37 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
           metadata: {
             title,
             author,
-            hasDescription: !!description
+            hasDescription: !!description,
+            hasEvermarkData: !!evermarkData,
+            isFarcasterCast: !!evermarkData?.farcasterData,
+            category: evermarkData?.category,
+            qualityScore: evermarkData?.farcasterData?.qualityScore
           }
         })
       });
     } catch (error) {
       console.log('Analytics tracking failed:', error);
-      // Don't block the user experience for analytics failures
     }
     
     setIsOpen(false);
   };
   
-  // Native share API for mobile
+  // Enhanced native share with metadata
   const handleNativeShare = async () => {
     if (navigator.share && typeof navigator.share === 'function') {
       try {
-        await navigator.share({
-          title: `${title} by ${author}`,
-          text: description || shareText,
-          url: evermarkUrl
-        });
+        const shareData = {
+          title: `${title} by ${author} | Evermark`,
+          text: description || getShareText('generic'),
+          url: FARCASTER_APP_ID ? generateFarcasterUniversalLink() : evermarkUrl
+        };
+        
+        await navigator.share(shareData);
         trackShare('native');
       } catch (err: any) {
         if (err.name !== 'AbortError') {
           console.error('Native share failed:', err);
-          setIsOpen(true); // Fallback to custom share menu
+          setIsOpen(true);
         }
       }
     } else {
@@ -214,7 +230,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     }
   };
   
-  // Button variant with cyber styling
+  // Button variant
   if (variant === 'button') {
     return (
       <div className="relative">
@@ -233,7 +249,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
           Share
         </button>
         
-        {/* Enhanced share menu with cyber styling */}
+        {/* Enhanced share menu */}
         {isOpen && !isMobile && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
@@ -246,6 +262,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
                 config={config}
                 title={title}
                 author={author}
+                evermarkData={evermarkData}
                 onClose={() => setIsOpen(false)}
               />
             </div>
@@ -255,7 +272,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
     );
   }
   
-  // Icon variant with cyber styling
+  // Icon variant
   return (
     <div className="relative">
       <button
@@ -273,7 +290,6 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
         <ShareIcon className={config.iconSize} />
       </button>
       
-      {/* Desktop share menu */}
       {isOpen && !isMobile && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
@@ -286,6 +302,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
               config={config}
               title={title}
               author={author}
+              evermarkData={evermarkData}
               onClose={() => setIsOpen(false)}
             />
           </div>
@@ -295,27 +312,7 @@ export const ShareButton: React.FC<ShareButtonProps> = ({
   );
 };
 
-// New component that takes EvermarkMetadata for richer sharing
-export const ShareButtonWithMetadata: React.FC<EnhancedShareButtonProps> = ({
-  evermark,
-  variant = 'button',
-  size = 'md',
-  className = ''
-}) => {
-  return (
-    <ShareButton
-      evermarkId={evermark.id}
-      title={evermark.title}
-      description={evermark.description}
-      author={evermark.author}
-      variant={variant}
-      size={size}
-      className={className}
-    />
-  );
-};
-
-// Enhanced share menu component
+// Enhanced share menu component with metadata support
 const EnhancedShareMenu: React.FC<{
   platforms: Array<{
     name: string;
@@ -323,17 +320,24 @@ const EnhancedShareMenu: React.FC<{
     action: () => void;
     color: string;
     recommended?: boolean;
+    description?: string;
   }>;
   config: any;
   title: string;
   author: string;
+  evermarkData?: EvermarkMetadata;
   onClose: () => void;
-}> = ({ platforms, config, title, author, onClose }) => {
+}> = ({ platforms, config, title, author, evermarkData, onClose }) => {
   return (
     <>
       <div className="px-4 py-2 border-b border-gray-700">
         <h3 className="text-sm font-medium text-white">Share Evermark</h3>
         <p className="text-xs text-gray-400 mt-1">{title}</p>
+        {evermarkData?.farcasterData && (
+          <div className="text-xs text-purple-400 mt-1">
+            📤 Originally from Farcaster
+          </div>
+        )}
       </div>
       
       {/* Recommended options first */}
@@ -354,7 +358,9 @@ const EnhancedShareMenu: React.FC<{
             <IconComponent className={cn("mr-3", config.iconSize)} />
             <div className="flex-1">
               <div className="font-medium">{platform.name}</div>
-              <div className="text-xs text-gray-500">Recommended • Opens in Farcaster app</div>
+              {platform.description && (
+                <div className="text-xs text-gray-500">{platform.description}</div>
+              )}
             </div>
             <div className="text-xs bg-purple-600/20 text-purple-300 px-2 py-1 rounded">⭐</div>
           </button>
@@ -382,31 +388,61 @@ const EnhancedShareMenu: React.FC<{
             )}
           >
             <IconComponent className={cn("mr-3", config.iconSize)} />
-            {platform.name}
+            <div className="flex-1">
+              <div>{platform.name}</div>
+              {platform.description && (
+                <div className="text-xs text-gray-500">{platform.description}</div>
+              )}
+            </div>
           </button>
         );
       })}
       
-      {/* Preview section */}
+      {/* Enhanced preview section with metadata */}
       <div className="border-t border-gray-700 mt-2 p-4">
         <h4 className="text-xs font-medium text-gray-400 mb-2">Share Preview</h4>
         <div className="bg-gray-900/50 rounded p-2">
           <div className="text-xs text-gray-300 mb-1">{title}</div>
-          <div className="text-xs text-gray-500">by {author}</div>
+          <div className="text-xs text-gray-500 mb-1">by {author}</div>
+          
+          {evermarkData && (
+            <div className="flex flex-wrap gap-1 mt-2">
+              {evermarkData.category && (
+                <span className="text-xs bg-blue-600/20 text-blue-300 px-1.5 py-0.5 rounded">
+                  {evermarkData.category}
+                </span>
+              )}
+              {evermarkData.farcasterData && (
+                <span className="text-xs bg-purple-600/20 text-purple-300 px-1.5 py-0.5 rounded">
+                  Farcaster Cast
+                </span>
+              )}
+              {evermarkData.tags.slice(0, 2).map((tag, i) => (
+                <span key={i} className="text-xs bg-gray-600/20 text-gray-400 px-1.5 py-0.5 rounded">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+        
+        {evermarkData?.farcasterData && (
+          <div className="mt-2 text-xs text-gray-500">
+            Original engagement: {evermarkData.farcasterData.engagement.likes} likes, {evermarkData.farcasterData.engagement.recasts} recasts
+          </div>
+        )}
       </div>
     </>
   );
 };
 
-// ShareRedirect component for handling shared links
+// Keep existing ShareRedirect component
 export const ShareRedirect: React.FC = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const evermarkId = urlParams.get('id');
   
   React.useEffect(() => {
     if (evermarkId) {
-      // Track that someone accessed via share link
       fetch('/.netlify/functions/shares', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -416,11 +452,8 @@ export const ShareRedirect: React.FC = () => {
           timestamp: new Date().toISOString(),
           type: 'view'
         })
-      }).catch(() => {
-        // Ignore analytics failures
-      });
+      }).catch(() => {});
       
-      // Redirect to the actual Evermark
       window.location.href = `/evermark/${evermarkId}`;
     }
   }, [evermarkId]);
