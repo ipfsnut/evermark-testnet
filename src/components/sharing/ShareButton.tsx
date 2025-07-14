@@ -14,8 +14,8 @@ import { cn, useIsMobile, touchFriendly } from '../../utils/responsive';
 import type { EvermarkMetadata } from '../../utils/evermark-meta';
 import { EvermarkMetaGenerator } from '../../utils/evermark-meta';
 // Environment variables for Farcaster Universal Links
-const FARCASTER_APP_ID = import.meta.env.VITE_FARCASTER_APP_ID;
-const FARCASTER_APP_SLUG = import.meta.env.VITE_FARCASTER_APP_SLUG;
+const FARCASTER_APP_ID = import.meta.env.VITE_FARCASTER_MINI_APP_ID;
+const FARCASTER_APP_SLUG = import.meta.env.VITE_FARCASTER_MINI_APP_SLUG;
 
 // Updated interface with evermarkData support
 export interface ShareButtonProps {
