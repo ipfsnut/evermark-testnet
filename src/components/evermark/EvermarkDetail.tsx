@@ -436,28 +436,30 @@ export function EvermarkDetail({ id: propId }: EvermarkDetailProps) {
               
               {/* Action Buttons */}
               <div className="flex items-center space-x-3">
-                {isAuthenticated && (
+                {isAuthenticated && !isInFarcaster && (
                   <QuickBookshelfButton 
                     evermarkId={evermark.id}
                     userAddress={primaryAddress}
                     variant="button"
                   />
                 )}
-                <ShareButton 
-                  evermarkId={evermark.id}
-                  title={displayTitle}
-                  description={displayDescription}
-                  author={evermark.author}
-                  evermarkData={evermarkMetadata || undefined}
-                  variant="button"
-                  size="md"
-                />
+                {!isInFarcaster && (
+                  <ShareButton 
+                    evermarkId={evermark.id}
+                    title={displayTitle}
+                    description={displayDescription}
+                    author={evermark.author}
+                    evermarkData={evermarkMetadata || undefined}
+                    variant="button"
+                    size="md"
+                  />
+                )}
               </div>
             </div>
           </div>
           
-          {/* Bookshelf Status Badge */}
-          {isAuthenticated && (
+          {/* Bookshelf Status Badge - only in regular mode */}
+          {isAuthenticated && !isInFarcaster && (
             <div className="mb-6">
               <BookshelfStatusBadge 
                 evermarkId={evermark.id}
