@@ -4,6 +4,10 @@
   environment = { NODE_VERSION = "20" }
   functions = "netlify/functions"
 
+# Scheduled function for blockchain sync (every hour)
+[functions."sync-blockchain"]
+  schedule = "0 * * * *"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
@@ -29,6 +33,12 @@
   to = "/.netlify/functions/shares"
   status = 200
 
+# Thirdweb webhook for real-time updates
+[[redirects]]
+  from = "/webhook/thirdweb"
+  to = "/.netlify/functions/thirdweb-webhook"
+  status = 200
+
 [[redirects]]
   from = "/webhook"
   to = "/.netlify/functions/webhook"
@@ -42,6 +52,17 @@
 [[redirects]]
   from = "/api/shares/*"
   to = "/.netlify/functions/shares"
+  status = 200
+
+# Dev dashboard for manual sync
+[[redirects]]
+  from = "/dev"
+  to = "/.netlify/functions/dev-dashboard"
+  status = 200
+
+[[redirects]]
+  from = "/sync"
+  to = "/.netlify/functions/sync-now"
   status = 200
 
 [[redirects]]
