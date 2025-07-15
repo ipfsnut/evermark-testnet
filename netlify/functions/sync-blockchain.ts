@@ -1,19 +1,25 @@
-// netlify/functions/sync-blockchain.ts - FIXED to match actual Supabase schema
+// netlify/functions/sync-blockchain.ts - FIXED with Service Role Key
 import type { Context } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { createThirdwebClient, getContract, readContract } from 'thirdweb';
 import { base } from 'thirdweb/chains';
 
-// Environment variables - try both naming conventions
+// ✅ FIXED: Use SECRET key for server-side operations (bypasses RLS)
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 const thirdwebClientId = process.env.THIRDWEB_CLIENT_ID || process.env.VITE_THIRDWEB_CLIENT_ID;
 const evermarkNftAddress = process.env.EVERMARK_NFT_ADDRESS || process.env.VITE_EVERMARK_NFT_ADDRESS;
 
-if (!supabaseUrl || !supabaseKey || !thirdwebClientId || !evermarkNftAddress) {
+console.log('🔧 Using Supabase keys:', {
+  hasSecretKey: !!process.env.SUPABASE_SECRET_KEY,
+  hasAnonKey: !!process.env.SUPABASE_ANON_KEY,
+  usingKey: process.env.SUPABASE_SECRET_KEY ? 'SECRET' : 'ANON'
+});
+
+if (!supabaseUrl || !supabaseSecretKey || !thirdwebClientId || !evermarkNftAddress) {
   const missing = [
     !supabaseUrl && 'SUPABASE_URL',
-    !supabaseKey && 'SUPABASE_ANON_KEY', 
+    !supabaseSecretKey && 'SUPABASE_SECRET_KEY (or SUPABASE_ANON_KEY)', 
     !thirdwebClientId && 'THIRDWEB_CLIENT_ID',
     !evermarkNftAddress && 'EVERMARK_NFT_ADDRESS'
   ].filter(Boolean);
@@ -22,7 +28,8 @@ if (!supabaseUrl || !supabaseKey || !thirdwebClientId || !evermarkNftAddress) {
   throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey);
+// ✅ FIXED: Use secret key which bypasses RLS
+const supabase = createClient(supabaseUrl, supabaseSecretKey);
 const client = createThirdwebClient({ clientId: thirdwebClientId });
 
 export default async (request: Request, context: Context) => {
@@ -61,6 +68,7 @@ export default async (request: Request, context: Context) => {
       return Response.json({
         status: 'healthy',
         service: 'blockchain-sync',
+        usingSecretKey: !!process.env.SUPABASE_SECRET_KEY,
         blockchain: {
           totalSupply: totalSupply.toString(),
           contract: evermarkNftAddress,
@@ -113,7 +121,7 @@ export default async (request: Request, context: Context) => {
     
     // Sync missing Evermarks (start from 1, since NFTs usually start at 1)
     const totalTokens = Number(totalSupply);
-    const maxToSync = Math.min(10, totalTokens); // Limit to 10 per run to avoid timeouts
+    const maxToSync = Math.min(10, totalTokens); // Limit to 10 per run
     
     for (let tokenId = 1; tokenId <= totalTokens && synced < maxToSync; tokenId++) {
       if (existingIds.has(tokenId)) {
@@ -125,7 +133,7 @@ export default async (request: Request, context: Context) => {
         synced++;
         console.log(`✅ Synced Evermark ${tokenId} (${synced}/${maxToSync})`);
         
-        // Rate limiting - don't overwhelm
+        // Rate limiting
         if (synced % 3 === 0) {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
@@ -170,60 +178,14 @@ async function syncSingleEvermark(contract: any, tokenId: number) {
   try {
     console.log(`🔍 Syncing Evermark ${tokenId}...`);
     
-    // Try multiple method names to find the right one
-    let contractData: any = null;
-    let methodUsed = '';
+    // Get contract data (this part was already working)
+    const contractData = await readContract({
+      contract,
+      method: "function evermarkData(uint256) view returns (string,string,string,uint256,address,address)",
+      params: [BigInt(tokenId)]
+    });
     
-    const methodsToTry = [
-      "function evermarkData(uint256) view returns (string,string,string,uint256,address,address)",
-      "function getEvermarkMetadata(uint256) view returns (string,string,string)",
-      "function tokenURI(uint256) view returns (string)"
-    ];
-    
-    for (const method of methodsToTry) {
-      try {
-        contractData = await readContract({
-          contract,
-          method,
-          params: [BigInt(tokenId)]
-        });
-        methodUsed = method;
-        console.log(`✅ Successfully called ${method} for token ${tokenId}`);
-        break;
-      } catch (error) {
-        console.log(`⚠️ Method ${method} failed for token ${tokenId}:`, error);
-        continue;
-      }
-    }
-    
-    if (!contractData) {
-      throw new Error('All contract methods failed');
-    }
-    
-    // Parse data based on which method worked
-    let title = '', contractCreator = '', metadataURI = '', creationTime = BigInt(0), minter = '', referrer = '';
-    
-    if (methodUsed.includes('evermarkData')) {
-      // Full evermarkData response: [title, creator, metadataURI, creationTime, minter, referrer]
-      [title, contractCreator, metadataURI, creationTime, minter, referrer] = contractData;
-    } else if (methodUsed.includes('getEvermarkMetadata')) {
-      // Basic metadata response: [title, creator, metadataURI]
-      [title, contractCreator, metadataURI] = contractData;
-      creationTime = BigInt(Math.floor(Date.now() / 1000));
-      minter = contractCreator;
-    } else if (methodUsed.includes('tokenURI')) {
-      // Just URI - need to fetch metadata
-      metadataURI = contractData;
-      title = `Evermark #${tokenId}`;
-      contractCreator = 'Unknown';
-      creationTime = BigInt(Math.floor(Date.now() / 1000));
-      minter = 'Unknown';
-    }
-    
-    // Validate required fields
-    if (!title && !metadataURI) {
-      throw new Error('No title or metadata URI found');
-    }
+    const [title, contractCreator, metadataURI, creationTime, minter, referrer] = contractData;
     
     // Fetch IPFS metadata if available
     let metadata: any = {};
@@ -235,7 +197,7 @@ async function syncSingleEvermark(contract: any, tokenId: number) {
       }
     }
     
-    // ✅ FIXED: Match your actual Supabase schema exactly
+    // ✅ Same data structure as before - this was working
     const evermarkData = {
       id: tokenId.toString(),
       title: title || metadata.name || `Evermark #${tokenId}`,
@@ -243,7 +205,6 @@ async function syncSingleEvermark(contract: any, tokenId: number) {
       author: metadata.attributes?.find((a: any) => a.trait_type === 'Original Author')?.value || 
                metadata.attributes?.find((a: any) => a.trait_type === 'Author')?.value ||
                contractCreator || 'Unknown',
-      // user_id: null, // We don't have user mapping yet
       verified: true,
       metadata: {
         ...metadata,
@@ -251,23 +212,16 @@ async function syncSingleEvermark(contract: any, tokenId: number) {
         creationTime: Number(creationTime),
         contractCreator: minter || contractCreator,
         referrer: referrer === '0x0000000000000000000000000000000000000000' ? null : referrer,
-        methodUsed,
         syncedAt: new Date().toISOString()
       },
       created_at: new Date(Number(creationTime) * 1000).toISOString(),
       updated_at: new Date().toISOString(),
       last_synced_at: new Date().toISOString(),
-      // tx_hash: null // We don't have this from the sync
     };
     
-    console.log(`📝 Preparing to insert Evermark ${tokenId} with data:`, {
-      id: evermarkData.id,
-      title: evermarkData.title,
-      author: evermarkData.author,
-      hasMetadata: !!evermarkData.metadata
-    });
+    console.log(`📝 Inserting Evermark ${tokenId}: ${evermarkData.title}`);
     
-    // Insert into Supabase using upsert to handle duplicates
+    // ✅ This should now work with service role key (bypasses RLS)
     const { error } = await supabase
       .from('evermarks')
       .upsert(evermarkData, { 
@@ -280,7 +234,7 @@ async function syncSingleEvermark(contract: any, tokenId: number) {
       throw new Error(`Supabase upsert failed: ${error.message}`);
     }
     
-    console.log(`✅ Successfully synced Evermark ${tokenId} using ${methodUsed}`);
+    console.log(`✅ Successfully synced Evermark ${tokenId}`);
     
   } catch (error) {
     throw new Error(`Failed to sync token ${tokenId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -303,11 +257,11 @@ async function fetchIPFSMetadata(metadataURI: string): Promise<any> {
       return cached.content;
     }
   } catch (error) {
-    // Cache miss is normal, continue
+    // Cache miss is normal
     console.log(`📦 No cache found for ${ipfsHash}, fetching...`);
   }
   
-  // Fetch from IPFS gateway with timeout
+  // Fetch from IPFS gateway
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 8000);
   
