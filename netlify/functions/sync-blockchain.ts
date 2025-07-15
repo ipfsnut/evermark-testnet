@@ -1,24 +1,41 @@
-// netlify/functions/sync-blockchain.ts - Simplified approach
+// netlify/functions/sync-blockchain.ts - FIXED with correct environment variables
 import type { Context } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import { createThirdwebClient, getContract, readContract } from 'thirdweb';
 import { base } from 'thirdweb/chains';
 
-// Environment variables
+// ✅ FIXED: Use correct SERVER-SIDE environment variable names for Netlify functions
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const thirdwebClientId = process.env.THIRDWEB_CLIENT_ID;
 const evermarkNftAddress = process.env.EVERMARK_NFT_ADDRESS;
 
+console.log('🔍 Environment check:', {
+  hasSupabaseUrl: !!supabaseUrl,
+  hasSupabaseKey: !!supabaseKey,
+  hasThirdwebClientId: !!thirdwebClientId,
+  hasEvermarkNftAddress: !!evermarkNftAddress,
+  supabaseUrl: supabaseUrl ? `${supabaseUrl.slice(0, 30)}...` : 'MISSING',
+  evermarkNftAddress: evermarkNftAddress || 'MISSING'
+});
+
 if (!supabaseUrl || !supabaseKey || !thirdwebClientId || !evermarkNftAddress) {
-  throw new Error('Missing required environment variables');
+  const missing = [
+    !supabaseUrl && 'SUPABASE_URL',
+    !supabaseKey && 'SUPABASE_ANON_KEY', 
+    !thirdwebClientId && 'THIRDWEB_CLIENT_ID',
+    !evermarkNftAddress && 'EVERMARK_NFT_ADDRESS'
+  ].filter(Boolean);
+  
+  console.error('❌ Missing environment variables:', missing);
+  throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 const client = createThirdwebClient({ clientId: thirdwebClientId });
 
 export default async (request: Request, context: Context) => {
-  console.log('🔄 Blockchain sync started (simplified)');
+  console.log('🔄 Blockchain sync started');
   
   // Handle CORS
   if (request.method === 'OPTIONS') {
@@ -52,19 +69,33 @@ export default async (request: Request, context: Context) => {
       
       return Response.json({
         status: 'healthy',
-        service: 'blockchain-sync-simple',
+        service: 'blockchain-sync',
+        environment: {
+          hasSupabaseUrl: !!supabaseUrl,
+          hasSupabaseKey: !!supabaseKey,
+          hasThirdwebClientId: !!thirdwebClientId,
+          hasEvermarkNftAddress: !!evermarkNftAddress,
+        },
         blockchain: {
           totalSupply: totalSupply.toString(),
-          contract: evermarkNftAddress
+          contract: evermarkNftAddress,
+          chainId: base.id
         },
         database: {
           evermarksCount: dbCount || 0
         }
       });
     } catch (error) {
+      console.error('❌ Health check failed:', error);
       return Response.json({
         status: 'error',
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        environment: {
+          hasSupabaseUrl: !!supabaseUrl,
+          hasSupabaseKey: !!supabaseKey, 
+          hasThirdwebClientId: !!thirdwebClientId,
+          hasEvermarkNftAddress: !!evermarkNftAddress,
+        }
       }, { status: 500 });
     }
   }
@@ -78,7 +109,7 @@ export default async (request: Request, context: Context) => {
   const errors: string[] = [];
   
   try {
-    console.log('📚 Starting simplified sync...');
+    console.log('📚 Starting blockchain sync...');
     
     const contract = getContract({
       client,
@@ -114,7 +145,7 @@ export default async (request: Request, context: Context) => {
         console.log(`✅ Synced Evermark ${tokenId}`);
         
         // Rate limiting - don't overwhelm
-        if (synced % 10 === 0) {
+        if (synced % 5 === 0) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
@@ -155,35 +186,25 @@ export default async (request: Request, context: Context) => {
 
 async function syncSingleEvermark(contract: any, tokenId: number) {
   try {
-    // Get basic metadata from contract
-    const [title, creator, metadataURI] = await readContract({
+    console.log(`🔍 Syncing Evermark ${tokenId}...`);
+    
+    // ✅ FIXED: Use the correct method name that matches your hooks
+    const contractData = await readContract({
       contract,
-      method: "function getEvermarkMetadata(uint256) view returns (string, string, string)",
+      method: "function evermarkData(uint256) view returns (string,string,string,uint256,address,address)",
       params: [BigInt(tokenId)]
     });
     
-    // Get creation time
-    let creationTime;
-    try {
-      creationTime = await readContract({
-        contract,
-        method: "function getEvermarkCreationTime(uint256) view returns (uint256)",
-        params: [BigInt(tokenId)]
-      });
-    } catch {
-      creationTime = BigInt(Math.floor(Date.now() / 1000)); // Fallback to now
+    if (!contractData || !Array.isArray(contractData)) {
+      throw new Error('Invalid evermarkData response');
     }
     
-    // Get owner
-    let owner;
-    try {
-      owner = await readContract({
-        contract,
-        method: "function ownerOf(uint256) view returns (address)",
-        params: [BigInt(tokenId)]
-      });
-    } catch {
-      owner = '0x0000000000000000000000000000000000000000';
+    // Extract fields from tuple: [title, creator, metadataURI, creationTime, minter, referrer]
+    const [title, creator, metadataURI, creationTime, minter, referrer] = contractData;
+    
+    // Validate required fields
+    if (!title || !metadataURI) {
+      throw new Error('Missing required evermark data fields');
     }
     
     // Fetch IPFS metadata if available
@@ -202,12 +223,13 @@ async function syncSingleEvermark(contract: any, tokenId: number) {
       title: title || metadata.name || `Evermark #${tokenId}`,
       description: metadata.description || '',
       author: metadata.attributes?.find((a: any) => a.trait_type === 'Original Author')?.value || creator || 'Unknown',
-      creator: owner,
+      creator: minter || creator,
       metadata: {
         ...metadata,
         metadataURI,
         creationTime: Number(creationTime),
-        creator: owner
+        creator: minter || creator,
+        referrer: referrer === '0x0000000000000000000000000000000000000000' ? null : referrer
       },
       created_at: new Date(Number(creationTime) * 1000).toISOString(),
       updated_at: new Date().toISOString(),
@@ -217,11 +239,13 @@ async function syncSingleEvermark(contract: any, tokenId: number) {
     // Insert into Supabase
     const { error } = await supabase
       .from('evermarks')
-      .insert(evermarkData);
+      .upsert(evermarkData, { onConflict: 'id' });
     
     if (error) {
-      throw new Error(`Supabase insert failed: ${error.message}`);
+      throw new Error(`Supabase upsert failed: ${error.message}`);
     }
+    
+    console.log(`✅ Successfully synced Evermark ${tokenId}`);
     
   } catch (error) {
     throw new Error(`Failed to sync token ${tokenId}: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -242,24 +266,36 @@ async function fetchIPFSMetadata(metadataURI: string): Promise<any> {
     return cached.content;
   }
   
-  // Fetch from IPFS gateway
-  const response = await fetch(`https://gateway.pinata.cloud/ipfs/${ipfsHash}`, {
-  });
+  // Fetch from IPFS gateway with timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
   
-  if (!response.ok) {
-    throw new Error(`IPFS fetch failed: ${response.status}`);
+  try {
+    const response = await fetch(`https://gateway.pinata.cloud/ipfs/${ipfsHash}`, {
+      signal: controller.signal,
+      headers: { 'Accept': 'application/json' }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      throw new Error(`IPFS fetch failed: ${response.status}`);
+    }
+    
+    const metadata = await response.json();
+    
+    // Cache the result
+    await supabase
+      .from('ipfs_cache')
+      .upsert({
+        hash: ipfsHash,
+        content: metadata,
+        content_type: 'metadata'
+      }, { onConflict: 'hash' });
+    
+    return metadata;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
   }
-  
-  const metadata = await response.json();
-  
-  // Cache the result
-  await supabase
-    .from('ipfs_cache')
-    .upsert({
-      hash: ipfsHash,
-      content: metadata,
-      content_type: 'metadata'
-    }, { onConflict: 'hash' });
-  
-  return metadata;
 }
