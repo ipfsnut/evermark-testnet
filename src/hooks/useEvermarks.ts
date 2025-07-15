@@ -1,4 +1,4 @@
-// src/hooks/useEvermarks.ts - FIXED VERSION with better error handling
+// src/hooks/useEvermarks.ts - FIXED with missing exports
 import { useState, useEffect, useCallback } from 'react';
 
 interface EvermarkData {
@@ -35,6 +35,7 @@ interface UseEvermarkDetailResult {
   retry: () => void;
 }
 
+// Main hook for getting single evermark details
 export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
   const [evermark, setEvermark] = useState<EvermarkData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +49,6 @@ export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
       
       console.log(`🔍 Fetching Evermark ${evermarkId}, attempt ${attempt + 1}`);
       
-      // 🔧 FIXED: Use the correct API endpoint path
       const response = await fetch(`/.netlify/functions/evermarks?id=${encodeURIComponent(evermarkId)}`, {
         method: 'GET',
         headers: {
@@ -73,20 +73,18 @@ export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
       const data = await response.json();
       console.log('✅ Evermark data fetched:', data);
       
-      // 🔧 FIXED: Validate the response structure
       if (!data || !data.id) {
         throw new Error('Invalid response format from server');
       }
       
       setEvermark(data);
-      setRetryCount(0); // Reset retry count on success
+      setRetryCount(0);
       
     } catch (err) {
       console.error('❌ Error fetching Evermark:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);
       
-      // 🔧 FIXED: Retry logic for network errors (but not 404s)
       const maxRetries = 3;
       const shouldRetry = attempt < maxRetries && 
                          !errorMessage.includes('not found') && 
@@ -97,7 +95,7 @@ export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
         setTimeout(() => {
           setRetryCount(attempt + 1);
         }, 2000);
-        return; // Don't set loading to false yet
+        return;
       }
     } finally {
       setIsLoading(false);
@@ -130,7 +128,57 @@ export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
   };
 }
 
-// 🔧 NEW: Additional hook for listing evermarks
+// 🔧 FIXED: Add the missing useUserEvermarks export
+export function useUserEvermarks(userAddress?: string) {
+  const [evermarks, setEvermarks] = useState<EvermarkData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserEvermarks = async () => {
+      if (!userAddress) {
+        setIsLoading(false);
+        setEvermarks([]);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Try to fetch user's evermarks from the API
+        // This would need to be implemented based on your backend
+        const response = await fetch(`/.netlify/functions/evermarks?creator=${encodeURIComponent(userAddress)}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setEvermarks(Array.isArray(data.data) ? data.data : []);
+        } else {
+          // Fallback: return empty array if not implemented yet
+          console.log('User evermarks endpoint not implemented yet');
+          setEvermarks([]);
+        }
+        
+      } catch (err) {
+        console.error('Error fetching user evermarks:', err);
+        setError(err instanceof Error ? err.message : 'Unknown error');
+        setEvermarks([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserEvermarks();
+  }, [userAddress]);
+
+  return {
+    evermarks,
+    isLoading,
+    error
+  };
+}
+
+// Hook for listing evermarks with filters
 export function useEvermarksList(filters?: {
   author?: string;
   category?: string;
@@ -163,13 +211,15 @@ export function useEvermarksList(filters?: {
         const data = await response.json();
         
         // Handle both single evermark and array responses
-        const evermarksList = Array.isArray(data) ? data : [data];
+        const evermarksList = Array.isArray(data) ? data : 
+                             Array.isArray(data.data) ? data.data : 
+                             data ? [data] : [];
         setEvermarks(evermarksList);
         
       } catch (err) {
         console.error('❌ Error fetching evermarks list:', err);
         setError(err instanceof Error ? err.message : 'Unknown error');
-        setEvermarks([]); // Reset to empty array on error
+        setEvermarks([]);
       } finally {
         setIsLoading(false);
       }
