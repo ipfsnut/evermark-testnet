@@ -5,10 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
 <title>Evermark - Content Curation</title>
 
-<!-- FIXED: Simplified CSP - removed conflicting directives -->
+<!-- FIXED: Updated CSP to allow ThirdWeb and all necessary domains -->
 <meta http-equiv="Content-Security-Policy" content="
       default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https:;
-      connect-src 'self' https: wss: data: blob:;
+      connect-src 'self' https: wss: data: blob: 
+        https://*.thirdweb.com 
+        https://*.rpc.thirdweb.com 
+        https://c.thirdweb.com 
+        https://social.thirdweb.com 
+        https://*.supabase.co 
+        https://farcaster.xyz 
+        https://client.farcaster.xyz 
+        https://warpcast.com 
+        https://client.warpcast.com 
+        https://wrpcd.net 
+        https://*.wrpcd.net
+        https://api.neynar.com
+        https://gateway.pinata.cloud
+        https://*.pinata.cloud
+        https://ipfs.io
+        https://gateway.ipfs.io
+        https://*.infura.io
+        https://*.alchemy.com
+        https://*.ankr.com;
       script-src 'self' 'unsafe-inline' 'unsafe-eval' https: https://cdn.jsdelivr.net;
       img-src 'self' https: data: blob:;
       font-src 'self' data: https:;
@@ -16,7 +35,6 @@
       worker-src 'self' blob:;
       child-src 'self' blob: https:;
       frame-src 'self' https: data: blob:;
-      frame-ancestors *;
       object-src 'none';
       base-uri 'self';
     ">
