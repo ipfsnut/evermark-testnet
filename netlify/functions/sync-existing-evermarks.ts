@@ -17,14 +17,13 @@ export default async (request: Request, context: Context) => {
   }
 
   try {
-    // Step 1: Fetch NFTs from Thirdweb API
-    console.log('📡 Fetching NFTs from Thirdweb API...');
+    // Step 1: Fetch NFTs from Thirdweb Insight API
+    console.log('📡 Fetching NFTs from Thirdweb Insight API...');
     
     const thirdwebResponse = await fetch(
-      `https://api.thirdweb.com/v1/chain/8453/contract/${EVERMARK_NFT_ADDRESS}/nfts`,
+      `https://8453.insight.thirdweb.com/v1/nfts/${EVERMARK_NFT_ADDRESS}`,
       {
         headers: {
-          'Authorization': `Bearer ${THIRDWEB_SECRET_KEY}`,
           'Content-Type': 'application/json'
         }
       }
@@ -35,10 +34,10 @@ export default async (request: Request, context: Context) => {
     }
 
     const nftData = await thirdwebResponse.json();
-    console.log(`📊 Found ${nftData.data?.length || 0} NFTs from Thirdweb`);
+    console.log(`📊 Found ${nftData.result?.length || 0} NFTs from Thirdweb`);
 
     // Step 2: Transform to Evermark format
-    const evermarks = nftData.data.map((nft: any) => {
+    const evermarks = (nftData.result || []).map((nft: any) => {
       return {
         id: nft.tokenId || nft.id,
         title: nft.metadata?.name || `Evermark #${nft.tokenId}`,
