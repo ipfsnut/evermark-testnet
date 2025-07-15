@@ -3,8 +3,8 @@ import type { Context } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_ANON_KEY;
 const webhookSecret = process.env.THIRDWEB_WEBHOOK_SECRET;
 
 if (!supabaseUrl || !supabaseKey) {
@@ -134,10 +134,10 @@ async function routeWebhookEvent(webhook: ThirdwebWebhookEvent) {
   const { contractAddress, eventName, args, blockTimestamp, transactionHash } = webhook.data;
   
   // Get contract addresses from environment
-  const evermarkNft = process.env.VITE_EVERMARK_NFT_ADDRESS?.toLowerCase();
-  const cardCatalog = process.env.VITE_CARD_CATALOG_ADDRESS?.toLowerCase();
-  const voting = process.env.VITE_EVERMARK_VOTING_ADDRESS?.toLowerCase();
-  const leaderboard = process.env.VITE_EVERMARK_LEADERBOARD_ADDRESS?.toLowerCase();
+  const evermarkNft = process.env.EVERMARK_NFT_ADDRESS?.toLowerCase();
+  const cardCatalog = process.env.CARD_CATALOG_ADDRESS?.toLowerCase();
+  const voting = process.env.EVERMARK_VOTING_ADDRESS?.toLowerCase();
+  const leaderboard = process.env.EVERMARK_LEADERBOARD_ADDRESS?.toLowerCase();
   
   const contract = contractAddress.toLowerCase();
   
