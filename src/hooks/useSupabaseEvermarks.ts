@@ -13,7 +13,7 @@ export interface Evermark {
   image?: string;
   metadataURI: string;
   creator: string;
-  creationTime: number;
+  creationTime: number; 
   votes?: number;
   verified?: boolean;
 }
@@ -27,6 +27,98 @@ interface UseSupabaseEvermarksOptions {
   author?: string;
   verified?: boolean;
   enableBlockchainFallback?: boolean;
+}
+
+class TimestampUtils {
+
+  static toMilliseconds(timestamp: number | string | Date | null | undefined): number {
+    if (!timestamp) {
+      return Date.now();
+    }
+    
+    if (timestamp instanceof Date) {
+      return timestamp.getTime();
+    }
+    
+    if (typeof timestamp === 'string') {
+      const date = new Date(timestamp);
+      if (!isNaN(date.getTime())) {
+        return date.getTime();
+      }
+      
+      const num = parseInt(timestamp);
+      if (!isNaN(num)) {
+        return this.toMilliseconds(num);
+      }
+      
+      return Date.now();
+    }
+    
+    const num = Number(timestamp);
+    
+    if (num > 0 && num < 10000000000) {
+      return num * 1000;
+    }
+    
+    if (num >= 10000000000) {
+      return num;
+    }
+    
+    return Date.now();
+  }
+
+  static extractCreationTime(row: any): number {
+
+    if (row.metadata?.originalMetadata?.evermark?.createdAt) {
+      return this.toMilliseconds(row.metadata.originalMetadata.evermark.createdAt);
+    }
+    
+    if (row.metadata?.creationTime) {
+      return this.toMilliseconds(row.metadata.creationTime);
+    }
+    
+    if (row.metadata?.syncedAt) {
+      return this.toMilliseconds(row.metadata.syncedAt);
+    }
+    
+    if (row.created_at) {
+      return new Date(row.created_at).getTime();
+    }
+    
+    return Date.now();
+  }
+}
+
+class ImageResolver {
+  static convertIpfsToGateway(ipfsUri: string, gateway = 'https://gateway.pinata.cloud/ipfs/'): string {
+    if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
+      return ipfsUri;
+    }
+    
+    const hash = ipfsUri.replace('ipfs://', '');
+    return `${gateway}${hash}`;
+  }
+  
+  static resolveImageUrl(row: any): string | undefined {
+
+    if (row.processed_image_url) {
+      return row.processed_image_url;
+    }
+    
+    if (row.metadata?.originalMetadata?.image) {
+      return this.convertIpfsToGateway(row.metadata.originalMetadata.image);
+    }
+    
+    if (row.metadata?.image) {
+      return this.convertIpfsToGateway(row.metadata.image);
+    }
+    
+    if (row.metadata?.originalMetadata?.external_url?.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+      return row.metadata.originalMetadata.external_url;
+    }
+    
+    return undefined;
+  }
 }
 
 export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) {
@@ -51,62 +143,65 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
     enableBlockchainFallback = true
   } = options;
 
-  // FIXED: Helper function to convert IPFS URI to gateway URL
-  const convertIpfsToGateway = useCallback((ipfsUri: string, gatewayUrl = 'https://gateway.pinata.cloud/ipfs/'): string => {
-    if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
-      return ipfsUri;
-    }
-    
-    const hash = ipfsUri.replace('ipfs://', '');
-    return `${gatewayUrl}${hash}`;
-  }, []);
-
-  // FIXED: Convert Supabase row to Evermark interface with correct nested image path
   const convertToEvermark = useCallback((row: EvermarkRow): Evermark => {
-    // FIXED: Priority order for image URL:
-    // 1. processed_image_url (if available and not null)
-    // 2. metadata.originalMetadata.image converted from IPFS to gateway URL
-    // 3. metadata.image as fallback
-    // 4. undefined if no image
-    let finalImageUrl: string | undefined;
+    const creationTime = TimestampUtils.extractCreationTime(row);
     
-    if ((row as any).processed_image_url) {
-      // Use the processed image URL if available (likely already HTTP)
-      finalImageUrl = (row as any).processed_image_url;
-    } else if ((row.metadata as any)?.originalMetadata?.image) {
-      // FIXED: Look in the correct nested location for IPFS image
-      finalImageUrl = convertIpfsToGateway((row.metadata as any).originalMetadata.image);
-    } else if (row.metadata?.image) {
-      // Fallback to metadata.image
-      finalImageUrl = convertIpfsToGateway(row.metadata.image);
-    }
-
-    // Debug logging for development
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🖼️ Image mapping for ${row.id}:`, {
-        processed_image_url: (row as any).processed_image_url,
-        image_processing_status: (row as any).image_processing_status,
-        originalMetadata_image: (row.metadata as any)?.originalMetadata?.image,
-        metadata_image: row.metadata?.image,
-        final_image_url: finalImageUrl
-      });
-    }
-
-    return {
+    const imageUrl = ImageResolver.resolveImageUrl(row);
+    
+    const originalMetadata = (row.metadata as any)?.originalMetadata;
+    
+    const result: Evermark = {
       id: row.id,
       title: row.title,
       author: row.author,
-      description: row.description,
-      sourceUrl: row.metadata?.sourceUrl,
-      image: finalImageUrl,  // ← FIXED: Now looks in originalMetadata.image first
-      metadataURI: row.metadata?.metadataURI || '',
-      creator: row.metadata?.creator || row.author,
-      creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,
+      description: row.description || originalMetadata?.description,
+      sourceUrl: originalMetadata?.external_url,
+      image: imageUrl,
+      metadataURI: (row.metadata as any)?.tokenURI || '',
+      creator: (row.metadata as any)?.creator || row.author,
+      creationTime,
       verified: row.verified
     };
-  }, [convertIpfsToGateway]);
+    
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🔧 Evermark ${row.id} conversion:`, {
+        title: result.title.slice(0, 30),
+        creationTime: result.creationTime,
+        isMilliseconds: result.creationTime > 10000000000,
+        humanDate: new Date(result.creationTime).toISOString(),
+        relativeTime: formatRelativeTime(result.creationTime),
+        imageResolution: {
+          processed_image_url: !!(row as any).processed_image_url,
+          originalMetadata_image: !!originalMetadata?.image,
+          final_image_url: !!result.image
+        },
+        rawTimestamps: {
+          created_at: row.created_at,
+          syncedAt: (row.metadata as any)?.syncedAt,
+          evermarkCreatedAt: originalMetadata?.evermark?.createdAt,
+          metadataCreationTime: (row.metadata as any)?.creationTime
+        }
+      });
+    }
+    
+    return result;
+  }, []);
 
-  // Fetch from Supabase first, then blockchain fallback if needed
+  const formatRelativeTime = useCallback((timestamp: number): string => {
+    const now = Date.now();
+    const diffMs = now - timestamp;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffMinutes < 1) return 'just now';
+    if (diffMinutes < 60) return `${diffMinutes} minute${diffMinutes === 1 ? '' : 's'} ago`;
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+    if (diffDays < 30) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    
+    return new Date(timestamp).toLocaleDateString();
+  }, []);
+
   const fetchEvermarks = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -115,7 +210,6 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
       console.log('🚀 Fetching evermarks from Supabase...');
       const startTime = performance.now();
 
-      // Primary: Try Supabase first
       const supabaseResult = await SupabaseService.getEvermarks({
         page,
         pageSize,
@@ -130,16 +224,19 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
       console.log(`⚡ Supabase fetch completed in ${fetchTime.toFixed(2)}ms`);
 
       if (supabaseResult.data && supabaseResult.data.length > 0) {
-        // Success with Supabase data
         const convertedEvermarks = supabaseResult.data.map(convertToEvermark);
         
-        // FIXED: Log image URLs for debugging
-        if (process.env.NODE_ENV === 'development') {
-          console.log('🖼️ Image URLs debug:', convertedEvermarks.map(e => ({
+        const timestampIssues = convertedEvermarks.filter(e => {
+          const date = new Date(e.creationTime);
+          return date.getFullYear() < 2020;
+        });
+        
+        if (timestampIssues.length > 0) {
+          console.warn('⚠️ Found evermarks with suspicious timestamps:', timestampIssues.map(e => ({
             id: e.id,
             title: e.title.slice(0, 30),
-            originalImage: supabaseResult.data.find(r => r.id === e.id)?.metadata?.image,
-            processedImage: e.image
+            creationTime: e.creationTime,
+            humanDate: new Date(e.creationTime).toISOString()
           })));
         }
         
@@ -150,12 +247,10 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
         return;
       }
 
-      // Fallback: If no Supabase data and fallback enabled, try blockchain
       if (enableBlockchainFallback) {
         console.log('⚠️ No Supabase data found, falling back to blockchain...');
         await fetchFromBlockchain();
       } else {
-        // No data and no fallback
         setEvermarks([]);
         setTotalCount(0);
         setTotalPages(0);
@@ -175,7 +270,6 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
     }
   }, [page, pageSize, sortBy, sortOrder, search, author, verified, enableBlockchainFallback, convertToEvermark]);
 
-  // Blockchain fallback function
   const fetchFromBlockchain = useCallback(async () => {
     try {
       console.log('🔗 Fetching from blockchain...');
@@ -195,7 +289,6 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
         return;
       }
 
-      // For blockchain fallback, get recent tokens (limited batch)
       const totalTokens = Number(totalSupply);
       const startId = Math.max(1, totalTokens - (pageSize * page) + 1);
       const endId = Math.min(totalTokens, startId + pageSize - 1);
@@ -203,7 +296,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
       const tokenIds = Array.from(
         { length: endId - startId + 1 }, 
         (_, i) => BigInt(startId + i)
-      ).reverse(); // Newest first
+      ).reverse();
 
       const evermarkDataPromises = tokenIds.map(async (tokenId) => {
         try {
@@ -224,10 +317,10 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
           author: data!.author,
           description: data!.description,
           sourceUrl: data!.sourceUrl,
-          image: data!.image ? convertIpfsToGateway(data!.image) : undefined, // FIXED: Convert IPFS here too
+          image: data!.image ? ImageResolver.convertIpfsToGateway(data!.image) : undefined,
           metadataURI: data!.metadataURI,
           creator: data!.creator,
-          creationTime: data!.creationTime,
+          creationTime: TimestampUtils.toMilliseconds(data!.creationTime), // ✅ FIXED
         }));
 
       const blockchainFetchTime = performance.now() - blockchainStartTime;
@@ -243,14 +336,12 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
       setError(err instanceof Error ? err.message : 'Failed to fetch from blockchain');
       setIsLoading(false);
     }
-  }, [evermarkNFT, fetchEvermarkData, page, pageSize, convertIpfsToGateway]);
+  }, [evermarkNFT, fetchEvermarkData, page, pageSize]);
 
-  // Refresh function
   const refresh = useCallback(() => {
     fetchEvermarks();
   }, [fetchEvermarks]);
 
-  // Load more function for infinite scroll
   const loadMore = useCallback(async () => {
     if (isLoadingMore || page >= totalPages) return;
 
@@ -277,7 +368,6 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
     }
   }, [isLoadingMore, page, totalPages, pageSize, sortBy, sortOrder, search, author, verified, convertToEvermark]);
 
-  // Fetch on mount and when options change
   useEffect(() => {
     fetchEvermarks();
   }, [fetchEvermarks]);
@@ -297,21 +387,10 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
   };
 }
 
-// Hook for getting recent evermarks (simplified)
 export function useRecentEvermarks(limit = 10) {
   const [evermarks, setEvermarks] = useState<Evermark[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // FIXED: Helper function to convert IPFS URI to gateway URL
-  const convertIpfsToGateway = useCallback((ipfsUri: string, gatewayUrl = 'https://gateway.pinata.cloud/ipfs/'): string => {
-    if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
-      return ipfsUri;
-    }
-    
-    const hash = ipfsUri.replace('ipfs://', '');
-    return `${gatewayUrl}${hash}`;
-  }, []);
 
   const fetchRecent = useCallback(async () => {
     try {
@@ -320,32 +399,18 @@ export function useRecentEvermarks(limit = 10) {
 
       const data = await SupabaseService.getRecentEvermarks(limit);
       
-      const convertedEvermarks = data.map((row: EvermarkRow): Evermark => {
-        // FIXED: Use same image priority logic as main hook - check originalMetadata.image
-        let finalImageUrl: string | undefined;
-        
-        if ((row as any).processed_image_url) {
-          finalImageUrl = (row as any).processed_image_url;
-        } else if ((row.metadata as any)?.originalMetadata?.image) {
-          // FIXED: Look in the correct nested location
-          finalImageUrl = convertIpfsToGateway((row.metadata as any).originalMetadata.image);
-        } else if (row.metadata?.image) {
-          finalImageUrl = convertIpfsToGateway(row.metadata.image);
-        }
-
-        return {
-          id: row.id,
-          title: row.title,
-          author: row.author,
-          description: row.description,
-          sourceUrl: row.metadata?.sourceUrl,
-          image: finalImageUrl, // ← FIXED: Same logic as main hook
-          metadataURI: row.metadata?.metadataURI || '',
-          creator: row.metadata?.creator || row.author,
-          creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,
-          verified: row.verified
-        };
-      });
+      const convertedEvermarks = data.map((row: any): Evermark => ({
+        id: row.id,
+        title: row.title,
+        author: row.author,
+        description: row.description || row.metadata?.originalMetadata?.description,
+        sourceUrl: row.metadata?.originalMetadata?.external_url,
+        image: ImageResolver.resolveImageUrl(row),
+        metadataURI: row.metadata?.tokenURI || '',
+        creator: row.metadata?.creator || row.author,
+        creationTime: TimestampUtils.extractCreationTime(row), // ✅ FIXED
+        verified: row.verified
+      }));
 
       setEvermarks(convertedEvermarks);
     } catch (err) {
@@ -354,7 +419,7 @@ export function useRecentEvermarks(limit = 10) {
     } finally {
       setIsLoading(false);
     }
-  }, [limit, convertIpfsToGateway]);
+  }, [limit]);
 
   useEffect(() => {
     fetchRecent();
