@@ -1,7 +1,7 @@
-// src/hooks/core/useMetadataUtils.ts - Clean implementation optimized for ThirdWeb v5
 import { useCallback, useMemo } from 'react';
 import { readContract } from "thirdweb";
 import { useContracts } from './useContracts';
+import { useSupabaseCache } from './useSupabaseCache';
 
 export interface IPFSMetadata {
   description: string;
@@ -68,12 +68,31 @@ export interface CastData {
   error?: string;
 }
 
+// NEW: Supabase metadata structure interface
+export interface SupabaseEvermarkMetadata {
+  source: string;
+  tokenId: number;
+  syncedAt: string;
+  tokenURI: string;
+  originalMetadata: {
+    name: string;
+    image: string;
+    description: string;
+    external_url: string;
+    attributes: Array<{ trait_type: string; value: string; }>;
+  };
+}
+
 /**
- * Enhanced metadata and IPFS utilities optimized for ThirdWeb v5
- * Handles all Evermark metadata operations including IPFS fetching and validation
+ * Enhanced metadata and IPFS utilities with Supabase integration
  */
 export function useMetadataUtils() {
   const { evermarkNFT } = useContracts();
+  const { 
+    validateMetadataStructure, 
+    extractImageUri, 
+    convertIpfsToGateway 
+  } = useSupabaseCache();
 
   /**
    * Fetch IPFS metadata with enhanced error handling and multiple gateways
@@ -136,7 +155,7 @@ export function useMetadataUtils() {
             description: ipfsData.description || ipfsData.desc || "",
             sourceUrl: ipfsData.external_url || ipfsData.sourceUrl || ipfsData.source_url || "",
             image: ipfsData.image 
-              ? ipfsData.image.replace('ipfs://', 'https://gateway.pinata.cloud/ipfs/') 
+              ? convertIpfsToGateway(ipfsData.image) 
               : "",
             name: ipfsData.name || ipfsData.title || "",
             attributes: Array.isArray(ipfsData.attributes) ? ipfsData.attributes : []
@@ -159,7 +178,55 @@ export function useMetadataUtils() {
       console.error("❌ Error fetching IPFS metadata:", errorMessage);
       return defaultReturn;
     }
-  }, []);
+  }, [convertIpfsToGateway]);
+
+  // NEW: Process Supabase metadata structure
+  /**
+   * Extract image URL from Supabase metadata structure
+   */
+  const extractImageFromSupabaseMetadata = useCallback((metadata: any): string | null => {
+    const validation = validateMetadataStructure(metadata);
+    if (!validation.isValid) {
+      console.warn('Invalid metadata structure:', validation.issues);
+      return null;
+    }
+
+    const imageUri = extractImageUri(metadata);
+    return imageUri ? convertIpfsToGateway(imageUri) : null;
+  }, [validateMetadataStructure, extractImageUri, convertIpfsToGateway]);
+
+  /**
+   * Convert Supabase metadata to EvermarkData format
+   */
+  const convertSupabaseToEvermarkData = useCallback((
+    id: string,
+    title: string,
+    author: string,
+    metadata: SupabaseEvermarkMetadata,
+    processedImageUrl?: string
+  ): EvermarkData => {
+    const imageUrl = processedImageUrl || extractImageFromSupabaseMetadata(metadata) || '';
+    
+    // Extract creator from attributes if available, fallback to author
+    const creatorAttribute = metadata.originalMetadata?.attributes?.find(
+      attr => attr.trait_type === 'Creator Address' || attr.trait_type === 'Creator'
+    );
+    const creator = creatorAttribute?.value || author || 'Unknown';
+    
+    return {
+      id,
+      title: title || metadata.originalMetadata?.name || `Evermark #${id}`,
+      author: author || 'Unknown',
+      creator,
+      description: metadata.originalMetadata?.description || '',
+      sourceUrl: metadata.originalMetadata?.external_url || '',
+      image: imageUrl,
+      metadataURI: metadata.tokenURI || '',
+      creationTime: metadata.syncedAt ? new Date(metadata.syncedAt).getTime() / 1000 : 0,
+      minter: creator,
+      referrer: undefined
+    };
+  }, [extractImageFromSupabaseMetadata]);
 
   /**
    * Fetch complete Evermark data from contract and IPFS
@@ -786,6 +853,10 @@ export function useMetadataUtils() {
     
     // Metadata building
     buildComprehensiveMetadata,
+    
+    // NEW: Supabase integration functions
+    extractImageFromSupabaseMetadata,
+    convertSupabaseToEvermarkData,
   }), [
     fetchIPFSMetadata,
     uploadToPinata,
@@ -800,23 +871,9 @@ export function useMetadataUtils() {
     extractCastHash,
     fetchCastDataFromPinata,
     buildComprehensiveMetadata,
+    extractImageFromSupabaseMetadata,
+    convertSupabaseToEvermarkData,
   ]);
-}
-
-/**
- * Helper function to get user-friendly token name
- */
-function getTokenName(contract?: string): string {
-  switch (contract?.toUpperCase()) {
-    case 'EMARK_TOKEN':
-    case 'EMARK':
-      return 'EMARK';
-    case 'CARD_CATALOG':
-    case 'WEMARK':
-      return 'wEMARK';
-    default:
-      return 'tokens';
-  }
 }
 
 /**
@@ -834,3 +891,4 @@ export function createErrorContext(
     timestamp: Date.now()
   };
 }
+

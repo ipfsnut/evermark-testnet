@@ -1,4 +1,4 @@
-// src/hooks/core/useSupabaseCache.ts - Supabase caching layer for blockchain data
+
 import { useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 
@@ -22,9 +22,23 @@ interface CacheOptions {
   userSpecific?: boolean; // Whether this data is user-specific
 }
 
+// NEW: Metadata structure validation
+interface SupabaseEvermarkMetadata {
+  source: string;
+  tokenId: number;
+  syncedAt: string;
+  tokenURI: string;
+  originalMetadata: {
+    name: string;
+    image: string;  // Key: This is the IPFS image URI to process
+    description: string;
+    external_url: string;
+    attributes: Array<{ trait_type: string; value: string; }>;
+  };
+}
+
 /**
- * Supabase caching layer for blockchain data
- * Provides intelligent caching with block-aware invalidation
+ * Enhanced Supabase caching layer for blockchain data with metadata validation
  */
 export function useSupabaseCache() {
   
@@ -138,6 +152,66 @@ export function useSupabaseCache() {
     }
   }, []);
 
+  // NEW: Metadata validation functions
+  /**
+   * Validate Evermark metadata structure
+   */
+  const validateMetadataStructure = useCallback((metadata: any): {
+    isValid: boolean;
+    hasOriginalMetadata: boolean;
+    hasImage: boolean;
+    hasValidImageUri: boolean;
+    issues: string[];
+  } => {
+    const issues: string[] = [];
+    
+    const hasOriginalMetadata = !!metadata?.originalMetadata;
+    if (!hasOriginalMetadata) {
+      issues.push('Missing originalMetadata');
+    }
+
+    const hasImage = !!metadata?.originalMetadata?.image;
+    if (!hasImage) {
+      issues.push('Missing image in originalMetadata');
+    }
+
+    const hasValidImageUri = metadata?.originalMetadata?.image?.startsWith('ipfs://');
+    if (hasImage && !hasValidImageUri) {
+      issues.push('Image URI is not a valid IPFS URI');
+    }
+
+    return {
+      isValid: hasOriginalMetadata && hasImage && hasValidImageUri,
+      hasOriginalMetadata,
+      hasImage,
+      hasValidImageUri,
+      issues
+    };
+  }, []);
+
+  /**
+   * Extract image URI from metadata structure
+   */
+  const extractImageUri = useCallback((metadata: any): string | null => {
+    const validation = validateMetadataStructure(metadata);
+    if (!validation.hasValidImageUri) {
+      return null;
+    }
+    return metadata.originalMetadata.image;
+  }, [validateMetadataStructure]);
+
+  /**
+   * Convert IPFS URI to gateway URL
+   */
+  const convertIpfsToGateway = useCallback((ipfsUri: string, gatewayUrl = 'https://gateway.pinata.cloud/ipfs/'): string => {
+    if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
+      return ipfsUri;
+    }
+    
+    const hash = ipfsUri.replace('ipfs://', '');
+    return `${gatewayUrl}${hash}`;
+  }, []);
+
   /**
    * Invalidate cache entries by pattern
    */
@@ -225,5 +299,10 @@ export function useSupabaseCache() {
     invalidateCache,
     clearExpiredCache,
     getCacheStats,
+    
+    // NEW: Metadata validation functions
+    validateMetadataStructure,
+    extractImageUri,
+    convertIpfsToGateway,
   };
 }

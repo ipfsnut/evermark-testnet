@@ -1,9 +1,10 @@
-// src/hooks/core/useUserData.ts - Enhanced ThirdWeb v5 implementation with proper query management
-import { useMemo, useCallback } from 'react';
+import { useMemo, useCallback, useState, useEffect } from 'react';
 import { useReadContract, useActiveAccount } from "thirdweb/react";
 import { readContract } from "thirdweb";
 import { useContracts } from './useContracts';
 import { useContractErrors } from './useContractErrors';
+import { useSupabaseCache } from './useSupabaseCache';
+import { supabase } from '../../lib/supabase';
 
 export interface UserTokenBalances {
   emarkBalance: bigint;
@@ -45,6 +46,25 @@ export interface UserRewardsData {
   hasClaimableRewards: boolean;
 }
 
+// NEW: Cached user data structure
+export interface CachedUserData {
+  user_address: string;
+  cached_balance_data: {
+    emarkBalance: string;
+    wEmarkBalance: string;
+    stakingAllowance: string;
+    totalStaked: string;
+    availableVotingPower: string;
+    totalVotingPower: string;
+    delegatedPower: string;
+    pendingEthRewards: string;
+    pendingEmarkRewards: string;
+    periodEthRewards: string;
+    periodEmarkRewards: string;
+  };
+  cache_updated_at: string;
+}
+
 export interface UserDataState {
   // Token balances
   balances: UserTokenBalances;
@@ -77,6 +97,10 @@ export interface UserDataState {
   cycleError: string | null;
   rewardsError: string | null;
   
+  // Cache info
+  isUsingCache: boolean;
+  cacheAge: number; // seconds since last cache update
+  
   // Refresh functions
   refetch: () => Promise<void>;
   refetchBalances: () => Promise<void>;
@@ -92,28 +116,70 @@ export interface UserDataState {
 }
 
 /**
- * Enhanced consolidated user data hook with optimized queries for ThirdWeb v5
- * Single source of truth for all user-related blockchain data
+ * Enhanced consolidated user data hook with Supabase caching for optimal performance
  */
 export function useUserData(userAddress?: string): UserDataState {
   const { cardCatalog, emarkToken, voting, evermarkRewards } = useContracts();
   const { parseError } = useContractErrors();
+  const { getCachedData } = useSupabaseCache(); // Only destructure what we actually use
   const activeAccount = useActiveAccount();
   
   // Use provided address or active account address
   const effectiveUserAddress = userAddress || activeAccount?.address;
   const hasValidAddress = !!effectiveUserAddress;
 
+  // NEW: Cache state management
+  const [cachedData, setCachedDataState] = useState<CachedUserData | null>(null);
+  const [isUsingCache, setIsUsingCache] = useState(false);
+  const [cacheAge, setCacheAge] = useState(0);
+
   // Zero address for disabled queries
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-  // Token Balances Queries - Using correct ThirdWeb v5 queryOptions
+  // NEW: Load cached data from Supabase
+  useEffect(() => {
+    const loadCachedUserData = async () => {
+      if (!effectiveUserAddress) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('user_address, cached_balance_data, cache_updated_at')
+          .eq('user_address', effectiveUserAddress)
+          .single();
+
+        if (!error && data && data.cached_balance_data) {
+          setCachedDataState(data);
+          setIsUsingCache(true);
+          
+          const cacheTime = new Date(data.cache_updated_at).getTime();
+          const currentTime = Date.now();
+          setCacheAge(Math.floor((currentTime - cacheTime) / 1000));
+          
+          console.log(`🎯 Loaded cached user data for ${effectiveUserAddress}, age: ${Math.floor((currentTime - cacheTime) / 1000)}s`);
+        }
+      } catch (error) {
+        console.warn('Failed to load cached user data:', error);
+      }
+    };
+
+    loadCachedUserData();
+  }, [effectiveUserAddress]);
+
+  // NEW: Cache freshness check
+  const isCacheStale = useCallback((maxAgeSeconds: number = 300): boolean => {
+    return cacheAge > maxAgeSeconds;
+  }, [cacheAge]);
+
+  // Token Balances Queries - Only run if cache is stale or missing
+  const shouldQueryBlockchain = !isUsingCache || isCacheStale(300); // 5 minutes
+
   const emarkBalanceQuery = useReadContract({
     contract: emarkToken,
     method: "function balanceOf(address) view returns (uint256)",
     params: [effectiveUserAddress || ZERO_ADDRESS],
     queryOptions: {
-      enabled: hasValidAddress,
+      enabled: hasValidAddress && shouldQueryBlockchain,
     },
   });
 
@@ -122,17 +188,17 @@ export function useUserData(userAddress?: string): UserDataState {
     method: "function allowance(address,address) view returns (uint256)",
     params: [effectiveUserAddress || ZERO_ADDRESS, cardCatalog.address],
     queryOptions: {
-      enabled: hasValidAddress,
+      enabled: hasValidAddress && shouldQueryBlockchain,
     },
   });
 
-  // CardCatalog Queries - Enhanced with better error handling
+  // CardCatalog Queries
   const userSummaryQuery = useReadContract({
     contract: cardCatalog,
     method: "function getUserSummary(address) view returns (uint256,uint256,uint256,uint256,uint256,bool)",
     params: [effectiveUserAddress || ZERO_ADDRESS],
     queryOptions: {
-      enabled: hasValidAddress,
+      enabled: hasValidAddress && shouldQueryBlockchain,
     },
   });
 
@@ -141,7 +207,7 @@ export function useUserData(userAddress?: string): UserDataState {
     method: "function getAvailableVotingPower(address) view returns (uint256)",
     params: [effectiveUserAddress || ZERO_ADDRESS],
     queryOptions: {
-      enabled: hasValidAddress,
+      enabled: hasValidAddress && shouldQueryBlockchain,
     },
   });
 
@@ -150,7 +216,7 @@ export function useUserData(userAddress?: string): UserDataState {
     method: "function getTotalVotingPower(address) view returns (uint256)",
     params: [effectiveUserAddress || ZERO_ADDRESS],
     queryOptions: {
-      enabled: hasValidAddress,
+      enabled: hasValidAddress && shouldQueryBlockchain,
     },
   });
 
@@ -160,11 +226,11 @@ export function useUserData(userAddress?: string): UserDataState {
     method: "function getUnbondingInfo(address) view returns (uint256,uint256,bool)",
     params: [effectiveUserAddress || ZERO_ADDRESS],
     queryOptions: {
-      enabled: hasValidAddress,
+      enabled: hasValidAddress && shouldQueryBlockchain,
     },
   });
 
-  // Cycle Information - No user address needed
+  // Cycle Information - Always fetch as it's not user-specific
   const currentCycleQuery = useReadContract({
     contract: voting,
     method: "function getCurrentCycle() view returns (uint256)",
@@ -192,11 +258,46 @@ export function useUserData(userAddress?: string): UserDataState {
     method: "function getUserRewardInfo(address) view returns (uint256,uint256,uint256,uint256,uint256)",
     params: [effectiveUserAddress || ZERO_ADDRESS],
     queryOptions: {
-      enabled: hasValidAddress,
+      enabled: hasValidAddress && shouldQueryBlockchain,
     },
   });
 
-  // Enhanced refetch functions with better error handling
+  // NEW: Update cache when fresh data is available
+  const updateCache = useCallback(async (freshData: any) => {
+    if (!effectiveUserAddress) return;
+
+    const cacheData = {
+      emarkBalance: freshData.emarkBalance?.toString() || '0',
+      wEmarkBalance: freshData.wEmarkBalance?.toString() || '0', 
+      stakingAllowance: freshData.stakingAllowance?.toString() || '0',
+      totalStaked: freshData.totalStaked?.toString() || '0',
+      availableVotingPower: freshData.availableVotingPower?.toString() || '0',
+      totalVotingPower: freshData.totalVotingPower?.toString() || '0',
+      delegatedPower: freshData.delegatedPower?.toString() || '0',
+      pendingEthRewards: freshData.pendingEthRewards?.toString() || '0',
+      pendingEmarkRewards: freshData.pendingEmarkRewards?.toString() || '0',
+      periodEthRewards: freshData.periodEthRewards?.toString() || '0',
+      periodEmarkRewards: freshData.periodEmarkRewards?.toString() || '0',
+    };
+
+    try {
+      await supabase
+        .from('users')
+        .upsert({
+          user_address: effectiveUserAddress,
+          cached_balance_data: cacheData,
+          cache_updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_address'
+        });
+
+      console.log(`💾 Updated cache for user ${effectiveUserAddress}`);
+    } catch (error) {
+      console.warn('Failed to update user cache:', error);
+    }
+  }, [effectiveUserAddress]);
+
+  // Enhanced refetch functions
   const refetchBalances = useCallback(async () => {
     try {
       await Promise.allSettled([
@@ -261,31 +362,44 @@ export function useUserData(userAddress?: string): UserDataState {
     ]);
   }, [refetchBalances, refetchVoting, refetchUnbonding, refetchCycle, refetchRewards]);
 
-  // Parse and structure the data with enhanced error handling
+  // Parse and structure the data with cache integration
   const userData = useMemo((): UserDataState => {
-    // Parse userSummary tuple safely: [stakedBalance, availableVotingPower, delegatedPower, unbondingAmount_, unbondingReleaseTime_, canClaimUnbonding]
-    const stakedBalance = userSummaryQuery.data?.[0] || BigInt(0);
-    const summaryAvailableVoting = userSummaryQuery.data?.[1] || BigInt(0);
-    const delegatedPower = userSummaryQuery.data?.[2] || BigInt(0);
+    // Helper function to get value from cache or blockchain
+    const getValue = (blockchainValue: bigint | undefined, cacheKey: keyof CachedUserData['cached_balance_data']): bigint => {
+      if (shouldQueryBlockchain && blockchainValue !== undefined) {
+        return blockchainValue;
+      }
+      if (cachedData?.cached_balance_data?.[cacheKey]) {
+        return BigInt(cachedData.cached_balance_data[cacheKey]);
+      }
+      return BigInt(0);
+    };
+
+    // Parse userSummary tuple safely
+    const stakedBalance = getValue(userSummaryQuery.data?.[0], 'wEmarkBalance');
+    const summaryAvailableVoting = getValue(userSummaryQuery.data?.[1], 'availableVotingPower');
+    const delegatedPower = getValue(userSummaryQuery.data?.[2], 'delegatedPower');
     const summaryUnbondingAmount = userSummaryQuery.data?.[3] || BigInt(0);
     const summaryUnbondingReleaseTime = userSummaryQuery.data?.[4] || BigInt(0);
     const summaryCanClaimUnbonding = userSummaryQuery.data?.[5] || false;
 
-    // Parse unbondingInfo tuple safely: [amount, releaseTime, canClaim]
+    // Parse unbondingInfo tuple safely
     const unbondingAmount = unbondingInfoQuery.data?.[0] || summaryUnbondingAmount;
     const unbondingReleaseTime = unbondingInfoQuery.data?.[1] || summaryUnbondingReleaseTime;
     const canClaimUnbonding = unbondingInfoQuery.data?.[2] ?? summaryCanClaimUnbonding;
 
-    // Parse userRewardInfo tuple safely: [pendingEth, pendingEmark, stakedAmount, periodEth, periodEmark]
-    const pendingEthRewards = userRewardInfoQuery.data?.[0] || BigInt(0);
-    const pendingEmarkRewards = userRewardInfoQuery.data?.[1] || BigInt(0);
+    // Parse userRewardInfo tuple safely
+    const pendingEthRewards = getValue(userRewardInfoQuery.data?.[0], 'pendingEthRewards');
+    const pendingEmarkRewards = getValue(userRewardInfoQuery.data?.[1], 'pendingEmarkRewards');
     const rewardsStakedAmount = userRewardInfoQuery.data?.[2] || BigInt(0);
-    const periodEthRewards = userRewardInfoQuery.data?.[3] || BigInt(0);
-    const periodEmarkRewards = userRewardInfoQuery.data?.[4] || BigInt(0);
+    const periodEthRewards = getValue(userRewardInfoQuery.data?.[3], 'periodEthRewards');
+    const periodEmarkRewards = getValue(userRewardInfoQuery.data?.[4], 'periodEmarkRewards');
 
-    // Use individual queries as fallback for voting power
-    const effectiveAvailableVoting = availableVotingPowerQuery.data || summaryAvailableVoting;
-    const effectiveTotalVoting = totalVotingPowerQuery.data || stakedBalance;
+    // Use individual queries or cache as fallback
+    const emarkBalance = getValue(emarkBalanceQuery.data, 'emarkBalance');
+    const stakingAllowance = getValue(stakingAllowanceQuery.data, 'stakingAllowance');
+    const effectiveAvailableVoting = getValue(availableVotingPowerQuery.data, 'availableVotingPower') || summaryAvailableVoting;
+    const effectiveTotalVoting = getValue(totalVotingPowerQuery.data, 'totalVotingPower') || stakedBalance;
 
     // Calculate derived values
     const totalRewards = pendingEthRewards + pendingEmarkRewards;
@@ -301,12 +415,12 @@ export function useUserData(userAddress?: string): UserDataState {
     const cycleEnd = cycleInfoQuery.data?.[1] ? Number(cycleInfoQuery.data[1]) : 0;
     const isCycleActive = currentTime >= cycleStart && currentTime <= cycleEnd;
 
-    // Loading states - more granular
-    const isLoadingBalances = emarkBalanceQuery.isLoading || stakingAllowanceQuery.isLoading;
-    const isLoadingVoting = userSummaryQuery.isLoading || availableVotingPowerQuery.isLoading || totalVotingPowerQuery.isLoading;
-    const isLoadingUnbonding = unbondingInfoQuery.isLoading;
+    // Loading states - adjusted for cache usage
+    const isLoadingBalances = shouldQueryBlockchain && (emarkBalanceQuery.isLoading || stakingAllowanceQuery.isLoading);
+    const isLoadingVoting = shouldQueryBlockchain && (userSummaryQuery.isLoading || availableVotingPowerQuery.isLoading || totalVotingPowerQuery.isLoading);
+    const isLoadingUnbonding = shouldQueryBlockchain && unbondingInfoQuery.isLoading;
     const isLoadingCycle = currentCycleQuery.isLoading || timeRemainingQuery.isLoading || cycleInfoQuery.isLoading;
-    const isLoadingRewards = userRewardInfoQuery.isLoading;
+    const isLoadingRewards = shouldQueryBlockchain && userRewardInfoQuery.isLoading;
     const isLoading = isLoadingBalances || isLoadingVoting || isLoadingCycle || isLoadingRewards || isLoadingUnbonding;
 
     // Enhanced error parsing with user-friendly messages
@@ -333,11 +447,31 @@ export function useUserData(userAddress?: string): UserDataState {
     
     const generalError = balancesError || votingError || unbondingError || cycleError || rewardsError;
 
+    // NEW: Update cache when we have fresh blockchain data
+    if (shouldQueryBlockchain && !isLoading && !generalError && hasValidAddress) {
+      const freshData = {
+        emarkBalance,
+        wEmarkBalance: stakedBalance,
+        stakingAllowance,
+        totalStaked: stakedBalance,
+        availableVotingPower: effectiveAvailableVoting,
+        totalVotingPower: effectiveTotalVoting,
+        delegatedPower,
+        pendingEthRewards,
+        pendingEmarkRewards,
+        periodEthRewards,
+        periodEmarkRewards,
+      };
+      
+      // Debounced cache update (async, don't block render)
+      setTimeout(() => updateCache(freshData), 1000);
+    }
+
     return {
       balances: {
-        emarkBalance: emarkBalanceQuery.data || BigInt(0),
+        emarkBalance,
         wEmarkBalance: stakedBalance,
-        stakingAllowance: stakingAllowanceQuery.data || BigInt(0),
+        stakingAllowance,
         totalStaked: stakedBalance,
       },
       
@@ -390,6 +524,10 @@ export function useUserData(userAddress?: string): UserDataState {
       cycleError,
       rewardsError,
       
+      // NEW: Cache info
+      isUsingCache,
+      cacheAge,
+      
       // Refresh functions
       refetch,
       refetchBalances,
@@ -424,14 +562,23 @@ export function useUserData(userAddress?: string): UserDataState {
     // Functions
     refetch, refetchBalances, refetchVoting, refetchUnbonding, refetchRewards, refetchCycle,
     
+    // NEW: Cache dependencies
+    cachedData, isUsingCache, cacheAge, shouldQueryBlockchain, updateCache,
+    
     // Utility
     hasValidAddress, effectiveUserAddress, parseError,
   ]);
 
-  // Enhanced debug logging for development
+  // Enhanced debug logging for development with cache info
   if (process.env.NODE_ENV === 'development' && hasValidAddress) {
-    console.log('📊 UserData state:', {
+    console.log('📊 UserData state (with cache):', {
       userAddress: effectiveUserAddress ? `${effectiveUserAddress.slice(0, 6)}...${effectiveUserAddress.slice(-4)}` : null,
+      cacheStatus: {
+        isUsingCache,
+        cacheAge: `${cacheAge}s`,
+        shouldQueryBlockchain,
+        cacheStale: isCacheStale()
+      },
       balances: {
         emark: userData.balances.emarkBalance.toString(),
         wEmark: userData.balances.wEmarkBalance.toString(),
@@ -469,43 +616,51 @@ export function useUserData(userAddress?: string): UserDataState {
 }
 
 /**
- * Get only token balances (lighter query for performance)
+ * Get only token balances (lighter query for performance) with cache support
  */
 export function useUserBalances(userAddress?: string): UserTokenBalances & { 
   isLoading: boolean; 
   error: string | null;
-  refetch: () => Promise<void>; 
+  refetch: () => Promise<void>;
+  isUsingCache: boolean;
+  cacheAge: number;
 } {
-  const { balances, isLoadingBalances, balancesError, refetchBalances } = useUserData(userAddress);
+  const { balances, isLoadingBalances, balancesError, refetchBalances, isUsingCache, cacheAge } = useUserData(userAddress);
   
   return {
     ...balances,
     isLoading: isLoadingBalances,
     error: balancesError,
     refetch: refetchBalances,
+    isUsingCache,
+    cacheAge,
   };
 }
 
 /**
- * Get only voting data (lighter query for performance)
+ * Get only voting data (lighter query for performance) with cache support
  */
 export function useUserVoting(userAddress?: string): UserVotingData & { 
   isLoading: boolean; 
   error: string | null;
-  refetch: () => Promise<void>; 
+  refetch: () => Promise<void>;
+  isUsingCache: boolean;
+  cacheAge: number;
 } {
-  const { voting, isLoadingVoting, votingError, refetchVoting } = useUserData(userAddress);
+  const { voting, isLoadingVoting, votingError, refetchVoting, isUsingCache, cacheAge } = useUserData(userAddress);
   
   return {
     ...voting,
     isLoading: isLoadingVoting,
     error: votingError,
     refetch: refetchVoting,
+    isUsingCache,
+    cacheAge,
   };
 }
 
 /**
- * Get only cycle data (no user address needed)
+ * Get only cycle data (no user address needed) - not cached as it's global
  */
 export function useCycleData(): UserCycleData & { 
   isLoading: boolean;
@@ -523,7 +678,7 @@ export function useCycleData(): UserCycleData & {
 }
 
 /**
- * Enhanced user data summary for quick overview
+ * Enhanced user data summary for quick overview with cache awareness
  */
 export function useUserSummary(userAddress?: string) {
   const userData = useUserData(userAddress);
@@ -550,6 +705,13 @@ export function useUserSummary(userAddress?: string) {
     hasAllowance: userData.balances.stakingAllowance > BigInt(0),
     needsApproval: userData.balances.emarkBalance > userData.balances.stakingAllowance,
     
+    // NEW: Cache info
+    isUsingCache: userData.isUsingCache,
+    cacheAge: userData.cacheAge,
+    dataFreshness: userData.isUsingCache ? 
+      (userData.cacheAge < 60 ? 'fresh' : userData.cacheAge < 300 ? 'moderate' : 'stale') : 
+      'live',
+    
     // Refresh function
     refresh: userData.refetch,
     
@@ -560,10 +722,10 @@ export function useUserSummary(userAddress?: string) {
 }
 
 /**
- * Hook specifically for checking user permissions and capabilities
+ * Hook specifically for checking user permissions and capabilities with cache support
  */
 export function useUserCapabilities(userAddress?: string) {
-  const { balances, voting, unbonding, rewards, hasWallet, error } = useUserData(userAddress);
+  const { balances, voting, unbonding, rewards, hasWallet, error, isUsingCache } = useUserData(userAddress);
   
   return useMemo(() => ({
     // Connection status
@@ -591,5 +753,8 @@ export function useUserCapabilities(userAddress?: string) {
     // Combined status
     isActiveUser: balances.wEmarkBalance > BigInt(0) || voting.totalVotingPower > BigInt(0),
     
-  }), [balances, voting, unbonding, rewards, hasWallet, error]);
+    // NEW: Performance info
+    dataSource: isUsingCache ? 'cache' : 'blockchain',
+    
+  }), [balances, voting, unbonding, rewards, hasWallet, error, isUsingCache]);
 }

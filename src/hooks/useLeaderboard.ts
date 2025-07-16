@@ -1,12 +1,11 @@
-// src/hooks/useLeaderboard.ts - Fast Supabase-first leaderboard with blockchain fallback
 import { useSupabaseLeaderboard, useTopVotedEvermarks } from './useSupabaseLeaderboard';
 
 // Re-export the interface for compatibility
 export type { LeaderboardEntry } from './useSupabaseLeaderboard';
 
 /**
- * Main leaderboard hook - now uses Supabase-first approach
- * for dramatically improved performance (~50ms vs 3000ms+)
+ * Main leaderboard hook - now uses enhanced Supabase-first approach
+ * with image processing awareness for dramatically improved performance
  */
 export function useLeaderboard(weekNumber?: number, limit = 10) {
   const {
@@ -36,7 +35,7 @@ export function useLeaderboard(weekNumber?: number, limit = 10) {
 }
 
 /**
- * Hook for getting top voted evermarks across all cycles
+ * Hook for getting top voted evermarks with enhanced image processing
  */
 export function useTopVoted(limit = 5) {
   return useTopVotedEvermarks(limit);
