@@ -1,4 +1,3 @@
-// src/hooks/useSupabaseEvermarks.ts - FIXED: Convert IPFS URIs to gateway URLs
 import { useState, useEffect, useCallback } from 'react';
 import { SupabaseService, EvermarkRow } from '../lib/supabase';
 import { useMetadataUtils } from './core/useMetadataUtils';
@@ -62,11 +61,36 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
     return `${gatewayUrl}${hash}`;
   }, []);
 
-  // FIXED: Convert Supabase row to Evermark interface with proper image URL conversion
+  // FIXED: Convert Supabase row to Evermark interface with correct nested image path
   const convertToEvermark = useCallback((row: EvermarkRow): Evermark => {
-    // Convert IPFS image URI to gateway URL
-    const imageUri = row.metadata?.image;
-    const processedImage = imageUri ? convertIpfsToGateway(imageUri) : undefined;
+    // FIXED: Priority order for image URL:
+    // 1. processed_image_url (if available and not null)
+    // 2. metadata.originalMetadata.image converted from IPFS to gateway URL
+    // 3. metadata.image as fallback
+    // 4. undefined if no image
+    let finalImageUrl: string | undefined;
+    
+    if ((row as any).processed_image_url) {
+      // Use the processed image URL if available (likely already HTTP)
+      finalImageUrl = (row as any).processed_image_url;
+    } else if ((row.metadata as any)?.originalMetadata?.image) {
+      // FIXED: Look in the correct nested location for IPFS image
+      finalImageUrl = convertIpfsToGateway((row.metadata as any).originalMetadata.image);
+    } else if (row.metadata?.image) {
+      // Fallback to metadata.image
+      finalImageUrl = convertIpfsToGateway(row.metadata.image);
+    }
+
+    // Debug logging for development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`🖼️ Image mapping for ${row.id}:`, {
+        processed_image_url: (row as any).processed_image_url,
+        image_processing_status: (row as any).image_processing_status,
+        originalMetadata_image: (row.metadata as any)?.originalMetadata?.image,
+        metadata_image: row.metadata?.image,
+        final_image_url: finalImageUrl
+      });
+    }
 
     return {
       id: row.id,
@@ -74,7 +98,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
       author: row.author,
       description: row.description,
       sourceUrl: row.metadata?.sourceUrl,
-      image: processedImage,  // ← FIXED: Now converts IPFS to HTTP URL
+      image: finalImageUrl,  // ← FIXED: Now looks in originalMetadata.image first
       metadataURI: row.metadata?.metadataURI || '',
       creator: row.metadata?.creator || row.author,
       creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,
@@ -297,9 +321,17 @@ export function useRecentEvermarks(limit = 10) {
       const data = await SupabaseService.getRecentEvermarks(limit);
       
       const convertedEvermarks = data.map((row: EvermarkRow): Evermark => {
-        // FIXED: Convert IPFS image URI to gateway URL
-        const imageUri = row.metadata?.image;
-        const processedImage = imageUri ? convertIpfsToGateway(imageUri) : undefined;
+        // FIXED: Use same image priority logic as main hook - check originalMetadata.image
+        let finalImageUrl: string | undefined;
+        
+        if ((row as any).processed_image_url) {
+          finalImageUrl = (row as any).processed_image_url;
+        } else if ((row.metadata as any)?.originalMetadata?.image) {
+          // FIXED: Look in the correct nested location
+          finalImageUrl = convertIpfsToGateway((row.metadata as any).originalMetadata.image);
+        } else if (row.metadata?.image) {
+          finalImageUrl = convertIpfsToGateway(row.metadata.image);
+        }
 
         return {
           id: row.id,
@@ -307,7 +339,7 @@ export function useRecentEvermarks(limit = 10) {
           author: row.author,
           description: row.description,
           sourceUrl: row.metadata?.sourceUrl,
-          image: processedImage, // ← FIXED: Convert IPFS to HTTP URL
+          image: finalImageUrl, // ← FIXED: Same logic as main hook
           metadataURI: row.metadata?.metadataURI || '',
           creator: row.metadata?.creator || row.author,
           creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,

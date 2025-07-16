@@ -1,4 +1,4 @@
-// src/lib/supabase.ts - Centralized Supabase client and data operations
+// src/lib/supabase.ts - Updated EvermarkRow interface
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Database types
+// FIXED: Updated database types to match your actual table structure
 export interface EvermarkRow {
   id: string;
   title: string;
@@ -21,16 +21,34 @@ export interface EvermarkRow {
   created_at: string;
   updated_at: string;
   metadata: {
-    creator: string;
+    creator?: string;
     sourceUrl?: string;
     image?: string;
-    metadataURI: string;
-    creationTime: number;
+    metadataURI?: string;
+    creationTime?: number;
     minter?: string;
     referrer?: string;
+    // FIXED: Add the actual nested structure we see in the data
+    source?: string;
+    tokenId?: number;
+    syncedAt?: string;
+    tokenURI?: string;
+    originalMetadata?: {
+      name?: string;
+      image?: string;
+      description?: string;
+      external_url?: string;
+      attributes?: Array<{ trait_type: string; value: string; }>;
+      evermark?: any;
+    } | null;
   };
   last_synced_at?: string;
   tx_hash?: string;
+  block_number?: bigint;
+  // FIXED: Added the missing image processing columns
+  processed_image_url?: string;
+  image_processing_status?: string;
+  image_processed_at?: string;
 }
 
 export interface StakeRow {
@@ -57,6 +75,7 @@ export class SupabaseService {
   
   /**
    * Get evermarks with pagination and filtering
+   * FIXED: Select the processed_image_url column
    */
   static async getEvermarks(options: {
     page?: number;
@@ -79,7 +98,7 @@ export class SupabaseService {
 
     let query = supabase
       .from('evermarks')
-      .select('*', { count: 'exact' });
+      .select('*, processed_image_url, image_processing_status', { count: 'exact' });
 
     // Apply filters
     if (search) {
@@ -119,11 +138,12 @@ export class SupabaseService {
 
   /**
    * Get recent evermarks (last N)
+   * FIXED: Select the processed_image_url column
    */
   static async getRecentEvermarks(limit = 10) {
     const { data, error } = await supabase
       .from('evermarks')
-      .select('*')
+      .select('*, processed_image_url, image_processing_status')
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -136,11 +156,12 @@ export class SupabaseService {
 
   /**
    * Get evermark by ID
+   * FIXED: Select the processed_image_url column
    */
   static async getEvermarkById(id: string) {
     const { data, error } = await supabase
       .from('evermarks')
-      .select('*')
+      .select('*, processed_image_url, image_processing_status')
       .eq('id', id)
       .single();
 
@@ -159,7 +180,7 @@ export class SupabaseService {
       .from('stakes')
       .select(`
         evermark_id,
-        evermarks!inner(id, title, author, description, metadata),
+        evermarks!inner(id, title, author, description, metadata, processed_image_url, image_processing_status),
         amount
       `)
       .eq('status', 'confirmed')
@@ -184,7 +205,10 @@ export class SupabaseService {
         description: entry.evermarks.description,
         creator: entry.evermarks.metadata?.creator || entry.evermarks.author,
         sourceUrl: entry.evermarks.metadata?.sourceUrl,
-        image: entry.evermarks.metadata?.image,
+        // FIXED: Use processed_image_url first, then check originalMetadata.image
+        image: entry.evermarks.processed_image_url || 
+               entry.evermarks.metadata?.originalMetadata?.image || 
+               entry.evermarks.metadata?.image,
         metadataURI: entry.evermarks.metadata?.metadataURI || '',
         creationTime: entry.evermarks.metadata?.creationTime || new Date(entry.evermarks.created_at).getTime() / 1000,
       },
