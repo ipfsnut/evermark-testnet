@@ -1,4 +1,4 @@
-// src/hooks/useSupabaseEvermarks.ts - Fast Supabase-first evermarks with blockchain fallback
+// src/hooks/useSupabaseEvermarks.ts - FIXED: Convert IPFS URIs to gateway URLs
 import { useState, useEffect, useCallback } from 'react';
 import { SupabaseService, EvermarkRow } from '../lib/supabase';
 import { useMetadataUtils } from './core/useMetadataUtils';
@@ -52,19 +52,35 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
     enableBlockchainFallback = true
   } = options;
 
-  // Convert Supabase row to Evermark interface
-  const convertToEvermark = useCallback((row: EvermarkRow): Evermark => ({
-    id: row.id,
-    title: row.title,
-    author: row.author,
-    description: row.description,
-    sourceUrl: row.metadata?.sourceUrl,
-    image: row.metadata?.image,
-    metadataURI: row.metadata?.metadataURI || '',
-    creator: row.metadata?.creator || row.author,
-    creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,
-    verified: row.verified
-  }), []);
+  // FIXED: Helper function to convert IPFS URI to gateway URL
+  const convertIpfsToGateway = useCallback((ipfsUri: string, gatewayUrl = 'https://gateway.pinata.cloud/ipfs/'): string => {
+    if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
+      return ipfsUri;
+    }
+    
+    const hash = ipfsUri.replace('ipfs://', '');
+    return `${gatewayUrl}${hash}`;
+  }, []);
+
+  // FIXED: Convert Supabase row to Evermark interface with proper image URL conversion
+  const convertToEvermark = useCallback((row: EvermarkRow): Evermark => {
+    // Convert IPFS image URI to gateway URL
+    const imageUri = row.metadata?.image;
+    const processedImage = imageUri ? convertIpfsToGateway(imageUri) : undefined;
+
+    return {
+      id: row.id,
+      title: row.title,
+      author: row.author,
+      description: row.description,
+      sourceUrl: row.metadata?.sourceUrl,
+      image: processedImage,  // ← FIXED: Now converts IPFS to HTTP URL
+      metadataURI: row.metadata?.metadataURI || '',
+      creator: row.metadata?.creator || row.author,
+      creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,
+      verified: row.verified
+    };
+  }, [convertIpfsToGateway]);
 
   // Fetch from Supabase first, then blockchain fallback if needed
   const fetchEvermarks = useCallback(async () => {
@@ -92,6 +108,17 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
       if (supabaseResult.data && supabaseResult.data.length > 0) {
         // Success with Supabase data
         const convertedEvermarks = supabaseResult.data.map(convertToEvermark);
+        
+        // FIXED: Log image URLs for debugging
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🖼️ Image URLs debug:', convertedEvermarks.map(e => ({
+            id: e.id,
+            title: e.title.slice(0, 30),
+            originalImage: supabaseResult.data.find(r => r.id === e.id)?.metadata?.image,
+            processedImage: e.image
+          })));
+        }
+        
         setEvermarks(convertedEvermarks);
         setTotalCount(supabaseResult.count);
         setTotalPages(supabaseResult.totalPages);
@@ -173,7 +200,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
           author: data!.author,
           description: data!.description,
           sourceUrl: data!.sourceUrl,
-          image: data!.image,
+          image: data!.image ? convertIpfsToGateway(data!.image) : undefined, // FIXED: Convert IPFS here too
           metadataURI: data!.metadataURI,
           creator: data!.creator,
           creationTime: data!.creationTime,
@@ -192,7 +219,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}) 
       setError(err instanceof Error ? err.message : 'Failed to fetch from blockchain');
       setIsLoading(false);
     }
-  }, [evermarkNFT, fetchEvermarkData, page, pageSize]);
+  }, [evermarkNFT, fetchEvermarkData, page, pageSize, convertIpfsToGateway]);
 
   // Refresh function
   const refresh = useCallback(() => {
@@ -252,6 +279,16 @@ export function useRecentEvermarks(limit = 10) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // FIXED: Helper function to convert IPFS URI to gateway URL
+  const convertIpfsToGateway = useCallback((ipfsUri: string, gatewayUrl = 'https://gateway.pinata.cloud/ipfs/'): string => {
+    if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
+      return ipfsUri;
+    }
+    
+    const hash = ipfsUri.replace('ipfs://', '');
+    return `${gatewayUrl}${hash}`;
+  }, []);
+
   const fetchRecent = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -259,18 +296,24 @@ export function useRecentEvermarks(limit = 10) {
 
       const data = await SupabaseService.getRecentEvermarks(limit);
       
-      const convertedEvermarks = data.map((row: EvermarkRow): Evermark => ({
-        id: row.id,
-        title: row.title,
-        author: row.author,
-        description: row.description,
-        sourceUrl: row.metadata?.sourceUrl,
-        image: row.metadata?.image,
-        metadataURI: row.metadata?.metadataURI || '',
-        creator: row.metadata?.creator || row.author,
-        creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,
-        verified: row.verified
-      }));
+      const convertedEvermarks = data.map((row: EvermarkRow): Evermark => {
+        // FIXED: Convert IPFS image URI to gateway URL
+        const imageUri = row.metadata?.image;
+        const processedImage = imageUri ? convertIpfsToGateway(imageUri) : undefined;
+
+        return {
+          id: row.id,
+          title: row.title,
+          author: row.author,
+          description: row.description,
+          sourceUrl: row.metadata?.sourceUrl,
+          image: processedImage, // ← FIXED: Convert IPFS to HTTP URL
+          metadataURI: row.metadata?.metadataURI || '',
+          creator: row.metadata?.creator || row.author,
+          creationTime: row.metadata?.creationTime || new Date(row.created_at).getTime() / 1000,
+          verified: row.verified
+        };
+      });
 
       setEvermarks(convertedEvermarks);
     } catch (err) {
@@ -279,7 +322,7 @@ export function useRecentEvermarks(limit = 10) {
     } finally {
       setIsLoading(false);
     }
-  }, [limit]);
+  }, [limit, convertIpfsToGateway]);
 
   useEffect(() => {
     fetchRecent();
