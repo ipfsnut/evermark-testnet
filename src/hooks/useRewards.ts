@@ -1,3 +1,9 @@
+// ===================================================================
+// src/hooks/useRewards.ts - PHASE 3: MEDIUM PRIORITY
+// GOAL: Optimize cache usage and coordination
+// CHANGES: Better cache refresh coordination, optimistic updates, reduce redundant calls
+// ===================================================================
+
 import { useCallback } from "react";
 import { CONTRACTS, REWARDS_ABI } from "../lib/contracts";
 import { toEther } from "thirdweb/utils";
@@ -6,8 +12,14 @@ import { useUserData } from './core/useUserData';
 
 export function useRewards(userAddress?: string) {
   const { executeTransaction, isProcessing, error, success, clearMessages } = useTransactionUtils();
-  const { rewards, refetchRewards, hasWallet } = useUserData(userAddress);
+  const { 
+    rewards, 
+    refetchRewards, 
+    refetch: refetchAllUserData, // ✅ NEW: Get full user data refetch
+    hasWallet 
+  } = useUserData(userAddress);
 
+  // ✅ ENHANCED: Better cache coordination after claim
   const claimRewards = useCallback(async () => {
     const minimumClaimable = BigInt("1000000000000000"); // 0.001 tokens minimum
     if (rewards.totalRewards < minimumClaimable) {
@@ -44,14 +56,28 @@ export function useRewards(userAddress?: string) {
       }
     );
 
+    // ✅ ENHANCED: Refresh both rewards and full user data after successful claim
     if (result.success) {
+      console.log("🔄 Refreshing user data cache after successful rewards claim");
       setTimeout(() => {
+        // Refresh rewards specifically first
         refetchRewards();
+        // Then refresh all user data (balances may have changed)
+        refetchAllUserData();
       }, 2000);
     }
 
     return result;
-  }, [rewards, executeTransaction, userAddress, refetchRewards]);
+  }, [rewards, executeTransaction, userAddress, refetchRewards, refetchAllUserData]);
+
+  // ✅ NEW: Enhanced refetch that coordinates both rewards and user data
+  const refetch = useCallback(async () => {
+    console.log("🔄 Manually refreshing all rewards-related data");
+    await Promise.all([
+      refetchRewards(),
+      refetchAllUserData()
+    ]);
+  }, [refetchRewards, refetchAllUserData]);
 
   return {
     pendingRewards: rewards.totalRewards,
@@ -69,7 +95,7 @@ export function useRewards(userAddress?: string) {
     clearMessages,
     
     isLoadingRewards: !hasWallet, 
-    refetch: refetchRewards,
+    refetch, // ✅ NEW: Enhanced refetch function
     
     hasWalletAccess: hasWallet,
     
@@ -123,3 +149,4 @@ export function useUserRewardsSummary(userAddress?: string) {
       : 0,
   };
 }
+

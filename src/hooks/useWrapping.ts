@@ -1,15 +1,22 @@
+
 import { useCallback } from "react";
-import { CONTRACTS, EMARK_TOKEN_ABI } from "../lib/contracts";
-import CardCatalogABI from "../lib/abis/CardCatalog.json";
+import { CONTRACTS, EMARK_TOKEN_ABI, CARD_CATALOG_ABI } from "../lib/contracts"; // ✅ FIXED: Use contracts export
 import { useTransactionUtils } from './core/useTransactionUtils';
 import { useUserData } from './core/useUserData';
 
 export function useWrapping(userAddress?: string) {
   const { executeTransaction, executeBatchTransactions, isProcessing } = useTransactionUtils();
-  const { balances, voting, unbonding, refetch, hasWallet } = useUserData(userAddress);
+  const { 
+    balances, 
+    voting, 
+    unbonding, 
+    refetch: refetchUserData, // ✅ FIXED: This should work based on useUserData
+    hasWallet 
+  } = useUserData(userAddress);
   
+  // ✅ FIXED: Proper batch transaction handling
   const wrapTokens = useCallback(async (amount: bigint) => {
-    return await executeBatchTransactions([
+    const results = await executeBatchTransactions([
       {
         contractAddress: CONTRACTS.EMARK_TOKEN,
         abi: EMARK_TOKEN_ABI,
@@ -21,7 +28,7 @@ export function useWrapping(userAddress?: string) {
       },
       {
         contractAddress: CONTRACTS.CARD_CATALOG,
-        abi: CardCatalogABI,
+        abi: CARD_CATALOG_ABI, // ✅ FIXED: Import from contracts
         functionName: "wrap",
         params: [amount],
         options: {
@@ -30,12 +37,23 @@ export function useWrapping(userAddress?: string) {
         }
       }
     ]);
-  }, [executeBatchTransactions]);
+
+    // ✅ FIXED: Proper type handling - results is TransactionResult[]
+    const allSuccessful = results.every(result => result.success);
+    if (allSuccessful) {
+      console.log("🔄 Refreshing user data cache after successful wrap");
+      setTimeout(() => {
+        refetchUserData();
+      }, 2000);
+    }
+
+    return results;
+  }, [executeBatchTransactions, refetchUserData]);
 
   const requestUnwrap = useCallback(async (amount: bigint) => {
-    return await executeTransaction(
+    const result = await executeTransaction(
       CONTRACTS.CARD_CATALOG,
-      CardCatalogABI,
+      CARD_CATALOG_ABI, // ✅ FIXED: Import from contracts
       "requestUnwrap",
       [amount],
       {
@@ -46,12 +64,21 @@ export function useWrapping(userAddress?: string) {
         }
       }
     );
-  }, [executeTransaction]);
+
+    if (result.success) {
+      console.log("🔄 Refreshing user data cache after successful unwrap request");
+      setTimeout(() => {
+        refetchUserData();
+      }, 2000);
+    }
+
+    return result;
+  }, [executeTransaction, refetchUserData]);
 
   const completeUnwrap = useCallback(async () => {
-    return await executeTransaction(
+    const result = await executeTransaction(
       CONTRACTS.CARD_CATALOG,
-      CardCatalogABI,
+      CARD_CATALOG_ABI, // ✅ FIXED: Import from contracts
       "completeUnwrap",
       [],
       {
@@ -59,12 +86,21 @@ export function useWrapping(userAddress?: string) {
         errorContext: { operation: 'completeUnwrap' }
       }
     );
-  }, [executeTransaction]);
+
+    if (result.success) {
+      console.log("🔄 Refreshing user data cache after successful unwrap completion");
+      setTimeout(() => {
+        refetchUserData();
+      }, 2000);
+    }
+
+    return result;
+  }, [executeTransaction, refetchUserData]);
 
   const cancelUnbonding = useCallback(async () => {
-    return await executeTransaction(
+    const result = await executeTransaction(
       CONTRACTS.CARD_CATALOG,
-      CardCatalogABI,
+      CARD_CATALOG_ABI, // ✅ FIXED: Import from contracts
       "cancelUnbonding",
       [],
       {
@@ -72,7 +108,21 @@ export function useWrapping(userAddress?: string) {
         errorContext: { operation: 'cancelUnbonding' }
       }
     );
-  }, [executeTransaction]);
+
+    if (result.success) {
+      console.log("🔄 Refreshing user data cache after successful cancel unbonding");
+      setTimeout(() => {
+        refetchUserData();
+      }, 2000);
+    }
+
+    return result;
+  }, [executeTransaction, refetchUserData]);
+
+  const refetch = useCallback(async () => {
+    console.log("🔄 Manually refreshing all wrapping-related data");
+    await refetchUserData();
+  }, [refetchUserData]);
 
   return {
     emarkBalance: balances.emarkBalance,
@@ -113,3 +163,4 @@ export function useWrapping(userAddress?: string) {
     }
   };
 }
+

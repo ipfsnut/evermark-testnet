@@ -1,5 +1,5 @@
-// src/hooks/useEvermarks.ts - FIXED with missing exports
 import { useState, useEffect, useCallback } from 'react';
+import { useSupabaseEvermarks, type Evermark } from './useSupabaseEvermarks';
 
 interface EvermarkData {
   id: string;
@@ -35,81 +35,61 @@ interface UseEvermarkDetailResult {
   retry: () => void;
 }
 
-// Main hook for getting single evermark details
+// Convert Supabase Evermark to legacy EvermarkData format for compatibility
+const convertToLegacyFormat = (evermark: Evermark): EvermarkData => ({
+  id: evermark.id,
+  name: evermark.title, // Map title to name for legacy compatibility
+  title: evermark.title,
+  description: evermark.description || '',
+  content: evermark.description || '', // Map description to content
+  image: evermark.image,
+  external_url: evermark.sourceUrl,
+  author: evermark.author,
+  creator: evermark.creator,
+  timestamp: new Date(evermark.creationTime * 1000).toISOString(),
+  created_at: new Date(evermark.creationTime * 1000).toISOString(),
+  updated_at: new Date(evermark.creationTime * 1000).toISOString(),
+  creationTime: evermark.creationTime,
+  tx_hash: undefined,
+  block_number: undefined,
+  metadataURI: evermark.metadataURI,
+  evermark_type: 'standard',
+  source_platform: evermark.sourceUrl?.includes('farcaster') ? 'farcaster' : 'web',
+  sourceUrl: evermark.sourceUrl,
+  voting_power: evermark.votes || 0,
+  view_count: 0, // Could be enhanced with view tracking
+  tags: [],
+  category: 'general',
+  metadata: {
+    creator: evermark.creator,
+    sourceUrl: evermark.sourceUrl,
+    image: evermark.image,
+    metadataURI: evermark.metadataURI,
+    creationTime: evermark.creationTime
+  }
+});
+
+// Main hook for getting single evermark details - NOW USES SUPABASE CACHE
 export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
   const [evermark, setEvermark] = useState<EvermarkData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
 
-  const fetchEvermark = useCallback(async (evermarkId: string, attempt: number = 0) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      console.log(`🔍 Fetching Evermark ${evermarkId}, attempt ${attempt + 1}`);
-      
-      const response = await fetch(`/.netlify/functions/evermarks?id=${encodeURIComponent(evermarkId)}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        
-        if (response.status === 404) {
-          throw new Error(errorData.message || 'Evermark not found');
-        }
-        
-        if (response.status >= 500) {
-          throw new Error(errorData.message || 'Server error - please try again');
-        }
-        
-        throw new Error(errorData.message || `Request failed with status ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log('✅ Evermark data fetched:', data);
-      
-      if (!data || !data.id) {
-        throw new Error('Invalid response format from server');
-      }
-      
-      setEvermark(data);
-      setRetryCount(0);
-      
-    } catch (err) {
-      console.error('❌ Error fetching Evermark:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-      setError(errorMessage);
-      
-      const maxRetries = 3;
-      const shouldRetry = attempt < maxRetries && 
-                         !errorMessage.includes('not found') && 
-                         !errorMessage.includes('404');
-      
-      if (shouldRetry) {
-        console.log(`🔄 Retrying in 2 seconds... (${attempt + 1}/${maxRetries})`);
-        setTimeout(() => {
-          setRetryCount(attempt + 1);
-        }, 2000);
-        return;
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  // Use Supabase hook with single item fetch
+  const { 
+    evermarks, 
+    isLoading: supabaseLoading, 
+    error: supabaseError, 
+    refresh 
+  } = useSupabaseEvermarks({
+    page: 1,
+    pageSize: 1,
+    // Could add specific ID filter here if SupabaseService supports it
+    enableBlockchainFallback: true
+  });
 
-  const retry = useCallback(() => {
-    if (id) {
-      setRetryCount(0);
-      fetchEvermark(id, 0);
-    }
-  }, [id, fetchEvermark]);
-
-  useEffect(() => {
+  // Fetch specific evermark by ID using Supabase
+  const fetchEvermark = useCallback(async () => {
     if (!id) {
       setIsLoading(false);
       setError('No Evermark ID provided');
@@ -117,120 +97,107 @@ export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
       return;
     }
 
-    fetchEvermark(id, retryCount);
-  }, [id, retryCount, fetchEvermark]);
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Try to find in current evermarks first (cache hit)
+      const cachedEvermark = evermarks.find(e => e.id === id);
+      if (cachedEvermark) {
+        setEvermark(convertToLegacyFormat(cachedEvermark));
+        setIsLoading(false);
+        return;
+      }
+
+      // If not in current results, use SupabaseService directly for single fetch
+      const { SupabaseService } = await import('../lib/supabase');
+      const supabaseEvermark = await SupabaseService.getEvermarkById(id);
+      
+      if (supabaseEvermark) {
+        // Convert from Supabase format to our Evermark interface
+        const evermarkData: Evermark = {
+          id: supabaseEvermark.id,
+          title: supabaseEvermark.title,
+          author: supabaseEvermark.author,
+          description: supabaseEvermark.description,
+          sourceUrl: supabaseEvermark.metadata?.sourceUrl,
+          image: supabaseEvermark.metadata?.image,
+          metadataURI: supabaseEvermark.metadata?.metadataURI || '',
+          creator: supabaseEvermark.metadata?.creator || supabaseEvermark.author,
+          creationTime: supabaseEvermark.metadata?.creationTime || new Date(supabaseEvermark.created_at).getTime() / 1000,
+          verified: supabaseEvermark.verified
+        };
+        
+        setEvermark(convertToLegacyFormat(evermarkData));
+      } else {
+        throw new Error('Evermark not found');
+      }
+      
+    } catch (err) {
+      console.error('❌ Error fetching Evermark:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [id, evermarks]);
+
+  const retry = useCallback(() => {
+    refresh();
+    fetchEvermark();
+  }, [refresh, fetchEvermark]);
+
+  useEffect(() => {
+    fetchEvermark();
+  }, [fetchEvermark]);
 
   return {
     evermark,
-    isLoading,
-    error,
+    isLoading: isLoading || supabaseLoading,
+    error: error || supabaseError,
     retry
   };
 }
 
-// 🔧 FIXED: Add the missing useUserEvermarks export
+// Hook for user evermarks - NOW USES SUPABASE CACHE
 export function useUserEvermarks(userAddress?: string) {
-  const [evermarks, setEvermarks] = useState<EvermarkData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchUserEvermarks = async () => {
-      if (!userAddress) {
-        setIsLoading(false);
-        setEvermarks([]);
-        return;
-      }
-
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // Try to fetch user's evermarks from the API
-        // This would need to be implemented based on your backend
-        const response = await fetch(`/.netlify/functions/evermarks?creator=${encodeURIComponent(userAddress)}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          setEvermarks(Array.isArray(data.data) ? data.data : []);
-        } else {
-          // Fallback: return empty array if not implemented yet
-          console.log('User evermarks endpoint not implemented yet');
-          setEvermarks([]);
-        }
-        
-      } catch (err) {
-        console.error('Error fetching user evermarks:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setEvermarks([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserEvermarks();
-  }, [userAddress]);
+  const { 
+    evermarks, 
+    isLoading, 
+    error 
+  } = useSupabaseEvermarks({
+    author: userAddress, // Filter by user address as author
+    pageSize: 100, // Get all user evermarks
+    enableBlockchainFallback: true
+  });
 
   return {
-    evermarks,
+    evermarks: evermarks.map(convertToLegacyFormat),
     isLoading,
     error
   };
 }
 
-// Hook for listing evermarks with filters
+// Hook for listing evermarks with filters - NOW USES SUPABASE CACHE
 export function useEvermarksList(filters?: {
   author?: string;
   category?: string;
   limit?: number;
 }) {
-  const [evermarks, setEvermarks] = useState<EvermarkData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchEvermarks = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const params = new URLSearchParams();
-        if (filters?.author) params.set('author', filters.author);
-        if (filters?.category) params.set('category', filters.category);
-        if (filters?.limit) params.set('limit', filters.limit.toString());
-        
-        const queryString = params.toString();
-        const url = `/.netlify/functions/evermarks${queryString ? `?${queryString}` : ''}`;
-        
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch evermarks: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Handle both single evermark and array responses
-        const evermarksList = Array.isArray(data) ? data : 
-                             Array.isArray(data.data) ? data.data : 
-                             data ? [data] : [];
-        setEvermarks(evermarksList);
-        
-      } catch (err) {
-        console.error('❌ Error fetching evermarks list:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error');
-        setEvermarks([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchEvermarks();
-  }, [filters?.author, filters?.category, filters?.limit]);
+  const { 
+    evermarks, 
+    isLoading, 
+    error 
+  } = useSupabaseEvermarks({
+    author: filters?.author,
+    pageSize: filters?.limit || 20,
+    enableBlockchainFallback: true
+  });
 
   return {
-    evermarks,
+    evermarks: evermarks.map(convertToLegacyFormat),
     isLoading,
     error
   };
 }
+

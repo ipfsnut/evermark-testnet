@@ -1,4 +1,9 @@
-// src/hooks/useViewTracking.ts - FIXED: Remove infinite loops
+// ===================================================================
+// src/hooks/useViewTracking.ts - PHASE 4: MEDIUM PRIORITY
+// GOAL: Simplify and stabilize view tracking  
+// CHANGES: Fix infinite loops, simplify logic, add proper dependencies
+// ===================================================================
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface ViewStats {
@@ -15,29 +20,37 @@ interface ViewTrackingResult {
   trackView: () => Promise<void>;
 }
 
-// FIXED: Simple localStorage-based tracking without infinite loops
+// ✅ FIXED: Simplified localStorage-based tracking without infinite loops
 export function useViewTracking(evermarkId: string): ViewTrackingResult {
   const [viewStats, setViewStats] = useState<ViewStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // FIXED: Use ref to track if view has been tracked this session
+  // ✅ FIXED: Use ref to track if view has been tracked this session
   const hasTrackedView = useRef(false);
+  const evermarkIdRef = useRef<string>('');
 
-  // Generate a simple user fingerprint for basic deduplication
+  // ✅ FIXED: Reset tracking when evermarkId changes
+  useEffect(() => {
+    if (evermarkIdRef.current !== evermarkId) {
+      hasTrackedView.current = false;
+      evermarkIdRef.current = evermarkId;
+    }
+  }, [evermarkId]);
+
+  // ✅ SIMPLIFIED: Basic user fingerprint for deduplication
   const getUserFingerprint = useCallback(() => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    ctx?.fillText('fingerprint', 2, 2);
-    const fingerprint = canvas.toDataURL();
-    return btoa(fingerprint + navigator.userAgent).slice(0, 32);
+    // Simple browser fingerprint - much simpler than before
+    const userAgent = navigator.userAgent;
+    const screen = `${window.screen.width}x${window.screen.height}`;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return btoa(`${userAgent}-${screen}-${timezone}`).slice(0, 16);
   }, []);
 
-  // FIXED: Stable trackView function that doesn't change on every render
+  // ✅ FIXED: Stable trackView function with proper session tracking
   const trackView = useCallback(async () => {
-    // FIXED: Prevent multiple tracking in the same session
-    if (hasTrackedView.current) {
-      console.log('View already tracked this session');
+    // ✅ FIXED: Prevent multiple tracking in the same session
+    if (hasTrackedView.current || !evermarkId) {
       return;
     }
 
@@ -54,7 +67,6 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
         now.toDateString() !== lastViewDate.toDateString();
       
       if (!isNewView) {
-        console.log('View already tracked today for this user');
         hasTrackedView.current = true; // Still mark as tracked to prevent retries
         return;
       }
@@ -62,7 +74,7 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
       // Update view tracking
       localStorage.setItem(viewKey, now.toISOString());
       
-      // FIXED: Update stats without triggering infinite loop
+      // ✅ FIXED: Update stats without triggering re-render loops
       setViewStats(prevStats => {
         if (!prevStats) return null;
         
@@ -87,9 +99,9 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
       console.error('Error tracking view:', err);
       setError('Failed to track view');
     }
-  }, [evermarkId, getUserFingerprint]); // FIXED: Stable dependencies
+  }, [evermarkId, getUserFingerprint]); // ✅ FIXED: Stable dependencies only
 
-  // FIXED: Load stats only once on mount
+  // ✅ FIXED: Load stats only once when evermarkId changes
   useEffect(() => {
     if (!evermarkId) {
       setIsLoading(false);
@@ -97,7 +109,7 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
       return;
     }
 
-    const loadViewStats = async () => {
+    const loadViewStats = () => {
       try {
         setIsLoading(true);
         setError(null);
@@ -123,24 +135,25 @@ export function useViewTracking(evermarkId: string): ViewTrackingResult {
       } catch (err) {
         console.error('Error loading view stats:', err);
         setError('Failed to load view statistics');
+        setViewStats(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     loadViewStats();
-  }, [evermarkId]); // FIXED: Only depend on evermarkId
+  }, [evermarkId]); // ✅ FIXED: Only depend on evermarkId
 
-  // FIXED: Auto-track view once when component is ready (no dependencies on changing values)
+  // ✅ FIXED: Auto-track view once when component is ready
   useEffect(() => {
-    if (evermarkId && viewStats && !hasTrackedView.current) {
+    if (evermarkId && viewStats && !hasTrackedView.current && !isLoading) {
       const timer = setTimeout(() => {
         trackView();
       }, 1000); // 1 second delay
       
       return () => clearTimeout(timer);
     }
-  }, [evermarkId, !!viewStats, trackView]); // FIXED: Use !!viewStats to avoid dependency on object
+  }, [evermarkId, viewStats, isLoading, trackView]); // ✅ FIXED: Proper dependencies
 
   return {
     viewStats,
@@ -169,12 +182,17 @@ export function useAggregatedViews(evermarkIds: string[]) {
     evermarkIds.forEach(id => {
       const stored = localStorage.getItem(`evermark_views_${id}`);
       if (stored) {
-        const data = JSON.parse(stored);
-        total += data.totalViews || 0;
+        try {
+          const data = JSON.parse(stored);
+          total += data.totalViews || 0;
+        } catch (err) {
+          console.warn(`Failed to parse view data for ${id}:`, err);
+        }
       }
     });
     setTotalViews(total);
-  }, [evermarkIds]);
+  }, [evermarkIds.join(',')]); // ✅ FIXED: Stable dependency
   
   return { totalViews };
 }
+

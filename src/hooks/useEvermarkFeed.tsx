@@ -1,4 +1,3 @@
-// src/hooks/useEvermarkFeed.tsx - Fast Supabase-first feed with pagination and filtering
 import { useState, useMemo, useCallback } from 'react';
 import { useSupabaseEvermarks, Evermark } from './useSupabaseEvermarks';
 
@@ -31,6 +30,7 @@ export interface EvermarkFeedResult {
   setFilters: (filters: Partial<FeedFilters>) => void;
   setPage: (page: number) => void;
   refresh: () => void;
+  refreshAfterCreation: () => void; // ✅ FIXED: Add missing property
 }
 
 const DEFAULT_PAGE_SIZE = 12;
@@ -57,7 +57,7 @@ export function useEvermarkFeed(initialPageSize = DEFAULT_PAGE_SIZE): EvermarkFe
     return filters.sort === 'oldest' ? 'asc' : 'desc';
   }, [filters.sort]);
 
-  // Use the new Supabase-first hook
+  // ✅ ENHANCED: Use the Supabase-first hook with better error handling
   const {
     evermarks: rawEvermarks,
     isLoading,
@@ -132,10 +132,20 @@ export function useEvermarkFeed(initialPageSize = DEFAULT_PAGE_SIZE): EvermarkFe
     setCurrentPage(page);
   }, []);
 
-  // Refresh function
+  // ✅ ENHANCED: Refresh function with cache coordination
   const refresh = useCallback(() => {
+    console.log("🔄 Refreshing evermark feed data");
     refreshSupabase();
   }, [refreshSupabase]);
+
+  // ✅ NEW: Auto-refresh when new evermarks might be created
+  // This could be enhanced with real-time subscriptions later
+  const refreshAfterCreation = useCallback(() => {
+    console.log("🔄 Refreshing feed after potential new evermark creation");
+    setTimeout(() => {
+      refresh();
+    }, 3000); // Give time for webhook to update Supabase
+  }, [refresh]);
 
   return {
     evermarks: filteredEvermarks,
@@ -145,7 +155,9 @@ export function useEvermarkFeed(initialPageSize = DEFAULT_PAGE_SIZE): EvermarkFe
     filters,
     setFilters,
     setPage,
-    refresh
+    refresh,
+    // ✅ NEW: Expose refresh trigger for after creation
+    refreshAfterCreation,
   };
 }
 

@@ -1,9 +1,8 @@
-// src/hooks/useVoting.ts - ✅ FIXED with proper ThirdWeb v5 syntax and core infrastructure
-
 import { useState, useCallback, useMemo } from "react";
 import { useReadContract } from "thirdweb/react";
 import { useContracts } from './core/useContracts';
 import { useTransactionUtils } from './core/useTransactionUtils';
+import { useUserData } from './core/useUserData'; // NOW USING CACHED DATA
 import { useWalletAuth } from "../providers/WalletProvider";
 import { toEther, toWei } from "thirdweb/utils";
 import { VOTING_ABI, CONTRACTS } from "../lib/contracts";
@@ -12,52 +11,30 @@ export function useVoting(evermarkId: string, userAddress?: string) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   
-  // ✅ Use unified wallet providers and core infrastructure
+  // Use unified wallet providers and core infrastructure
   const { address: walletAddress, isConnected, requireConnection } = useWalletAuth();
   const { executeTransaction, isProcessing } = useTransactionUtils();
-  const { voting, cardCatalog } = useContracts();
+  const { voting } = useContracts();
   
-  // ✅ Use wallet provider address if userAddress not provided
+  // Use wallet provider address if userAddress not provided
   const effectiveUserAddress = userAddress || walletAddress;
   
-  // ✅ FIXED: Use correct ThirdWeb v5 syntax for all contract calls
+  // ✅ NEW: Use cached user data instead of direct blockchain calls
+  const { 
+    voting: userVotingData, 
+    cycle: cycleData,
+    refetch: refetchUserData,
+    isLoading: isLoadingUserData 
+  } = useUserData(effectiveUserAddress);
+
+  // Get current cycle from voting contract (still needed for real-time cycle info)
   const { data: currentCycle, isLoading: isLoadingCycle, refetch: refetchCycle } = useReadContract({
     contract: voting,
     method: "function getCurrentCycle() view returns (uint256)",
     params: [],
   });
 
-  // ✅ FIXED: Get voting power from CardCatalog with proper syntax
-  const { data: availableVotingPower, isLoading: isLoadingVotingPower, refetch: refetchVotingPower } = useReadContract({
-    contract: cardCatalog,
-    method: "function getAvailableVotingPower(address) view returns (uint256)",
-    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
-    queryOptions: {
-      enabled: !!effectiveUserAddress,
-    },
-  });
-
-  // ✅ FIXED: Get total voting power from CardCatalog
-  const { data: totalVotingPower } = useReadContract({
-    contract: cardCatalog,
-    method: "function getTotalVotingPower(address) view returns (uint256)",
-    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
-    queryOptions: {
-      enabled: !!effectiveUserAddress,
-    },
-  });
-
-  // ✅ FIXED: Get total wEMARK balance for debugging
-  const { data: totalWemark } = useReadContract({
-    contract: cardCatalog,
-    method: "function balanceOf(address) view returns (uint256)",
-    params: [effectiveUserAddress || "0x0000000000000000000000000000000000000000"] as const,
-    queryOptions: {
-      enabled: !!effectiveUserAddress,
-    },
-  });
-
-  // ✅ FIXED: Use correct method name for getting votes in cycle
+  // Get total votes for this evermark (still needs blockchain call)
   const { data: totalVotes, isLoading: isLoadingTotalVotes, refetch: refetchTotalVotes } = useReadContract({
     contract: voting,
     method: "function getEvermarkVotesInCycle(uint256,uint256) view returns (uint256)",
@@ -67,7 +44,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // ✅ FIXED: Use correct method name for getting user votes in cycle
+  // Get user votes for this specific evermark (still needs blockchain call)
   const userVotesQuery = useReadContract({
     contract: voting,
     method: "function getUserVotesInCycle(uint256,address,uint256) view returns (uint256)",
@@ -81,7 +58,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // ✅ FIXED: Get cycle info
+  // Get cycle info (still needs blockchain call for real-time cycle status)
   const { data: cycleInfo } = useReadContract({
     contract: voting,
     method: "function getCycleInfo(uint256) view returns (uint256,uint256,uint256,uint256,bool,uint256)",
@@ -91,30 +68,40 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     },
   });
 
-  // ✅ FIXED: Get time remaining
+  // Get time remaining (still needs blockchain call for real-time updates)
   const { data: timeRemaining } = useReadContract({
     contract: voting,
     method: "function getTimeRemainingInCurrentCycle() view returns (uint256)",
     params: [] as const,
   });
 
-  // Debug logging
+  // ✅ NEW: Enhanced cache coordination after transactions
+  const refreshAllData = useCallback(async () => {
+    await Promise.all([
+      refetchUserData(), // Refresh cached user data
+      refetchCycle(),
+      refetchTotalVotes(),
+      userVotesQuery.refetch?.()
+    ]);
+  }, [refetchUserData, refetchCycle, refetchTotalVotes, userVotesQuery]);
+
+  // Debug logging using cached data
   if (process.env.NODE_ENV === 'development') {
-    console.log("🔍 Voting Power:", {
+    console.log("🔍 Voting Power (CACHED):", {
       userAddress: effectiveUserAddress ? `${effectiveUserAddress.slice(0, 6)}...${effectiveUserAddress.slice(-4)}` : null,
-      totalWemark: totalWemark ? toEther(totalWemark) : "0",
-      availableVotingPower: availableVotingPower ? toEther(availableVotingPower) : "0",
-      totalVotingPower: totalVotingPower ? toEther(totalVotingPower) : "0",
+      totalWemark: toEther(userVotingData.stakedBalance),
+      availableVotingPower: toEther(userVotingData.availableVotingPower), // FROM CACHE
+      totalVotingPower: toEther(userVotingData.totalVotingPower), // FROM CACHE
       currentCycle: currentCycle?.toString(),
-      isConnected
+      isConnected,
+      cacheAge: `Cache age info would go here`
     });
   }
   
-  // ✅ Delegate votes using core transaction utilities
+  // ✅ ENHANCED: Delegate votes with better cache coordination
   const delegateVotes = useCallback(async (amount: string) => {
     console.log('🗳️ Starting delegate votes process...');
     
-    // ✅ Use unified connection check
     if (!isConnected) {
       const connectionResult = await requireConnection();
       if (!connectionResult.success) {
@@ -139,29 +126,22 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setError(null);
     setSuccess(null);
 
-    // Refresh data immediately before transaction
-    await Promise.all([
-      refetchCycle(),
-      refetchVotingPower(), 
-      refetchTotalVotes(),
-      userVotesQuery.refetch?.(),
-    ]);
-
+    // ✅ NEW: Refresh cached data before transaction
+    await refreshAllData();
     await new Promise(resolve => setTimeout(resolve, 500));
     
     const voteAmountWei = toWei(amount);
     
-    // Re-check with fresh data  
-    const freshVotingPowerResult = await refetchVotingPower();
-    const actualAvailable = freshVotingPowerResult.data || availableVotingPower || BigInt(0);
+    // ✅ NEW: Use cached available voting power for validation
+    const actualAvailable = userVotingData.availableVotingPower;
     
-    console.log("🔍 Voting attempt:", {
+    console.log("🔍 Voting attempt (using cache):", {
       amount: `${amount} wEMARK`,
       available: `${toEther(actualAvailable)} wEMARK`,
       hasEnough: voteAmountWei <= actualAvailable,
     });
 
-    // Check with fresh data
+    // Check with cached data first
     if (voteAmountWei > actualAvailable) {
       const errorMsg = `Insufficient voting power. Available: ${toEther(actualAvailable)} wEMARK`;
       setError(errorMsg);
@@ -169,7 +149,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     }
     
     try {
-      // ✅ Use core transaction utilities
+      // Execute transaction using core transaction utilities
       const result = await executeTransaction(
         CONTRACTS.VOTING,
         VOTING_ABI,
@@ -193,12 +173,9 @@ export function useVoting(evermarkId: string, userAddress?: string) {
         
         setSuccess(result.message || "Vote delegation successful");
         
-        // Refetch all relevant data
+        // ✅ NEW: Enhanced cache refresh after successful transaction
         setTimeout(() => {
-          refetchCycle();
-          refetchTotalVotes();
-          refetchVotingPower();
-          userVotesQuery.refetch?.();
+          refreshAllData();
         }, 2000);
         
         return result;
@@ -231,20 +208,16 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     isConnected, 
     requireConnection, 
     evermarkId, 
-    availableVotingPower, 
+    userVotingData.availableVotingPower, // NOW USING CACHED DATA
     executeTransaction,
-    refetchCycle, 
-    refetchTotalVotes, 
-    refetchVotingPower, 
-    userVotesQuery,
+    refreshAllData, // NEW: Enhanced refresh
     effectiveUserAddress
   ]);
   
-  // ✅ Undelegate votes using core transaction utilities
+  // ✅ ENHANCED: Undelegate votes with cache coordination
   const undelegateVotes = useCallback(async (amount: string) => {
     console.log('🗳️ Starting undelegate votes process...');
     
-    // ✅ Use unified connection check
     if (!isConnected) {
       const connectionResult = await requireConnection();
       if (!connectionResult.success) {
@@ -278,7 +251,6 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setSuccess(null);
     
     try {
-      // ✅ Use core transaction utilities
       const result = await executeTransaction(
         CONTRACTS.VOTING,
         VOTING_ABI,
@@ -302,12 +274,9 @@ export function useVoting(evermarkId: string, userAddress?: string) {
         
         setSuccess(result.message || "Vote undelegation successful");
         
-        // Refetch all relevant data
+        // ✅ NEW: Enhanced cache refresh after successful transaction
         setTimeout(() => {
-          refetchCycle();
-          refetchTotalVotes();
-          refetchVotingPower();
-          userVotesQuery.refetch?.();
+          refreshAllData();
         }, 2000);
         
         return result;
@@ -338,14 +307,11 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     userVotesQuery.data, 
     evermarkId, 
     executeTransaction,
-    refetchCycle, 
-    refetchTotalVotes, 
-    refetchVotingPower, 
-    userVotesQuery,
+    refreshAllData, // NEW: Enhanced refresh
     effectiveUserAddress
   ]);
 
-  // ✅ NEW: Batch delegate votes function using core utilities
+  // ✅ NEW: Batch delegate votes function
   const delegateVotesBatch = useCallback(async (evermarkIds: string[], amounts: string[]) => {
     console.log('🗳️ Starting batch delegate votes process...');
     
@@ -377,7 +343,6 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       const evermarkIdsBigInt = evermarkIds.map(id => BigInt(id));
       const amountsBigInt = amounts.map(amount => toWei(amount));
       
-      // ✅ Use core transaction utilities
       const result = await executeTransaction(
         CONTRACTS.VOTING,
         VOTING_ABI,
@@ -399,12 +364,9 @@ export function useVoting(evermarkId: string, userAddress?: string) {
         
         setSuccess(result.message || "Batch vote delegation successful");
         
-        // Refetch all relevant data
+        // ✅ NEW: Enhanced cache refresh after successful transaction
         setTimeout(() => {
-          refetchCycle();
-          refetchTotalVotes();
-          refetchVotingPower();
-          userVotesQuery.refetch?.();
+          refreshAllData();
         }, 2000);
         
         return result;
@@ -431,10 +393,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     isConnected,
     requireConnection,
     executeTransaction,
-    refetchCycle,
-    refetchTotalVotes,
-    refetchVotingPower,
-    userVotesQuery,
+    refreshAllData,
     effectiveUserAddress
   ]);
   
@@ -444,29 +403,29 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     setSuccess(null);
   }, []);
 
-  // Calculate derived values
+  // Calculate derived values using cached data where possible
   const isLoadingVotingData = isLoadingCycle || isLoadingTotalVotes || 
     (!!effectiveUserAddress && userVotesQuery.isLoading) || 
-    (!!effectiveUserAddress && isLoadingVotingPower);
+    isLoadingUserData; // NEW: Include user data loading
     
   const cycleEndTime = useMemo(() => {
     if (!cycleInfo) return null;
-    return new Date(Number(cycleInfo[1]) * 1000); // Use endTime from tuple
+    return new Date(Number(cycleInfo[1]) * 1000);
   }, [cycleInfo]);
   
-  const isCycleFinalized = cycleInfo?.[4] || false; // Use finalized from tuple
+  const isCycleFinalized = cycleInfo?.[4] || false;
   const canVote = !!effectiveUserAddress && !isLoadingVotingData && !isCycleFinalized && 
-                  (availableVotingPower || BigInt(0)) > BigInt(0);
+                  userVotingData.availableVotingPower > BigInt(0); // NOW USING CACHED DATA
   
   return {
-    // Core voting data
+    // Core voting data - NOW USING CACHED DATA WHERE POSSIBLE
     totalVotes: totalVotes || BigInt(0),
     userVotes: userVotesQuery.data || BigInt(0),
-    availableVotingPower: availableVotingPower || BigInt(0),
+    availableVotingPower: userVotingData.availableVotingPower, // FROM CACHE
     
-    // Debug info
-    totalWemarkBalance: totalWemark || BigInt(0),
-    totalVotingPower: totalVotingPower || BigInt(0),
+    // Debug info - NOW USING CACHED DATA
+    totalWemarkBalance: userVotingData.stakedBalance, // FROM CACHE
+    totalVotingPower: userVotingData.totalVotingPower, // FROM CACHE
     
     // Cycle information
     currentCycle: currentCycle ? Number(currentCycle) : 0,
@@ -478,7 +437,7 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     // Loading states
     isLoadingTotalVotes: isLoadingVotingData,
     isLoadingUserVotes: userVotesQuery.isLoading,
-    isLoadingVotingPower,
+    isLoadingVotingPower: isLoadingUserData, // NOW TRACKS CACHE LOADING
     isLoadingCycle,
     
     // Action states
@@ -492,16 +451,11 @@ export function useVoting(evermarkId: string, userAddress?: string) {
     // Actions
     delegateVotes,
     undelegateVotes,
-    delegateVotesBatch, // ✅ NEW: Batch voting function
+    delegateVotesBatch,
     clearMessages,
     
-    // Manual refresh
-    refresh: useCallback(() => {
-      refetchCycle();
-      refetchTotalVotes();
-      refetchVotingPower();
-      userVotesQuery.refetch?.();
-    }, [refetchCycle, refetchTotalVotes, refetchVotingPower, userVotesQuery]),
+    // ✅ NEW: Enhanced refresh that coordinates cache
+    refresh: refreshAllData,
     
     // Helper functions
     formatTimeRemaining: useCallback((seconds: number) => {
@@ -520,10 +474,11 @@ export function useVoting(evermarkId: string, userAddress?: string) {
       }
     }, []),
     
-    // ✅ Auth info for debugging
+    // Auth info for debugging
     authInfo: {
       effectiveUserAddress,
       isConnected,
     }
   };
 }
+
