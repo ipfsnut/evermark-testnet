@@ -1,4 +1,4 @@
-// src/lib/supabase.ts - Updated EvermarkRow interface
+// src/lib/supabase.ts - Updated EvermarkRow interface with proper types
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
-// FIXED: Updated database types to match your actual table structure
+// 🔧 FIXED: Updated database types to match actual table structure with proper image processing types
 export interface EvermarkRow {
   id: string;
   title: string;
@@ -28,26 +28,68 @@ export interface EvermarkRow {
     creationTime?: number;
     minter?: string;
     referrer?: string;
-    // FIXED: Add the actual nested structure we see in the data
+    // 🔧 FIXED: Added the actual nested structure we see in the data
     source?: string;
     tokenId?: number;
     syncedAt?: string;
     tokenURI?: string;
+    doi?: string;
+    isbn?: string;
+    farcasterData?: any;
+    tags?: string[];
+    category?: string;
     originalMetadata?: {
       name?: string;
       image?: string;
       description?: string;
       external_url?: string;
       attributes?: Array<{ trait_type: string; value: string; }>;
-      evermark?: any;
+      evermark?: {
+        version?: string;
+        schema?: string;
+        sourceUrl?: string;
+        author?: string;
+        contentType?: string;
+        customFields?: Array<{ key: string; value: string; }>;
+        tags?: string[];
+        doi?: string;
+        isbn?: string;
+        url?: string;
+        castUrl?: string;
+        publisher?: string;
+        publicationDate?: string;
+        journal?: string;
+        volume?: string;
+        issue?: string;
+        pages?: string;
+        farcasterData?: {
+          castHash?: string;
+          author?: string;
+          username?: string;
+          authorFid?: number;
+          content?: string;
+          timestamp?: string;
+          canonicalUrl?: string;
+          embeds?: any[];
+          mentions?: any[];
+          parentHash?: string;
+          rootParentHash?: string;
+          likes?: number;
+          recasts?: number;
+          replies?: number;
+        };
+        createdAt?: string;
+        createdBy?: string;
+        platform?: string;
+      };
     } | null;
   };
   last_synced_at?: string;
   tx_hash?: string;
   block_number?: bigint;
-  // FIXED: Added the missing image processing columns
+  // 🔧 FIXED: Image processing columns with proper type constraints
   processed_image_url?: string;
-  image_processing_status?: string;
+  image_processing_status?: 'pending' | 'processing' | 'completed' | 'failed';
   image_processed_at?: string;
 }
 
@@ -70,12 +112,12 @@ export interface LeaderboardRow {
   updated_at: string;
 }
 
-// Supabase data operations
+// Supabase data operations (keeping existing implementation)
 export class SupabaseService {
   
   /**
    * Get evermarks with pagination and filtering
-   * FIXED: Select the processed_image_url column
+   * 🔧 FIXED: Select the processed_image_url column
    */
   static async getEvermarks(options: {
     page?: number;
@@ -138,7 +180,7 @@ export class SupabaseService {
 
   /**
    * Get recent evermarks (last N)
-   * FIXED: Select the processed_image_url column
+   * 🔧 FIXED: Select the processed_image_url column
    */
   static async getRecentEvermarks(limit = 10) {
     const { data, error } = await supabase
@@ -156,7 +198,7 @@ export class SupabaseService {
 
   /**
    * Get evermark by ID
-   * FIXED: Select the processed_image_url column
+   * 🔧 FIXED: Select the processed_image_url column
    */
   static async getEvermarkById(id: string) {
     const { data, error } = await supabase
@@ -187,9 +229,6 @@ export class SupabaseService {
       .order('amount', { ascending: false })
       .limit(limit);
 
-    // If cycleId is provided, we could filter by cycle (would need cycle_id in stakes table)
-    // For now, return overall leaderboard
-
     const { data, error } = await query;
 
     if (error) {
@@ -205,7 +244,7 @@ export class SupabaseService {
         description: entry.evermarks.description,
         creator: entry.evermarks.metadata?.creator || entry.evermarks.author,
         sourceUrl: entry.evermarks.metadata?.sourceUrl,
-        // FIXED: Use processed_image_url first, then check originalMetadata.image
+        // 🔧 FIXED: Use processed_image_url first, then check originalMetadata.image
         image: entry.evermarks.processed_image_url || 
                entry.evermarks.metadata?.originalMetadata?.image || 
                entry.evermarks.metadata?.image,
