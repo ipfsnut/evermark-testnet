@@ -155,13 +155,36 @@ export class TimestampProcessor {
    * Validate and normalize timestamp from multiple sources
    */
   static extractCreationTime(metadata: any): number {
+    // 🔧 FIXED: Updated to match your actual database structure
     const sources = [
+      // Direct metadata fields
       metadata?.creationTime,
-      metadata?.originalMetadata?.evermark?.createdAt,
-      metadata?.originalMetadata?.creationTime,
-      metadata?.timestamp,
       metadata?.created_at,
-      metadata?.syncedAt
+      metadata?.syncedAt,
+      metadata?.timestamp,
+      
+      // From originalMetadata.evermark (if it exists)
+      metadata?.originalMetadata?.evermark?.createdAt,
+      metadata?.originalMetadata?.evermark?.creationTime,
+      
+      // 🔧 NEW: From attributes array (your actual data structure!)
+      // Look for "Created" trait_type in attributes
+      (() => {
+        const attributes = metadata?.originalMetadata?.attributes;
+        if (Array.isArray(attributes)) {
+          const createdAttr = attributes.find(attr => 
+            attr?.trait_type === 'Created' || 
+            attr?.trait_type === 'created' ||
+            attr?.trait_type === 'createdAt'
+          );
+          return createdAttr?.value;
+        }
+        return null;
+      })(),
+      
+      // From top-level originalMetadata
+      metadata?.originalMetadata?.createdAt,
+      metadata?.originalMetadata?.created_at,
     ];
 
     for (const source of sources) {
@@ -169,12 +192,13 @@ export class TimestampProcessor {
         const timestamp = this.toUnixTimestamp(source);
         // Sanity check - should be between 2020 and 2030
         if (timestamp > 1577836800 && timestamp < 1893456000) {
+          console.log('✅ Found valid timestamp:', source, '→', timestamp);
           return timestamp;
         }
       }
     }
 
-    console.warn('⚠️ No valid timestamp found in metadata, using current time');
+    console.warn('⚠️ No valid timestamp found in metadata, using current time. Sources checked:', sources.filter(Boolean));
     return Math.floor(Date.now() / 1000);
   }
 }
@@ -342,18 +366,35 @@ export class MetadataTransformer {
    * Resolve author vs creator attribution consistently
    */
   private static resolveAttribution(row: EvermarkRow): { author: string; creator: string } {
+    // 🔧 FIXED: Handle your actual data structure with attributes
+    
+    // Extract author from attributes array
+    const getFromAttributes = (traitType: string) => {
+      const attributes = row.metadata?.originalMetadata?.attributes;
+      if (Array.isArray(attributes)) {
+        const attr = attributes.find(a => a?.trait_type === traitType);
+        return attr?.value;
+      }
+      return null;
+    };
+
     // Priority order for author
     const authorSources = [
-      row.author,
-      row.metadata?.originalMetadata?.evermark?.author, // Fix: Use evermark.author instead of originalMetadata.author
+      row.author, // Direct from table
+      getFromAttributes('Author'), // From your attributes structure
+      getFromAttributes('author'),
+      row.metadata?.originalMetadata?.evermark?.author,
       row.metadata?.creator,
+      row.metadata?.originalMetadata?.name, // Fallback to name
       'Unknown Author'
     ];
 
-    // Priority order for creator (contract/blockchain creator)
+    // Priority order for creator (contract/blockchain creator)  
     const creatorSources = [
       row.metadata?.minter,
       row.metadata?.creator,
+      getFromAttributes('Creator'),
+      getFromAttributes('Minter'),
       row.user_id,
       'Unknown Creator'
     ];
@@ -369,9 +410,30 @@ export class MetadataTransformer {
    */
   private static detectContentType(row: EvermarkRow): StandardizedEvermark['contentType'] {
     const metadata = row.metadata;
-    const evermarkData = metadata?.originalMetadata?.evermark;
     
-    // Check in evermark nested data first (more specific)
+    // 🔧 FIXED: Check attributes for Content Type
+    const getFromAttributes = (traitType: string) => {
+      const attributes = metadata?.originalMetadata?.attributes;
+      if (Array.isArray(attributes)) {
+        const attr = attributes.find(a => a?.trait_type === traitType);
+        return attr?.value;
+      }
+      return null;
+    };
+
+    const contentTypeFromAttributes = getFromAttributes('Content Type');
+    
+    // Map your attribute values to our types
+    if (contentTypeFromAttributes) {
+      if (contentTypeFromAttributes.includes('DOI')) return 'DOI';
+      if (contentTypeFromAttributes.includes('ISBN')) return 'ISBN';
+      if (contentTypeFromAttributes.includes('Cast') || contentTypeFromAttributes.includes('Farcaster')) return 'Cast';
+      if (contentTypeFromAttributes.includes('URL') || contentTypeFromAttributes.includes('Web')) return 'URL';
+      if (contentTypeFromAttributes.includes('Custom')) return 'Custom';
+    }
+    
+    // Fallback to checking evermark data
+    const evermarkData = metadata?.originalMetadata?.evermark;
     if (evermarkData?.doi || metadata?.doi) return 'DOI';
     if (evermarkData?.isbn || metadata?.isbn) return 'ISBN';
     if (evermarkData?.farcasterData || metadata?.farcasterData) return 'Cast';
@@ -385,14 +447,26 @@ export class MetadataTransformer {
    */
   private static extractSourceUrl(row: EvermarkRow): string {
     const metadata = row.metadata;
-    const evermarkData = metadata?.originalMetadata?.evermark;
+    
+    // 🔧 FIXED: Check attributes for Source URL
+    const getFromAttributes = (traitType: string) => {
+      const attributes = metadata?.originalMetadata?.attributes;
+      if (Array.isArray(attributes)) {
+        const attr = attributes.find(a => a?.trait_type === traitType);
+        return attr?.value;
+      }
+      return null;
+    };
     
     const sources = [
-      evermarkData?.sourceUrl,
+      getFromAttributes('Source URL'), // From your attributes structure
+      getFromAttributes('source_url'),
+      getFromAttributes('sourceUrl'),
       metadata?.originalMetadata?.external_url,
       metadata?.sourceUrl,
-      evermarkData?.farcasterData?.canonicalUrl,
-      evermarkData?.castUrl,
+      metadata?.originalMetadata?.evermark?.sourceUrl,
+      metadata?.originalMetadata?.evermark?.farcasterData?.canonicalUrl,
+      metadata?.originalMetadata?.evermark?.castUrl,
       ''
     ];
 
