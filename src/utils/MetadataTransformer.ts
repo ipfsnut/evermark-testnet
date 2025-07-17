@@ -1,688 +1,423 @@
-// src/utils/MetadataTransformer.ts - Centralized metadata processing and validation
-import type { EvermarkRow } from '../lib/supabase';
+// src/utils/MetadataTransformer.ts - Fixed version with proper imports and types
+import type { EvermarkRow } from '../lib/supabase'; // ✅ FIXED: Add the missing import
 
-// 🎯 UNIFIED: Single source of truth for all Evermark metadata
 export interface StandardizedEvermark {
-  id: string;
+  id: string;                         // String version of token_id for component compatibility
+  tokenId: number;                    // Actual numeric token_id
   title: string;
-  description: string;
   author: string;
-  creator: string; // Contract address or verified creator
-  
-  // 🔧 FIXED: Consistent timestamp handling
-  creationTime: number; // Always Unix timestamp in seconds
-  createdAt: string; // Always ISO string
-  updatedAt: string; // Always ISO string
-  
-  // 🔧 FIXED: Reliable image resolution
-  image: string; // Processed, verified image URL
-  imageStatus: 'processed' | 'processing' | 'failed' | 'none';
-  
-  // Content source info
-  sourceUrl: string;
-  contentType: 'DOI' | 'ISBN' | 'URL' | 'Cast' | 'Custom';
-  
-  // Blockchain data
+  description: string;
+  sourceUrl?: string;
+  image?: string;
   metadataURI: string;
-  txHash: string;
-  blockNumber: number;
-  
-  // Additional metadata
-  tags: string[];
-  category: string;
+  creator: string;
+  creationTime: number;
   verified: boolean;
-  
-  // 🔧 FIXED: Type-safe metadata instead of any
-  extendedMetadata: EvermarkExtendedMetadata;
-}
-
-// 🎯 TYPED: Replace any types with proper interfaces
-export interface EvermarkExtendedMetadata {
-  // Source tracking
-  source: 'blockchain' | 'api' | 'manual';
-  syncedAt?: string;
-  
-  // Content-specific data
-  doi?: string;
-  isbn?: string;
-  castData?: FarcasterCastMetadata;
-  
-  // Processing status
-  imageProcessing?: {
-    status: 'pending' | 'completed' | 'failed';
-    processedAt?: string;
-    originalUrl?: string;
-    processingErrors?: string[];
+  imageStatus: 'processed' | 'processing' | 'failed' | 'none';
+  extendedMetadata: {
+    doi?: string;
+    isbn?: string;
+    castData?: {
+      castHash?: string;
+      author?: string;
+      username?: string;
+      content?: string;
+      timestamp?: string;
+      engagement?: {
+        likes: number;
+        recasts: number;
+        replies: number;
+      };
+    };
+    tags?: string[];
+    customFields?: Array<{ key: string; value: string }>;
   };
-  
-  // Creator verification
-  creatorVerification?: {
-    method: 'farcaster' | 'wallet' | 'ens' | 'manual';
-    verified: boolean;
-    verifiedAt?: string;
-  };
-  
-  // Engagement data (if available)
-  engagement?: {
-    views: number;
-    votes: string; // BigInt as string
-    lastUpdated: string;
-  };
+  tags: string[];
+  contentType: 'DOI' | 'ISBN' | 'Cast' | 'URL' | 'Custom';
+  createdAt: string;
+  updatedAt: string;
+  lastSyncedAt?: string;
+  votes?: number;
 }
 
-export interface FarcasterCastMetadata {
-  castHash: string;
-  authorFid: number;
-  authorUsername: string;
-  authorDisplayName: string;
-  originalText: string;
-  timestamp: string;
-  engagement: {
-    likes: number;
-    recasts: number;
-    replies: number;
-  };
-  canonicalUrl: string;
+export interface MetadataValidation {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
 }
 
-// 🚨 CRITICAL FIX: Centralized timestamp handling
-export class TimestampProcessor {
-  /**
-   * Convert any timestamp format to reliable Unix timestamp (seconds)
-   */
-  static toUnixTimestamp(input: any): number {
-    if (!input) {
-      console.warn('⚠️ No timestamp provided, using current time');
-      return Math.floor(Date.now() / 1000);
-    }
-
-    try {
-      // Already a number - validate range
-      if (typeof input === 'number') {
-        // If it looks like milliseconds, convert to seconds
-        if (input > 1e12) {
-          return Math.floor(input / 1000);
-        }
-        // If it's a reasonable Unix timestamp (after 2020)
-        if (input > 1577836800) { // Jan 1, 2020
-          return Math.floor(input);
-        }
-        // If it's too small, might be a mistake - use current time
-        console.warn('⚠️ Suspicious timestamp value:', input);
-        return Math.floor(Date.now() / 1000);
-      }
-
-      // String input - try parsing
-      if (typeof input === 'string') {
-        const parsed = new Date(input);
-        if (isNaN(parsed.getTime())) {
-          console.warn('⚠️ Invalid date string:', input);
-          return Math.floor(Date.now() / 1000);
-        }
-        return Math.floor(parsed.getTime() / 1000);
-      }
-
-      // BigInt input (from blockchain)
-      if (typeof input === 'bigint') {
-        const num = Number(input);
-        // Blockchain timestamps are usually in seconds
-        if (num > 1577836800) {
-          return num;
-        }
-      }
-
-      console.warn('⚠️ Unrecognized timestamp format:', typeof input, input);
-      return Math.floor(Date.now() / 1000);
-    } catch (error) {
-      console.error('❌ Timestamp processing error:', error, input);
-      return Math.floor(Date.now() / 1000);
-    }
-  }
-
-  /**
-   * Convert Unix timestamp to ISO string
-   */
-  static toISOString(unixTimestamp: number): string {
-    try {
-      return new Date(unixTimestamp * 1000).toISOString();
-    } catch (error) {
-      console.error('❌ ISO conversion error:', error);
-      return new Date().toISOString();
-    }
-  }
-
-  /**
-   * Validate and normalize timestamp from multiple sources
-   */
-  static extractCreationTime(metadata: any): number {
-    // 🔧 FIXED: Updated to match your actual database structure
-    const sources = [
-      // Direct metadata fields
-      metadata?.creationTime,
-      metadata?.created_at,
-      metadata?.syncedAt,
-      metadata?.timestamp,
-      
-      // From originalMetadata.evermark (if it exists)
-      metadata?.originalMetadata?.evermark?.createdAt,
-      metadata?.originalMetadata?.evermark?.creationTime,
-      
-      // 🔧 NEW: From attributes array (your actual data structure!)
-      // Look for "Created" trait_type in attributes
-      (() => {
-        const attributes = metadata?.originalMetadata?.attributes;
-        if (Array.isArray(attributes)) {
-          const createdAttr = attributes.find(attr => 
-            attr?.trait_type === 'Created' || 
-            attr?.trait_type === 'created' ||
-            attr?.trait_type === 'createdAt'
-          );
-          return createdAttr?.value;
-        }
-        return null;
-      })(),
-      
-      // From top-level originalMetadata
-      metadata?.originalMetadata?.createdAt,
-      metadata?.originalMetadata?.created_at,
-    ];
-
-    for (const source of sources) {
-      if (source) {
-        const timestamp = this.toUnixTimestamp(source);
-        // Sanity check - should be between 2020 and 2030
-        if (timestamp > 1577836800 && timestamp < 1893456000) {
-          console.log('✅ Found valid timestamp:', source, '→', timestamp);
-          return timestamp;
-        }
-      }
-    }
-
-    console.warn('⚠️ No valid timestamp found in metadata, using current time. Sources checked:', sources.filter(Boolean));
-    return Math.floor(Date.now() / 1000);
-  }
-}
-
-// 🔥 HIGH: Standardized image resolution with clear fallback hierarchy
-export class ImageResolver {
-  // 🔧 FIXED: Make FALLBACK_IMAGE public so it can be accessed
-  static readonly FALLBACK_IMAGE = '/images/evermark-placeholder.svg';
-  private static readonly IPFS_GATEWAYS = [
-    'https://gateway.pinata.cloud/ipfs/',
-    'https://ipfs.io/ipfs/',
-    'https://cloudflare-ipfs.com/ipfs/',
-    'https://dweb.link/ipfs/'
-  ];
-
-  /**
-   * Resolve image URL with clear priority order and validation
-   */
-  static resolveImageUrl(data: Partial<EvermarkRow>): string {
-    // Priority order for image sources
-    const imageSources = [
-      // 1. Processed image (highest priority)
-      data.processed_image_url,
-      
-      // 2. Original metadata image
-      data.metadata?.originalMetadata?.image,
-      
-      // 3. General metadata image
-      data.metadata?.image,
-      
-      // 4. Legacy image field - safely access nested properties
-      data.metadata && typeof data.metadata === 'object' && 'imageUrl' in data.metadata ? 
-        (data.metadata as any).imageUrl : undefined,
-      
-      // 5. Fallback
-      this.FALLBACK_IMAGE
-    ];
-
-    for (const source of imageSources) {
-      if (source) {
-        const resolved = this.processImageUrl(source);
-        if (resolved) return resolved;
-      }
-    }
-
-    return this.FALLBACK_IMAGE;
-  }
-
-  /**
-   * Process individual image URL with IPFS handling
-   */
-  private static processImageUrl(url: string): string | null {
-    if (!url || typeof url !== 'string') return null;
-
-    try {
-      // Handle IPFS URLs
-      if (url.startsWith('ipfs://')) {
-        const hash = url.replace('ipfs://', '');
-        // Use first gateway as primary
-        return `${this.IPFS_GATEWAYS[0]}${hash}`;
-      }
-
-      // Validate HTTP URLs
-      if (url.startsWith('http://') || url.startsWith('https://')) {
-        new URL(url); // Throws if invalid
-        return url;
-      }
-
-      // Handle relative URLs
-      if (url.startsWith('/')) {
-        return url;
-      }
-
-      // If it looks like an IPFS hash without prefix
-      if (/^Qm[a-zA-Z0-9]{44}$/.test(url) || /^b[a-z2-7]{58}$/.test(url)) {
-        return `${this.IPFS_GATEWAYS[0]}${url}`;
-      }
-
-      return null;
-    } catch (error) {
-      console.warn('⚠️ Invalid image URL:', url, error);
-      return null;
-    }
-  }
-
-  /**
-   * Get image processing status
-   */
-  static getImageStatus(data: Partial<EvermarkRow>): StandardizedEvermark['imageStatus'] {
-    if (data.processed_image_url) return 'processed';
-    if (data.image_processing_status === 'processing') return 'processing';
-    if (data.image_processing_status === 'failed') return 'failed';
-    return 'none';
-  }
-
-  /**
-   * Generate multiple IPFS gateway URLs for redundancy
-   */
-  static getIpfsGatewayUrls(ipfsHash: string): string[] {
-    const cleanHash = ipfsHash.replace('ipfs://', '');
-    return this.IPFS_GATEWAYS.map(gateway => `${gateway}${cleanHash}`);
-  }
-}
-
-// ⚠️ MEDIUM: Unified metadata transformation
 export class MetadataTransformer {
   /**
-   * Convert EvermarkRow to StandardizedEvermark with full validation
+   * ✅ FIXED: Transform EvermarkRow to StandardizedEvermark for new schema
    */
   static transform(row: EvermarkRow): StandardizedEvermark {
-    try {
-      // 🔧 FIXED: Reliable timestamp processing
-      const creationTime = TimestampProcessor.extractCreationTime(row.metadata);
-      const createdAt = row.created_at || TimestampProcessor.toISOString(creationTime);
-      const updatedAt = row.updated_at || createdAt;
+    return {
+      // ✅ FIXED: Create string id from token_id for component compatibility
+      id: row.token_id.toString(),
+      tokenId: row.token_id,
+      
+      // Core fields from your new schema
+      title: row.title,
+      author: row.author,
+      description: row.description || '',
+      sourceUrl: row.source_url || '',
+      metadataURI: row.token_uri || '',
+      creator: row.owner || row.author,
+      creationTime: new Date(row.created_at).getTime() / 1000,
+      verified: row.verified || false,
+      
+      // ✅ FIXED: Image processing from your new schema
+      image: row.processed_image_url || this.extractImageFromMetadata(row.metadata),
+      imageStatus: this.mapImageStatus(row.image_processing_status),
+      
+      // ✅ FIXED: Handle your schema's metadata structure
+      extendedMetadata: this.extractExtendedMetadata(row),
+      
+      // Timestamps
+      createdAt: row.created_at,
+      updatedAt: row.updated_at || row.created_at,
+      lastSyncedAt: row.sync_timestamp,
+      
+      // Additional fields
+      tags: this.extractTags(row.metadata),
+      contentType: this.determineContentType(row)
+    };
+  }
 
-      // 🔧 FIXED: Reliable image resolution
-      const image = ImageResolver.resolveImageUrl(row);
-      const imageStatus = ImageResolver.getImageStatus(row);
-
-      // 🔧 FIXED: Author/Creator attribution consistency
-      const { author, creator } = this.resolveAttribution(row);
-
-      // 🔧 FIXED: Content type detection
-      const contentType = this.detectContentType(row);
-
-      // 🔧 FIXED: Type-safe metadata extraction
-      const extendedMetadata = this.extractExtendedMetadata(row);
-
-      return {
-        id: row.id,
-        title: row.title || `Evermark #${row.id}`,
-        description: row.description || '',
-        author,
-        creator,
-        
-        creationTime,
-        createdAt,
-        updatedAt,
-        
-        image,
-        imageStatus,
-        
-        sourceUrl: this.extractSourceUrl(row),
-        contentType,
-        
-        metadataURI: row.metadata?.metadataURI || row.metadata?.tokenURI || '',
-        txHash: row.tx_hash || '',
-        blockNumber: Number(row.block_number) || 0,
-        
-        tags: this.extractTags(row),
-        category: this.extractCategory(row),
-        verified: row.verified || false,
-        
-        extendedMetadata
-      };
-    } catch (error) {
-      console.error('❌ Metadata transformation error:', error, row);
-      // Return safe fallback
-      return this.createFallbackEvermark(row);
+  /**
+   * ✅ FIXED: Map image processing status from new schema
+   */
+  private static mapImageStatus(status?: string): StandardizedEvermark['imageStatus'] {
+    switch (status) {
+      case 'completed': return 'processed';
+      case 'processing': return 'processing';
+      case 'failed': return 'failed';
+      case 'pending': return 'processing';
+      default: return 'none';
     }
   }
 
   /**
-   * Resolve author vs creator attribution consistently
+   * ✅ FIXED: Determine content type from new schema fields
    */
-  private static resolveAttribution(row: EvermarkRow): { author: string; creator: string } {
-    // 🔧 FIXED: Handle your actual data structure with attributes
-    
-    // Extract author from attributes array
-    const getFromAttributes = (traitType: string) => {
-      const attributes = row.metadata?.originalMetadata?.attributes;
-      if (Array.isArray(attributes)) {
-        const attr = attributes.find(a => a?.trait_type === traitType);
-        return attr?.value;
-      }
-      return null;
-    };
-
-    // Priority order for author
-    const authorSources = [
-      row.author, // Direct from table
-      getFromAttributes('Author'), // From your attributes structure
-      getFromAttributes('author'),
-      row.metadata?.originalMetadata?.evermark?.author,
-      row.metadata?.creator,
-      row.metadata?.originalMetadata?.name, // Fallback to name
-      'Unknown Author'
-    ];
-
-    // Priority order for creator (contract/blockchain creator)  
-    const creatorSources = [
-      row.metadata?.minter,
-      row.metadata?.creator,
-      getFromAttributes('Creator'),
-      getFromAttributes('Minter'),
-      row.user_id,
-      'Unknown Creator'
-    ];
-
-    const author = authorSources.find(Boolean) || 'Unknown Author';
-    const creator = creatorSources.find(Boolean) || 'Unknown Creator';
-
-    return { author, creator };
-  }
-
-  /**
-   * Detect content type from metadata
-   */
-  private static detectContentType(row: EvermarkRow): StandardizedEvermark['contentType'] {
-    const metadata = row.metadata;
-    
-    // 🔧 FIXED: Check attributes for Content Type
-    const getFromAttributes = (traitType: string) => {
-      const attributes = metadata?.originalMetadata?.attributes;
-      if (Array.isArray(attributes)) {
-        const attr = attributes.find(a => a?.trait_type === traitType);
-        return attr?.value;
-      }
-      return null;
-    };
-
-    const contentTypeFromAttributes = getFromAttributes('Content Type');
-    
-    // Map your attribute values to our types
-    if (contentTypeFromAttributes) {
-      if (contentTypeFromAttributes.includes('DOI')) return 'DOI';
-      if (contentTypeFromAttributes.includes('ISBN')) return 'ISBN';
-      if (contentTypeFromAttributes.includes('Cast') || contentTypeFromAttributes.includes('Farcaster')) return 'Cast';
-      if (contentTypeFromAttributes.includes('URL') || contentTypeFromAttributes.includes('Web')) return 'URL';
-      if (contentTypeFromAttributes.includes('Custom')) return 'Custom';
+  private static determineContentType(row: EvermarkRow): StandardizedEvermark['contentType'] {
+    // Check content_type field first
+    if (row.content_type) {
+      const type = row.content_type.toLowerCase();
+      if (type.includes('cast')) return 'Cast';
+      if (type.includes('doi')) return 'DOI';
+      if (type.includes('isbn')) return 'ISBN';
+      if (type.includes('url')) return 'URL';
     }
-    
-    // Fallback to checking evermark data
-    const evermarkData = metadata?.originalMetadata?.evermark;
-    if (evermarkData?.doi || metadata?.doi) return 'DOI';
-    if (evermarkData?.isbn || metadata?.isbn) return 'ISBN';
-    if (evermarkData?.farcasterData || metadata?.farcasterData) return 'Cast';
-    if (evermarkData?.sourceUrl || metadata?.originalMetadata?.external_url || metadata?.sourceUrl) return 'URL';
-    
+
+    // Check metadata for content type hints
+    const metadata = row.metadata || row.metadata_json || row.ipfs_metadata;
+    if (metadata) {
+      if (metadata.doi || metadata.originalMetadata?.doi) return 'DOI';
+      if (metadata.isbn || metadata.originalMetadata?.isbn) return 'ISBN';
+      if (metadata.farcasterData || metadata.originalMetadata?.farcasterData) return 'Cast';
+      if (metadata.sourceUrl || metadata.originalMetadata?.external_url) return 'URL';
+    }
+
     return 'Custom';
   }
 
   /**
-   * Extract source URL consistently
+   * ✅ FIXED: Extract image from multiple metadata sources
    */
-  private static extractSourceUrl(row: EvermarkRow): string {
-    const metadata = row.metadata;
-    
-    // 🔧 FIXED: Check attributes for Source URL
-    const getFromAttributes = (traitType: string) => {
-      const attributes = metadata?.originalMetadata?.attributes;
-      if (Array.isArray(attributes)) {
-        const attr = attributes.find(a => a?.trait_type === traitType);
-        return attr?.value;
-      }
-      return null;
-    };
-    
-    const sources = [
-      getFromAttributes('Source URL'), // From your attributes structure
-      getFromAttributes('source_url'),
-      getFromAttributes('sourceUrl'),
-      metadata?.originalMetadata?.external_url,
-      metadata?.sourceUrl,
-      metadata?.originalMetadata?.evermark?.sourceUrl,
-      metadata?.originalMetadata?.evermark?.farcasterData?.canonicalUrl,
-      metadata?.originalMetadata?.evermark?.castUrl,
-      ''
-    ];
+  private static extractImageFromMetadata(metadata: any): string | undefined {
+    if (!metadata) return undefined;
 
-    return sources.find(Boolean) || '';
+    // Try different metadata structures
+    return metadata.image ||
+           metadata.originalMetadata?.image ||
+           metadata.evermark?.image ||
+           undefined;
   }
 
   /**
-   * Extract tags with fallbacks
+   * ✅ FIXED: Extract extended metadata from various sources
    */
-  private static extractTags(row: EvermarkRow): string[] {
-    const metadata = row.metadata;
-    const evermarkData = metadata?.originalMetadata?.evermark;
-    
-    const tagSources = [
-      evermarkData?.tags,
-      metadata?.tags,
-      // Safely access keywords if it exists
-      metadata?.originalMetadata && typeof metadata.originalMetadata === 'object' && 'keywords' in metadata.originalMetadata ?
-        (metadata.originalMetadata as any).keywords : undefined
-    ];
+  private static extractExtendedMetadata(row: EvermarkRow): StandardizedEvermark['extendedMetadata'] {
+    const metadata = row.metadata || row.metadata_json || row.ipfs_metadata || {};
+    const originalMetadata = metadata.originalMetadata || {};
+    const evermarkMetadata = originalMetadata.evermark || {};
 
-    for (const source of tagSources) {
-      if (Array.isArray(source)) {
-        return source.filter(tag => typeof tag === 'string' && tag.trim().length > 0);
-      }
-    }
-
-    return [];
-  }
-
-  /**
-   * Extract category with fallbacks
-   */
-  private static extractCategory(row: EvermarkRow): string {
-    const metadata = row.metadata;
-    const evermarkData = metadata?.originalMetadata?.evermark;
-    
-    const categorySources = [
-      evermarkData?.contentType,
-      metadata?.category,
-      // Safely access genre if it exists
-      metadata?.originalMetadata && typeof metadata.originalMetadata === 'object' && 'genre' in metadata.originalMetadata ?
-        (metadata.originalMetadata as any).genre : undefined,
-      'general'
-    ];
-
-    return categorySources.find(Boolean) || 'general';
-  }
-
-  /**
-   * Extract extended metadata safely with proper type checking
-   */
-  private static extractExtendedMetadata(row: EvermarkRow): EvermarkExtendedMetadata {
-    const metadata = row.metadata;
-    const evermarkData = metadata?.originalMetadata?.evermark;
-    
-    // 🔧 FIXED: Ensure source is typed correctly
-    let source: 'blockchain' | 'api' | 'manual' = 'manual';
-    if (metadata?.source === 'blockchain' || metadata?.source === 'api' || metadata?.source === 'manual') {
-      source = metadata.source;
-    }
-    
-    const extended: EvermarkExtendedMetadata = {
-      source,
-      syncedAt: metadata?.syncedAt
-    };
-
-    // Content-specific data - check both locations
-    if (evermarkData?.doi || metadata?.doi) {
-      extended.doi = evermarkData?.doi || metadata?.doi;
-    }
-    if (evermarkData?.isbn || metadata?.isbn) {
-      extended.isbn = evermarkData?.isbn || metadata?.isbn;
-    }
-
-    // Enhanced Farcaster cast data extraction
-    const farcasterData = evermarkData?.farcasterData || metadata?.farcasterData;
-    if (farcasterData) {
-      extended.castData = {
-        castHash: farcasterData.castHash || '',
-        authorFid: farcasterData.authorFid || 0,
-        authorUsername: farcasterData.username || '',
-        authorDisplayName: farcasterData.author || '',
-        originalText: farcasterData.content || '',
-        timestamp: farcasterData.timestamp || '',
-        engagement: {
-          likes: farcasterData.likes || 0,
-          recasts: farcasterData.recasts || 0,
-          replies: farcasterData.replies || 0
-        },
-        canonicalUrl: farcasterData.canonicalUrl || ''
-      };
-    }
-
-    // 🔧 FIXED: Handle image processing status type safely
-    if (row.image_processing_status) {
-      const status = row.image_processing_status;
-      let processedStatus: 'pending' | 'completed' | 'failed';
-      
-      // 🔧 FIXED: Map the actual status values to our expected types
-      if (status === 'completed') {
-        processedStatus = 'completed';
-      } else if (status === 'failed') {
-        processedStatus = 'failed';
-      } else {
-        // 'processing' or 'pending' both map to 'pending'
-        processedStatus = 'pending';
-      }
-
-      extended.imageProcessing = {
-        status: processedStatus,
-        processedAt: row.image_processed_at,
-        originalUrl: metadata?.originalMetadata?.image || metadata?.image
-      };
-    }
-
-    return extended;
-  }
-
-  /**
-   * Create safe fallback Evermark
-   */
-  private static createFallbackEvermark(row: EvermarkRow): StandardizedEvermark {
-    const now = Math.floor(Date.now() / 1000);
-    
     return {
-      id: row.id || 'unknown',
-      title: row.title || `Evermark #${row.id}`,
-      description: row.description || 'Failed to process metadata',
-      author: row.author || 'Unknown Author',
-      creator: 'Unknown Creator',
-      
-      creationTime: now,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      
-      image: ImageResolver.FALLBACK_IMAGE,
-      imageStatus: 'failed',
-      
-      sourceUrl: '',
-      contentType: 'Custom',
-      
-      metadataURI: '',
-      txHash: '',
-      blockNumber: 0,
-      
-      tags: [],
-      category: 'general',
-      verified: false,
-      
-      extendedMetadata: {
-        source: 'manual'
-      }
+      doi: metadata.doi || originalMetadata.doi || evermarkMetadata.doi,
+      isbn: metadata.isbn || originalMetadata.isbn || evermarkMetadata.isbn,
+      castData: this.extractCastData(metadata, originalMetadata, evermarkMetadata),
+      tags: this.extractTags(metadata),
+      customFields: evermarkMetadata.customFields || []
     };
   }
 
   /**
-   * Batch transform multiple rows efficiently
+   * ✅ FIXED: Extract Farcaster cast data from metadata
    */
-  static transformBatch(rows: EvermarkRow[]): StandardizedEvermark[] {
-    return rows.map(row => this.transform(row));
+  private static extractCastData(
+    metadata: any, 
+    originalMetadata: any, 
+    evermarkMetadata: any
+  ): StandardizedEvermark['extendedMetadata']['castData'] {
+    const farcasterData = metadata.farcasterData || 
+                         originalMetadata.farcasterData || 
+                         evermarkMetadata.farcasterData;
+
+    if (!farcasterData) return undefined;
+
+    return {
+      castHash: farcasterData.castHash,
+      author: farcasterData.author,
+      username: farcasterData.username,
+      content: farcasterData.content,
+      timestamp: farcasterData.timestamp,
+      engagement: farcasterData.likes !== undefined ? {
+        likes: farcasterData.likes || 0,
+        recasts: farcasterData.recasts || 0,
+        replies: farcasterData.replies || 0
+      } : undefined
+    };
   }
 
   /**
-   * Validate transformed Evermark
+   * ✅ FIXED: Extract tags from metadata
    */
-  static validate(evermark: StandardizedEvermark): { isValid: boolean; errors: string[] } {
-    const errors: string[] = [];
+  private static extractTags(metadata: any): string[] {
+    if (!metadata) return [];
 
-    if (!evermark.id) errors.push('Missing ID');
+    const tags = metadata.tags || 
+                metadata.originalMetadata?.tags || 
+                metadata.originalMetadata?.evermark?.tags || 
+                [];
+
+    return Array.isArray(tags) ? tags : [];
+  }
+
+  /**
+   * Validate standardized evermark data
+   */
+  static validate(evermark: StandardizedEvermark): MetadataValidation {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    // Required field validation
+    if (!evermark.id) errors.push('Missing id');
     if (!evermark.title) errors.push('Missing title');
-    if (evermark.creationTime < 1577836800) errors.push('Invalid creation time');
-    if (!evermark.image || evermark.image === '') errors.push('Missing image');
+    if (!evermark.author) errors.push('Missing author');
+    if (!evermark.tokenId || evermark.tokenId < 1) errors.push('Invalid tokenId');
+
+    // Data consistency checks
+    if (evermark.id !== evermark.tokenId.toString()) {
+      warnings.push('ID does not match tokenId');
+    }
+
+    // Image validation
+    if (evermark.imageStatus === 'failed' && evermark.image) {
+      warnings.push('Image processing failed but image URL exists');
+    }
+
+    // Content type validation
+    if (evermark.contentType === 'DOI' && !evermark.extendedMetadata.doi) {
+      warnings.push('Content type is DOI but no DOI found in metadata');
+    }
+
+    if (evermark.contentType === 'Cast' && !evermark.extendedMetadata.castData) {
+      warnings.push('Content type is Cast but no cast data found');
+    }
 
     return {
       isValid: errors.length === 0,
-      errors
+      errors,
+      warnings
     };
   }
 }
 
-// 📋 LOW: Type-safe utilities
-export class MetadataValidation {
-  /**
-   * Check if metadata contains required fields
-   */
-  static hasRequiredFields(metadata: any): boolean {
-    return !!(
-      metadata &&
-      (metadata.title || metadata.name) &&
-      (metadata.author || metadata.creator)
-    );
+export class TimestampProcessor {
+  static toUnixTimestamp(dateString: string | number | null | undefined): number {
+    // ✅ FIXED: Handle various input types safely
+    if (!dateString) return Math.floor(Date.now() / 1000);
+    
+    if (typeof dateString === 'number') {
+      // If it's already a number, check if it's in milliseconds or seconds
+      if (dateString > 1000000000000) {
+        // Looks like milliseconds, convert to seconds
+        return Math.floor(dateString / 1000);
+      }
+      // Already in seconds
+      return dateString;
+    }
+    
+    if (typeof dateString === 'string') {
+      const parsed = new Date(dateString);
+      if (isNaN(parsed.getTime())) {
+        console.warn('Invalid date string:', dateString);
+        return Math.floor(Date.now() / 1000);
+      }
+      return Math.floor(parsed.getTime() / 1000);
+    }
+    
+    return Math.floor(Date.now() / 1000);
   }
 
-  /**
-   * Sanitize metadata to prevent XSS
-   */
-  static sanitizeString(input: string): string {
-    if (typeof input !== 'string') return '';
-    
-    return input
-      .replace(/[<>]/g, '') // Remove basic HTML
-      .trim()
-      .substring(0, 1000); // Limit length
+  static toISOString(timestamp: number): string {
+    return new Date(timestamp * 1000).toISOString();
   }
 
-  /**
-   * Validate IPFS hash format
-   */
-  static isValidIpfsHash(hash: string): boolean {
-    if (!hash || typeof hash !== 'string') return false;
-    
-    const cleanHash = hash.replace('ipfs://', '');
-    return /^Qm[a-zA-Z0-9]{44}$/.test(cleanHash) || 
-           /^b[a-z2-7]{58}$/.test(cleanHash);
+  static formatForDisplay(timestamp: number): string {
+    return new Date(timestamp * 1000).toLocaleDateString();
   }
 }
+
+export class ImageResolver {
+  private static readonly IPFS_GATEWAYS = [
+    'https://gateway.pinata.cloud/ipfs/',
+    'https://ipfs.io/ipfs/',
+    'https://cloudflare-ipfs.com/ipfs/'
+  ];
+
+  static resolveImageUrl(image: string | undefined): string | undefined {
+    if (!image) return undefined;
+
+    // If already a processed URL, return as-is
+    if (image.startsWith('http')) return image;
+
+    // Convert IPFS URIs to gateway URLs
+    if (image.startsWith('ipfs://')) {
+      const hash = image.replace('ipfs://', '');
+      return `${this.IPFS_GATEWAYS[0]}${hash}`;
+    }
+
+    return image;
+  }
+
+  static getImageStatusColor(status: StandardizedEvermark['imageStatus']): string {
+    switch (status) {
+      case 'processed': return 'text-green-600';
+      case 'processing': return 'text-yellow-600';
+      case 'failed': return 'text-red-600';
+      case 'none': return 'text-gray-400';
+      default: return 'text-gray-400';
+    }
+  }
+}
+
+export const MetadataValidation = {
+  validateEvermark: MetadataTransformer.validate
+};
+
+// ✅ NEW: Export utility functions for easy component use
+export const MetadataUtils = {
+  /**
+   * Format display date consistently
+   */
+  formatDisplayDate: (evermark: StandardizedEvermark): string => {
+    try {
+      return new Date(evermark.createdAt).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid Date';
+    }
+  },
+
+  /**
+   * Get relative time (e.g., "2 hours ago")
+   */
+  getRelativeTime: (evermark: StandardizedEvermark): string => {
+    try {
+      const now = Date.now();
+      const created = new Date(evermark.createdAt).getTime();
+      const diffMs = now - created;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 30) return `${diffDays}d ago`;
+      
+      return MetadataUtils.formatDisplayDate(evermark);
+    } catch (error) {
+      return 'Unknown';
+    }
+  },
+
+  /**
+   * Get content type display name
+   */
+  getContentTypeDisplay: (contentType: StandardizedEvermark['contentType']): string => {
+    const displayNames = {
+      'DOI': 'Academic Paper',
+      'ISBN': 'Book',
+      'Cast': 'Farcaster Cast',
+      'URL': 'Web Content',
+      'Custom': 'Custom Content'
+    };
+    return displayNames[contentType] || contentType;
+  },
+
+  /**
+   * Get processing status display
+   */
+  getImageStatusDisplay: (imageStatus: StandardizedEvermark['imageStatus']): { 
+    text: string; 
+    color: 'green' | 'yellow' | 'red' | 'gray' 
+  } => {
+    const statusMap = {
+      'processed': { text: 'Processed', color: 'green' as const },
+      'processing': { text: 'Processing', color: 'yellow' as const },
+      'failed': { text: 'Failed', color: 'red' as const },
+      'none': { text: 'No Image', color: 'gray' as const }
+    };
+    return statusMap[imageStatus] || { text: 'Unknown', color: 'gray' };
+  },
+
+  /**
+   * Check if Evermark has rich metadata
+   */
+  hasRichMetadata: (evermark: StandardizedEvermark): boolean => {
+    return !!(
+      evermark.extendedMetadata.castData ||
+      evermark.extendedMetadata.doi ||
+      evermark.extendedMetadata.isbn ||
+      evermark.tags.length > 0
+    );
+  },
+
+  /**
+   * Extract primary tags for display
+   */
+  getPrimaryTags: (evermark: StandardizedEvermark, maxTags: number = 3): string[] => {
+    return evermark.tags.slice(0, maxTags);
+  },
+
+  /**
+   * Get engagement data if available
+   */
+  getEngagementData: (evermark: StandardizedEvermark): {
+    hasEngagement: boolean;
+    likes?: number;
+    recasts?: number;
+    replies?: number;
+    total: number;
+  } => {
+    const castData = evermark.extendedMetadata.castData;
+    if (castData?.engagement) {
+      const { likes, recasts, replies } = castData.engagement;
+      return {
+        hasEngagement: true,
+        likes,
+        recasts,
+        replies,
+        total: likes + recasts + replies
+      };
+    }
+    return { hasEngagement: false, total: 0 };
+  }
+};
 
 export default MetadataTransformer;
