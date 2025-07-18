@@ -1,3 +1,4 @@
+// src/pages/EnhancedHomePage.tsx - Updated with improved image handling
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -9,16 +10,21 @@ import {
   RocketIcon,
   StarIcon,
   UserIcon,
-  ClockIcon
+  ClockIcon,
+  ImageIcon,
+  EyeIcon
 } from 'lucide-react';
 import { useTrendingEvermarks, useRecentEvermarks } from '../hooks/useEvermarkFeed';
 import { useWalletAuth } from '../providers/WalletProvider';
 import { HeroEvermarkCard, ExploreEvermarkCard } from '../components/evermark/EvermarkCard';
 import { EnhancedEvermarkModal } from '../components/evermark/EnhancedEvermarkModal';
-import { useModal } from '../hooks/useModal';
+import { ImageGallery } from '../components/gallery/ImageGallery';
+import { useModal, useMultiModal } from '../hooks/useModal';
+import { useImageProcessing } from '../hooks/useImageProcessing';
+import { EvermarkImage } from '../components/layout/UniversalImage';
 import { cn, useIsMobile } from '../utils/responsive';
 
-// Quick stats component
+// Enhanced stats component with image analytics
 const CyberStats: React.FC = () => {
   const { evermarks: recentEvermarks, isLoading } = useRecentEvermarks(100);
   const isMobile = useIsMobile();
@@ -29,6 +35,7 @@ const CyberStats: React.FC = () => {
         totalEvermarks: 0,
         activeCreators: 0,
         thisWeek: 0,
+        withImages: 0,
         networkStatus: 'Loading...'
       };
     }
@@ -36,11 +43,13 @@ const CyberStats: React.FC = () => {
     const weekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
     const thisWeekCount = recentEvermarks.filter(e => e.creationTime > weekAgo).length;
     const uniqueCreators = new Set(recentEvermarks.map(e => e.creator).filter(Boolean)).size;
+    const withImagesCount = recentEvermarks.filter(e => e.image).length;
 
     return {
       totalEvermarks: recentEvermarks.length,
       activeCreators: uniqueCreators,
       thisWeek: thisWeekCount,
+      withImages: withImagesCount,
       networkStatus: 'Live on Base'
     };
   }, [recentEvermarks, isLoading]);
@@ -54,9 +63,9 @@ const CyberStats: React.FC = () => {
       glow: 'shadow-purple-500/20'
     },
     {
-      label: 'Network',
-      value: 'Base',
-      icon: <RocketIcon className="h-6 w-6" />,
+      label: 'With Images',
+      value: isLoading ? '...' : stats.withImages.toLocaleString(),
+      icon: <ImageIcon className="h-6 w-6" />,
       gradient: 'from-green-400 to-green-600',
       glow: 'shadow-green-500/20'
     },
@@ -107,10 +116,91 @@ const CyberStats: React.FC = () => {
   );
 };
 
+// Featured Image Showcase Component
+const FeaturedImageShowcase: React.FC<{ evermarks: any[] }> = ({ evermarks }) => {
+  const { openImageModal, closeImageModal, state } = useMultiModal();
+  const isMobile = useIsMobile();
+
+  // Filter evermarks with images
+  const evermarksWithImages = evermarks.filter(e => e.image).slice(0, 6);
+
+  if (evermarksWithImages.length === 0) return null;
+
+  return (
+    <div className="container mx-auto px-4 py-16">
+      <div className="text-center mb-12">
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-cyan-500 bg-clip-text text-transparent mb-4">
+          🖼️ FEATURED CONTENT
+        </h2>
+        <p className="text-gray-400">Evermarks with stunning visuals</p>
+      </div>
+
+      <div className={cn(
+        "grid gap-4",
+        isMobile ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3 lg:grid-cols-6"
+      )}>
+        {evermarksWithImages.map((evermark, index) => {
+          const { getOptimalImageUrl } = useImageProcessing(evermark);
+          
+          return (
+            <div
+              key={evermark.id}
+              className="group relative aspect-square cursor-pointer overflow-hidden rounded-lg bg-gray-800 border border-gray-700 hover:border-cyan-400/50 transition-all duration-300"
+              onClick={() => openImageModal(getOptimalImageUrl('large') || evermark.image, evermark.title)}
+            >
+              <EvermarkImage
+                src={getOptimalImageUrl('medium')}
+                alt={evermark.title}
+                aspectRatio="square"
+                rounded="lg"
+                className="w-full h-full group-hover:scale-110 transition-transform duration-500"
+                evermarkTitle={evermark.title}
+              />
+              
+              {/* Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
+              {/* Content */}
+              <div className="absolute bottom-0 left-0 right-0 p-3 text-white transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                <h4 className="font-medium text-sm line-clamp-2 mb-1">
+                  {evermark.title}
+                </h4>
+                <p className="text-xs text-gray-300 line-clamp-1">
+                  by {evermark.author}
+                </p>
+              </div>
+
+              {/* View indicator */}
+              <div className="absolute top-2 right-2 bg-black/60 rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <EyeIcon className="h-3 w-3 text-white" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Image Modal */}
+      <ImageGallery
+        images={evermarksWithImages.map(e => ({
+          src: e.image,
+          alt: e.title,
+          title: e.title,
+          description: `by ${e.author}`,
+          evermarkId: e.id
+        }))}
+        isOpen={state.imageModal.isOpen}
+        onClose={closeImageModal}
+        showControls={true}
+        allowDownload={true}
+      />
+    </div>
+  );
+};
+
 export default function EnhancedHomePage() {
   const { isConnected, address, requireConnection } = useWalletAuth();
-  const { evermarks: trendingEvermarks, isLoading: isLoadingTrending } = useTrendingEvermarks(6);
-  const { evermarks: recentEvermarks, isLoading: isLoadingRecent } = useRecentEvermarks(6);
+  const { evermarks: trendingEvermarks, isLoading: isLoadingTrending } = useTrendingEvermarks(8);
+  const { evermarks: recentEvermarks, isLoading: isLoadingRecent } = useRecentEvermarks(8);
   const isMobile = useIsMobile();
 
   // Use the unified modal hook
@@ -159,6 +249,9 @@ export default function EnhancedHomePage() {
               </span>
               <span className="px-4 py-2 bg-cyan-400/20 text-cyan-400 rounded-full font-medium border border-cyan-400/30">
                 🗳️ Community Voting
+              </span>
+              <span className="px-4 py-2 bg-yellow-400/20 text-yellow-400 rounded-full font-medium border border-yellow-400/30">
+                🖼️ Rich Media
               </span>
             </div>
           </div>
@@ -219,6 +312,9 @@ export default function EnhancedHomePage() {
       <div className="container mx-auto px-4 py-16">
         <CyberStats />
       </div>
+
+      {/* Featured Image Showcase */}
+      <FeaturedImageShowcase evermarks={[...trendingEvermarks, ...recentEvermarks]} />
 
       {/* Featured Hero Evermark */}
       {trendingEvermarks.length > 0 && (
@@ -345,6 +441,41 @@ export default function EnhancedHomePage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Image Quality Statistics */}
+      <div className="container mx-auto px-4 py-16">
+        <div className="bg-gradient-to-r from-gray-800/50 to-gray-900/50 border border-gray-700 rounded-2xl p-8 text-center">
+          <h3 className="text-2xl font-bold bg-gradient-to-r from-green-400 to-cyan-500 bg-clip-text text-transparent mb-4">
+            📊 Content Analytics
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-2xl mx-auto">
+            <div>
+              <div className="text-2xl font-bold text-green-400">
+                {Math.round((recentEvermarks.filter(e => e.image).length / Math.max(recentEvermarks.length, 1)) * 100)}%
+              </div>
+              <div className="text-sm text-gray-400">With Images</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-cyan-400">
+                {recentEvermarks.filter(e => e.imageStatus === 'processed').length}
+              </div>
+              <div className="text-sm text-gray-400">Processed</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-yellow-400">
+                {recentEvermarks.filter(e => e.contentType === 'Cast').length}
+              </div>
+              <div className="text-sm text-gray-400">Farcaster</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-purple-400">
+                {recentEvermarks.filter(e => e.verified).length}
+              </div>
+              <div className="text-sm text-gray-400">Verified</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Final CTA */}

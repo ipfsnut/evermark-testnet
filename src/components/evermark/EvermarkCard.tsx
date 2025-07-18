@@ -1,4 +1,4 @@
-// src/components/evermark/EvermarkCard.tsx - UPDATED for schema layer StandardizedEvermark format
+// src/components/evermark/EvermarkCard.tsx - Enhanced with proper image handling
 import React from 'react';
 import { 
   UserIcon, 
@@ -10,16 +10,17 @@ import {
   BookOpenIcon,
   ShareIcon,
   ZapIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ImageIcon
 } from 'lucide-react';
 import { EvermarkImage } from '../layout/UniversalImage';
+import { useImageProcessing, useImagePlaceholder } from '../../hooks/useImageProcessing';
 import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
 import { formatDistanceToNow } from 'date-fns';
 import { cn, useIsMobile } from '../../utils/responsive';
-// ✅ UPDATED: Import the standardized type from schema layer
 import type { StandardizedEvermark } from '../../lib/supabase-schema';
 
-// ✅ UPDATED: Format votes for display using the new structure
+// Format votes for display
 const formatVotes = (votes?: number): string => {
   if (!votes || votes === 0) return '0';
   
@@ -39,7 +40,6 @@ const formatVotes = (votes?: number): string => {
 };
 
 export interface EvermarkCardProps {
-  // ✅ UPDATED: Use StandardizedEvermark from schema layer
   evermark: StandardizedEvermark;
   
   // Visual variants
@@ -47,7 +47,7 @@ export interface EvermarkCardProps {
   
   // Data to display
   rank?: number;
-  votes?: bigint; // Keep for backward compatibility, but prefer evermark.votes
+  votes?: bigint; // Keep for backward compatibility
   bookshelfCategory?: 'favorite' | 'currentReading';
   
   // What to show
@@ -58,7 +58,7 @@ export interface EvermarkCardProps {
   showImage?: boolean;
   showQuickActions?: boolean;
   
-  // Interactions - SIMPLIFIED: Only modal interactions
+  // Interactions
   onOpenModal: (evermarkId: string, options?: ModalOptions) => void;
   
   // Styling
@@ -87,15 +87,38 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
   priority = false,
   className = ''
 }) => {
-  // ✅ UPDATED: Use standardized evermark structure
-  const { id, title, author, description, image, creationTime, votes: evermarkVotes } = evermark;
+  const { id, title, author, description, creationTime, votes: evermarkVotes } = evermark;
   const { viewStats } = useViewTracking(id);
+  const { imageMetadata, getOptimalImageUrl } = useImageProcessing(evermark);
+  const { generatePlaceholder } = useImagePlaceholder(evermark);
   const isMobile = useIsMobile();
   
-  // ✅ UPDATED: Use evermark.votes if available, fallback to legacy votes prop
+  // Use evermark.votes if available, fallback to legacy votes prop
   const displayVotes = evermarkVotes || (votes ? Number(votes) / 1e18 : 0);
   
-  // Variant configurations - UPDATED for dark theme
+  // Get optimal image URL based on card variant
+  const getImageUrl = () => {
+    const sizeMap = {
+      hero: 'large',
+      standard: 'medium', 
+      compact: 'medium',
+      list: 'thumbnail',
+      leaderboard: 'medium'
+    } as const;
+    
+    const optimalUrl = getOptimalImageUrl(sizeMap[variant]);
+    
+    // Fallback to placeholder if no image
+    if (!optimalUrl && showImage) {
+      if (variant === 'hero') return generatePlaceholder(800, 450);
+      if (variant === 'list') return generatePlaceholder(150, 150);
+      return generatePlaceholder(400, 300);
+    }
+    
+    return optimalUrl;
+  };
+
+  // Variant configurations for dark theme
   const getVariantConfig = () => {
     const baseClasses = cn(
       'bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden transition-all duration-300 group cursor-pointer',
@@ -167,7 +190,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
     console.log(`Quick action: ${action} for evermark ${id}`);
   };
 
-  // Badge components - UPDATED for dark theme
+  // Badge components for dark theme
   const RankBadge = () => {
     if (!showRank || !rank) return null;
 
@@ -234,7 +257,27 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
     );
   };
 
-  // List variant (horizontal layout) - UPDATED for dark theme
+  // Image Status Indicator
+  const ImageStatusIndicator = () => {
+    if (!showImage || imageMetadata.status === 'processed') return null;
+
+    const statusConfig = {
+      processing: { icon: '⏳', text: 'Processing...', color: 'text-yellow-400' },
+      failed: { icon: '❌', text: 'Failed', color: 'text-red-400' },
+      none: { icon: '📷', text: 'No image', color: 'text-gray-400' }
+    };
+
+    const status = statusConfig[imageMetadata.status] || statusConfig.none;
+
+    return (
+      <div className="absolute bottom-2 left-2 z-20 bg-black/80 text-xs px-2 py-1 rounded flex items-center gap-1 backdrop-blur-sm">
+        <span>{status.icon}</span>
+        <span className={status.color}>{status.text}</span>
+      </div>
+    );
+  };
+
+  // List variant (horizontal layout)
   if (config.isList) {
     return (
       <div 
@@ -245,18 +288,19 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
         {showImage && (
           <div className={cn('relative flex-shrink-0', config.imageHeight)}>
             <EvermarkImage
-              src={image}
+              src={getImageUrl()}
               alt={title}
               aspectRatio="square"
               rounded="lg"
               priority={priority}
               className="w-full h-full"
+              evermarkTitle={title}
             />
-            {/* Dark overlay for better contrast */}
             <div className="absolute inset-0 bg-gradient-to-r from-black/20 to-transparent rounded-lg" />
             <RankBadge />
             <VoteBadge />
             <BookshelfBadge />
+            <ImageStatusIndicator />
           </div>
         )}
 
@@ -315,7 +359,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
     );
   }
 
-  // Standard card layout (vertical) - UPDATED for dark theme
+  // Standard card layout (vertical)
   return (
     <div 
       className={cn(config.container, 'flex flex-col h-full', className)}
@@ -325,12 +369,13 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
       {showImage && (
         <div className={cn('relative', config.imageHeight)}>
           <EvermarkImage
-            src={image}
+            src={getImageUrl()}
             alt={title}
             aspectRatio="video"
             rounded="none"
             priority={priority}
             className="w-full h-full group-hover:scale-105 transition-transform duration-500"
+            evermarkTitle={title}
           />
           
           {/* Enhanced gradient overlay for dark theme */}
@@ -339,6 +384,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
           <RankBadge />
           <VoteBadge />
           <BookshelfBadge />
+          <ImageStatusIndicator />
         </div>
       )}
 
@@ -420,7 +466,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
   );
 };
 
-// Helper components remain the same but with updated styling
+// Helper components with updated styling
 export const LeaderboardEvermarkCard: React.FC<{
   evermark: StandardizedEvermark;
   rank: number;

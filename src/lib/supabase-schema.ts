@@ -82,6 +82,7 @@ export interface StandardizedEvermark {
   
   // Extended metadata for rich content
   extendedMetadata: {
+    processedImageUrl: any;
     doi?: string;
     isbn?: string;
     castData?: {
@@ -286,12 +287,13 @@ export class EvermarkSchemaTransformer {
     const metadata = row.metadata || row.metadata_json || row.ipfs_metadata || {};
     
     return {
-      doi: metadata.doi || metadata.originalMetadata?.doi,
-      isbn: metadata.isbn || metadata.originalMetadata?.isbn,
-      castData: this.extractCastData(metadata),
-      tags: this.extractTags(row),
-      customFields: metadata.customFields || metadata.originalMetadata?.customFields || []
-    };
+  doi: metadata.doi || metadata.originalMetadata?.doi,
+  isbn: metadata.isbn || metadata.originalMetadata?.isbn,
+  castData: this.extractCastData(metadata),
+  tags: this.extractTags(row),
+  customFields: metadata.customFields || metadata.originalMetadata?.customFields || [],
+  processedImageUrl: undefined
+};
   }
 
   private static extractCastData(metadata: any): StandardizedEvermark['extendedMetadata']['castData'] {
