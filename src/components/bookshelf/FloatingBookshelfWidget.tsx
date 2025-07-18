@@ -18,6 +18,73 @@ interface FloatingBookshelfWidgetProps {
   className?: string;
 }
 
+interface QuickBookshelfButtonProps {
+  evermarkId: string;
+  className?: string;
+}
+
+// ✅ FIXED: Add the missing QuickBookshelfButton component
+export const QuickBookshelfButton: React.FC<QuickBookshelfButtonProps> = ({ 
+  evermarkId, 
+  className = '' 
+}) => {
+  const { addToFavorites, removeFromBookshelf, getBookshelfStatus } = useBookshelf();
+  const [isProcessing, setIsProcessing] = useState(false);
+  
+  // ✅ FIXED: Use the correct method from your hook
+  const bookshelfStatus = getBookshelfStatus(evermarkId);
+  const isCurrentlyFavorited = bookshelfStatus.isFavorite;
+
+  const handleToggleFavorite = async () => {
+    if (isProcessing) return;
+    
+    setIsProcessing(true);
+    try {
+      if (isCurrentlyFavorited) {
+        // ✅ FIXED: Use removeFromBookshelf instead of removeFromFavorites
+        removeFromBookshelf(evermarkId);
+      } else {
+        // ✅ FIXED: Use addToFavorites (this one was correct)
+        const result = addToFavorites(evermarkId);
+        if (!result.success) {
+          console.error('Failed to add to favorites:', result.error);
+          // Could show a toast or alert here
+        }
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handleToggleFavorite}
+      disabled={isProcessing}
+      className={`
+        inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium
+        transition-all duration-200 disabled:opacity-50
+        ${isCurrentlyFavorited 
+          ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        }
+        ${className}
+      `}
+      title={isCurrentlyFavorited ? 'Remove from favorites' : 'Add to favorites'}
+    >
+      {isProcessing ? (
+        <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+      ) : (
+        <HeartIcon 
+          className={`w-3 h-3 ${isCurrentlyFavorited ? 'fill-current' : ''}`} 
+        />
+      )}
+      {isCurrentlyFavorited ? 'Favorited' : 'Favorite'}
+    </button>
+  );
+};
+
 export const FloatingBookshelfWidget: React.FC<FloatingBookshelfWidgetProps> = ({ 
   userAddress, 
   className = '' 
