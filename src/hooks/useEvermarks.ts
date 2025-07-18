@@ -1,11 +1,12 @@
-// src/hooks/useEvermarks.ts - Fixed version with proper imports and hook usage
+// src/hooks/useEvermarks.ts - CORRECTED version based on your actual code
 import { useState, useEffect, useCallback } from 'react';
 import { 
   useSupabaseEvermarks, 
-  useSupabaseEvermark, // ✅ FIXED: Add the missing import
+  useSupabaseEvermark,
   type StandardizedEvermark 
 } from './useSupabaseEvermarks';
 
+// Keep your existing EvermarkData interface for backward compatibility
 interface EvermarkData {
   id: string;
   name: string;
@@ -40,7 +41,7 @@ interface UseEvermarkDetailResult {
   retry: () => void;
 }
 
-// ✅ FIXED: Convert StandardizedEvermark to legacy EvermarkData format for compatibility
+// FIXED: Convert StandardizedEvermark to legacy EvermarkData format for compatibility
 const convertToLegacyFormat = (evermark: StandardizedEvermark): EvermarkData => ({
   id: evermark.id,                    // Already string from tokenId
   name: evermark.title,               // Map title to name for legacy compatibility
@@ -76,19 +77,19 @@ const convertToLegacyFormat = (evermark: StandardizedEvermark): EvermarkData => 
   }
 });
 
-// ✅ FIXED: Main hook for getting single evermark details using token_id
+// FIXED: Main hook for getting single evermark details using token_id
 export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
   const [evermark, setEvermark] = useState<EvermarkData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ FIXED: Use the imported hook correctly
+  // Use the corrected hook
   const { 
     evermark: supabaseEvermark, 
     isLoading: supabaseLoading, 
     error: supabaseError, 
     refetch 
-  } = useSupabaseEvermark(id); // Now properly imported
+  } = useSupabaseEvermark(id);
 
   // Transform Supabase evermark to legacy format
   useEffect(() => {
@@ -116,7 +117,7 @@ export function useEvermarkDetail(id?: string): UseEvermarkDetailResult {
   };
 }
 
-// ✅ FIXED: Hook for user evermarks using owner/author fields
+// FIXED: Hook for user evermarks using owner/author fields
 export function useUserEvermarks(userAddress?: string) {
   const { 
     evermarks, 
@@ -135,7 +136,7 @@ export function useUserEvermarks(userAddress?: string) {
   };
 }
 
-// ✅ FIXED: Hook for listing evermarks with filters
+// FIXED: Hook for listing evermarks with filters
 export function useEvermarksList(filters?: {
   author?: string;
   category?: string;
@@ -158,87 +159,51 @@ export function useEvermarksList(filters?: {
   };
 }
 
-// ✅ NEW: Additional utility hooks for common use cases
-
-/**
- * Hook for getting evermarks by token IDs (efficient batch fetch)
- */
+// MUCH BETTER: Use the existing Supabase hook with proper filtering
 export function useEvermarksByTokenIds(tokenIds: string[]) {
-  // ✅ MUCH BETTER: Use the existing Supabase hook with proper filtering
+  // Convert string IDs to numbers for the schema layer
+  const numericTokenIds = tokenIds.map(id => parseInt(id)).filter(id => !isNaN(id));
+  
   const { 
     evermarks: supabaseEvermarks, 
     isLoading, 
     error 
   } = useSupabaseEvermarks({
-    page: 1,
-    pageSize: tokenIds.length || 100, // Set appropriate page size
-    // Note: We'd need to add token_id filtering to useSupabaseEvermarks
-    // For now, we'll fetch all and filter client-side (not ideal but better than 1-by-1)
+    tokenIds: numericTokenIds, // Use the tokenIds filter
+    pageSize: numericTokenIds.length || 100,
     enableBlockchainFallback: false // Skip blockchain for performance
   });
 
-  // Filter to only the requested token IDs
-  const filteredEvermarks = supabaseEvermarks.filter(evermark => 
-    tokenIds.includes(evermark.id)
-  );
-
   return {
-    evermarks: filteredEvermarks.map(convertToLegacyFormat),
+    evermarks: supabaseEvermarks.map(convertToLegacyFormat),
     isLoading,
     error
   };
 }
 
-/**
- * ✅ BETTER: Hook for getting multiple evermarks efficiently
- * Uses a single query with IN clause instead of multiple individual queries
- */
+// BETTER: Hook for getting multiple evermarks efficiently
+// Uses a single query with IN clause instead of multiple individual queries
 export function useEvermarksBatch(tokenIds: number[]) {
   const [evermarks, setEvermarks] = useState<EvermarkData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Use the new efficient batch hook
+  const {
+    evermarks: batchEvermarks,
+    isLoading: batchLoading,
+    error: batchError
+  } = useSupabaseEvermarks({
+    tokenIds, // This uses the efficient IN clause query
+    pageSize: tokenIds.length || 100,
+    enableBlockchainFallback: false
+  });
+
   useEffect(() => {
-    if (tokenIds.length === 0) {
-      setEvermarks([]);
-      setIsLoading(false);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    const fetchEvermarks = async () => {
-      try {
-        // ✅ EFFICIENT: Single query with IN clause
-        const { supabase } = await import('../lib/supabase');
-        const { MetadataTransformer } = await import('../utils/MetadataTransformer');
-        
-        const { data, error: queryError } = await supabase
-          .from('evermarks')
-          .select('*')
-          .in('token_id', tokenIds); // Much more efficient than individual queries
-
-        if (queryError) {
-          throw new Error(`Failed to fetch evermarks: ${queryError.message}`);
-        }
-
-        // Transform to legacy format
-        const transformedEvermarks = (data || []).map(row => {
-          const standardized = MetadataTransformer.transform(row);
-          return convertToLegacyFormat(standardized);
-        });
-
-        setEvermarks(transformedEvermarks);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch evermarks');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchEvermarks();
-  }, [tokenIds.join(',')]); // Stable dependency
+    setEvermarks(batchEvermarks.map(convertToLegacyFormat));
+    setIsLoading(batchLoading);
+    setError(batchError);
+  }, [batchEvermarks, batchLoading, batchError]);
 
   return {
     evermarks,
@@ -247,9 +212,7 @@ export function useEvermarksBatch(tokenIds: number[]) {
   };
 }
 
-/**
- * Hook for checking if an evermark exists
- */
+// Hook for checking if an evermark exists
 export function useEvermarkExists(id?: string) {
   const { evermark, isLoading, error } = useEvermarkDetail(id);
   
@@ -260,9 +223,7 @@ export function useEvermarkExists(id?: string) {
   };
 }
 
-/**
- * Hook for getting evermark metadata only (lighter query)
- */
+// Hook for getting evermark metadata only (lighter query)
 export function useEvermarkMetadata(id?: string) {
   const { evermark, isLoading, error } = useEvermarkDetail(id);
   
@@ -284,6 +245,5 @@ export function useEvermarkMetadata(id?: string) {
     error
   };
 }
-
 
 export type { EvermarkData, UseEvermarkDetailResult };

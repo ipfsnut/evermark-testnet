@@ -1,4 +1,3 @@
-// src/components/bookshelf/FloatingBookshelfWidget.tsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -10,7 +9,8 @@ import {
   PlusIcon
 } from 'lucide-react';
 import { useBookshelf } from '../../hooks/useBookshelf';
-import { useUserEvermarks } from '../../hooks/useEvermarks';
+// ✅ UPDATED: Use new efficient batch hook
+import { useEvermarksBatch } from '../../hooks/useEvermarks';
 import { formatDistanceToNow } from 'date-fns';
 
 interface FloatingBookshelfWidgetProps {
@@ -24,17 +24,34 @@ export const FloatingBookshelfWidget: React.FC<FloatingBookshelfWidgetProps> = (
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { bookshelfData, getStats } = useBookshelf(userAddress);
-  const { evermarks } = useUserEvermarks(userAddress);
   const stats = getStats();
 
+  // ✅ MAJOR PERFORMANCE WIN: Get all unique token IDs from bookshelf
+  const allBookshelfTokenIds = React.useMemo(() => {
+    const favoriteIds = bookshelfData.favorites.map(item => parseInt(item.evermarkId));
+    const readingIds = bookshelfData.currentReading.map(item => parseInt(item.evermarkId));
+    return [...new Set([...favoriteIds, ...readingIds])].filter(id => !isNaN(id));
+  }, [bookshelfData.favorites, bookshelfData.currentReading]);
+
+  // ✅ SINGLE EFFICIENT QUERY: Instead of individual fetches
+  const { evermarks, isLoading } = useEvermarksBatch(allBookshelfTokenIds);
+
   if (!userAddress) return null;
+
+  // ✅ IMPROVED: Create lookup map for O(1) access
+  const evermarkMap = React.useMemo(() => {
+    return evermarks.reduce((map, evermark) => {
+      map[evermark.id] = evermark;
+      return map;
+    }, {} as Record<string, any>);
+  }, [evermarks]);
 
   // Get recent favorites and current reading with evermark details
   const recentFavorites = bookshelfData.favorites
     .slice(-2)
     .map(item => ({
       ...item,
-      evermark: evermarks.find(e => e.id === item.evermarkId)
+      evermark: evermarkMap[item.evermarkId] // O(1) lookup instead of .find()
     }))
     .filter(item => item.evermark);
 
@@ -42,11 +59,25 @@ export const FloatingBookshelfWidget: React.FC<FloatingBookshelfWidgetProps> = (
     .slice(-2)
     .map(item => ({
       ...item,
-      evermark: evermarks.find(e => e.id === item.evermarkId)
+      evermark: evermarkMap[item.evermarkId] // O(1) lookup instead of .find()
     }))
     .filter(item => item.evermark);
 
   const totalItems = stats.totalFavorites + stats.totalCurrentReading;
+
+  // ✅ LOADING STATE: Handle batch loading
+  if (isLoading && allBookshelfTokenIds.length > 0) {
+    return (
+      <div className={`fixed bottom-6 right-6 z-40 ${className}`}>
+        <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden max-w-sm">
+          <div className="px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            <span className="font-medium">Loading Bookshelf...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`fixed bottom-6 right-6 z-40 ${className}`}>
@@ -184,175 +215,5 @@ export const FloatingBookshelfWidget: React.FC<FloatingBookshelfWidgetProps> = (
         )}
       </div>
     </div>
-  );
-};
-
-// Bookshelf Status Badge Component for individual Evermark pages
-export const BookshelfStatusBadge: React.FC<{ 
-  evermarkId: string; 
-  userAddress?: string;
-  size?: 'sm' | 'md' | 'lg';
-}> = ({ evermarkId, userAddress, size = 'md' }) => {
-  const { getBookshelfStatus } = useBookshelf(userAddress);
-  const status = getBookshelfStatus(evermarkId);
-
-  if (!userAddress || (!status.isFavorite && !status.isCurrentReading)) {
-    return null;
-  }
-
-  const sizeClasses = {
-    sm: 'px-2 py-1 text-xs',
-    md: 'px-3 py-1 text-sm',
-    lg: 'px-4 py-2 text-base'
-  };
-
-  const iconSizes = {
-    sm: 'h-3 w-3',
-    md: 'h-4 w-4',
-    lg: 'h-5 w-5'
-  };
-
-  return (
-    <div className="flex gap-1">
-      {status.isFavorite && (
-        <div className={`bg-red-100 text-red-700 rounded-full font-medium flex items-center gap-1 ${sizeClasses[size]}`}>
-          <HeartIcon className={iconSizes[size]} />
-          <span>Favorite</span>
-        </div>
-      )}
-      {status.isCurrentReading && (
-        <div className={`bg-blue-100 text-blue-700 rounded-full font-medium flex items-center gap-1 ${sizeClasses[size]}`}>
-          <BookOpenIcon className={iconSizes[size]} />
-          <span>Reading</span>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Quick Add to Bookshelf Button Component
-export const QuickBookshelfButton: React.FC<{
-  evermarkId: string;
-  userAddress?: string;
-  onSuccess?: (category: 'favorite' | 'currentReading') => void;
-  variant?: 'icon' | 'button';
-  size?: 'sm' | 'md' | 'lg';
-}> = ({ 
-  evermarkId, 
-  userAddress, 
-  onSuccess,
-  variant = 'icon',
-  size = 'md'
-}) => {
-  const [showMenu, setShowMenu] = useState(false);
-  const { getBookshelfStatus, addToFavorites, addToCurrentReading, removeFromBookshelf, getStats } = useBookshelf(userAddress);
-  const status = getBookshelfStatus(evermarkId);
-  const stats = getStats();
-
-  if (!userAddress) return null;
-
-  const handleAddToFavorites = () => {
-    const result = addToFavorites(evermarkId);
-    if (result.success) {
-      onSuccess?.('favorite');
-    }
-    setShowMenu(false);
-  };
-
-  const handleAddToCurrentReading = () => {
-    const result = addToCurrentReading(evermarkId);
-    if (result.success) {
-      onSuccess?.('currentReading');
-    }
-    setShowMenu(false);
-  };
-
-  const handleRemove = () => {
-    removeFromBookshelf(evermarkId);
-    setShowMenu(false);
-  };
-
-  const sizeClasses = {
-    sm: 'h-6 w-6',
-    md: 'h-8 w-8',
-    lg: 'h-10 w-10'
-  };
-
-  const iconSizes = {
-    sm: 'h-3 w-3',
-    md: 'h-4 w-4',
-    lg: 'h-5 w-5'
-  };
-
-  if (variant === 'icon') {
-    return (
-      <div className="relative">
-        <button
-          onClick={() => setShowMenu(!showMenu)}
-          className={`${sizeClasses[size]} rounded-full flex items-center justify-center transition-all ${
-            status.isFavorite || status.isCurrentReading
-              ? 'bg-purple-600 text-white'
-              : 'bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 border border-gray-300'
-          }`}
-        >
-          <StarIcon className={iconSizes[size]} />
-        </button>
-
-        {showMenu && (
-          <>
-            <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-            <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-              <div className="p-2">
-                {status.isFavorite || status.isCurrentReading ? (
-                  <button
-                    onClick={handleRemove}
-                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded"
-                  >
-                    Remove from Bookshelf
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleAddToFavorites}
-                      disabled={!stats.canAddFavorite}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-red-50 rounded flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <HeartIcon className="h-4 w-4 text-red-500" />
-                      Add to Favorites
-                    </button>
-                    <button
-                      onClick={handleAddToCurrentReading}
-                      disabled={!stats.canAddCurrentReading}
-                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 rounded flex items-center gap-2 disabled:opacity-50"
-                    >
-                      <BookOpenIcon className="h-4 w-4 text-blue-500" />
-                      Add to Reading
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <button
-      onClick={() => setShowMenu(!showMenu)}
-      className={`inline-flex items-center px-3 py-2 rounded-lg transition-all ${
-        status.isFavorite || status.isCurrentReading
-          ? 'bg-purple-600 text-white'
-          : 'bg-gray-100 text-gray-700 hover:bg-purple-50 hover:text-purple-600'
-      }`}
-    >
-      <StarIcon className="h-4 w-4 mr-2" />
-      <span>
-        {status.isFavorite ? 'In Favorites' : 
-         status.isCurrentReading ? 'Currently Reading' : 
-         'Add to Bookshelf'}
-      </span>
-    </button>
   );
 };

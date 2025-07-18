@@ -1,4 +1,3 @@
-// src/components/profile/PublicBookshelfView.tsx - ✅ Public trophy case view
 import React from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { 
@@ -13,7 +12,8 @@ import {
   PlusIcon
 } from 'lucide-react';
 import { useBookshelf } from '../../hooks/useBookshelf';
-import { useUserEvermarks } from '../../hooks/useEvermarks';
+// ✅ UPDATED: Use new efficient batch hook
+import { useEvermarksBatch } from '../../hooks/useEvermarks';
 import { formatDistanceToNow } from 'date-fns';
 import { EvermarkCard } from '../evermark/EvermarkCard';
 import PageContainer from '../layout/PageContainer';
@@ -31,16 +31,35 @@ export const PublicBookshelfView: React.FC<PublicBookshelfViewProps> = ({
   const params = useParams();
   const userAddress = propUserAddress || params.address;
   
-  const { bookshelfData, isLoading, getStats } = useBookshelf(userAddress);
-  const { evermarks } = useUserEvermarks(userAddress);
+  const { bookshelfData, isLoading: bookshelfLoading, getStats } = useBookshelf(userAddress);
   const stats = getStats();
   
+  // ✅ MAJOR PERFORMANCE WIN: Get all unique token IDs from bookshelf
+  const allBookshelfTokenIds = React.useMemo(() => {
+    const favoriteIds = bookshelfData.favorites.map(item => parseInt(item.evermarkId));
+    const readingIds = bookshelfData.currentReading.map(item => parseInt(item.evermarkId));
+    return [...new Set([...favoriteIds, ...readingIds])].filter(id => !isNaN(id));
+  }, [bookshelfData.favorites, bookshelfData.currentReading]);
+
+  // ✅ SINGLE EFFICIENT QUERY: Instead of individual fetches  
+  const { evermarks, isLoading: evermarksLoading } = useEvermarksBatch(allBookshelfTokenIds);
+  
+  const isLoading = bookshelfLoading || evermarksLoading;
+
+  // ✅ IMPROVED: Create lookup map for O(1) access
+  const evermarkMap = React.useMemo(() => {
+    return evermarks.reduce((map, evermark) => {
+      map[evermark.id] = evermark;
+      return map;
+    }, {} as Record<string, any>);
+  }, [evermarks]);
+
   // Get evermarks that match bookshelf items
   const getBookshelfEvermarks = () => {
     const allBookshelfItems = [...bookshelfData.favorites, ...bookshelfData.currentReading];
     return allBookshelfItems
       .map(item => {
-        const evermark = evermarks.find(e => e.id === item.evermarkId);
+        const evermark = evermarkMap[item.evermarkId]; // O(1) lookup
         if (!evermark) return null;
         return {
           evermark,
@@ -195,8 +214,12 @@ export const PublicBookshelfView: React.FC<PublicBookshelfViewProps> = ({
                     
                     <EvermarkCard 
                       evermark={evermark} 
-                      showActions={false}
+                      showQuickActions={false}
                       showViews={true}
+                      onOpenModal={(id) => {
+                        // Navigate to evermark detail page
+                        window.location.href = `/evermark/${id}`;
+                      }}
                     />
                   </div>
                 ))}
@@ -238,8 +261,12 @@ export const PublicBookshelfView: React.FC<PublicBookshelfViewProps> = ({
                     
                     <EvermarkCard 
                       evermark={evermark} 
-                      showActions={false}
+                      showQuickActions={false}
                       showViews={true}
+                      onOpenModal={(id) => {
+                        // Navigate to evermark detail page
+                        window.location.href = `/evermark/${id}`;
+                      }}
                     />
                   </div>
                 ))}

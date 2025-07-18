@@ -1,4 +1,4 @@
-// src/components/evermark/EvermarkCard.tsx - Dark Cyber Theme
+// src/components/evermark/EvermarkCard.tsx - UPDATED for schema layer StandardizedEvermark format
 import React from 'react';
 import { 
   UserIcon, 
@@ -16,44 +16,38 @@ import { EvermarkImage } from '../layout/UniversalImage';
 import { useViewTracking, formatViewCount } from '../../hooks/useViewTracking';
 import { formatDistanceToNow } from 'date-fns';
 import { cn, useIsMobile } from '../../utils/responsive';
-import { toEther } from 'thirdweb/utils';
+// ✅ UPDATED: Import the standardized type from schema layer
+import type { StandardizedEvermark } from '../../lib/supabase-schema';
 
-// Format votes for display
-const formatVotes = (votes: bigint): string => {
-  const voteNumber = Number(votes) / 1e18;
+// ✅ UPDATED: Format votes for display using the new structure
+const formatVotes = (votes?: number): string => {
+  if (!votes || votes === 0) return '0';
   
-  if (voteNumber >= 1000000) {
-    return `${(voteNumber / 1000000).toFixed(1)}M`;
-  } else if (voteNumber >= 1000) {
-    return `${(voteNumber / 1000).toFixed(1)}K`;
-  } else if (voteNumber >= 1) {
-    return voteNumber.toFixed(0);
-  } else if (voteNumber >= 0.1) {
-    return voteNumber.toFixed(1);
-  } else if (voteNumber > 0) {
-    return voteNumber.toFixed(2);
+  if (votes >= 1000000) {
+    return `${(votes / 1000000).toFixed(1)}M`;
+  } else if (votes >= 1000) {
+    return `${(votes / 1000).toFixed(1)}K`;
+  } else if (votes >= 1) {
+    return votes.toFixed(0);
+  } else if (votes >= 0.1) {
+    return votes.toFixed(1);
+  } else if (votes > 0) {
+    return votes.toFixed(2);
   } else {
     return '0';
   }
 };
 
 export interface EvermarkCardProps {
-  evermark: {
-    id: string;
-    title: string;
-    author: string;
-    description?: string;
-    image?: string;
-    creationTime: number;
-    creator?: string;
-  };
+  // ✅ UPDATED: Use StandardizedEvermark from schema layer
+  evermark: StandardizedEvermark;
   
   // Visual variants
   variant?: 'standard' | 'compact' | 'list' | 'hero' | 'leaderboard';
   
   // Data to display
   rank?: number;
-  votes?: bigint;
+  votes?: bigint; // Keep for backward compatibility, but prefer evermark.votes
   bookshelfCategory?: 'favorite' | 'currentReading';
   
   // What to show
@@ -81,7 +75,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
   evermark,
   variant = 'standard',
   rank,
-  votes,
+  votes, // Legacy prop
   bookshelfCategory,
   showRank = false,
   showVotes = false,
@@ -93,9 +87,13 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
   priority = false,
   className = ''
 }) => {
-  const { id, title, author, description, image, creationTime } = evermark;
+  // ✅ UPDATED: Use standardized evermark structure
+  const { id, title, author, description, image, creationTime, votes: evermarkVotes } = evermark;
   const { viewStats } = useViewTracking(id);
   const isMobile = useIsMobile();
+  
+  // ✅ UPDATED: Use evermark.votes if available, fallback to legacy votes prop
+  const displayVotes = evermarkVotes || (votes ? Number(votes) / 1e18 : 0);
   
   // Variant configurations - UPDATED for dark theme
   const getVariantConfig = () => {
@@ -197,12 +195,12 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
   };
 
   const VoteBadge = () => {
-    if (!showVotes || votes === undefined || votes === null) return null;
+    if (!showVotes || !displayVotes) return null;
 
     return (
       <div className="absolute top-2 right-2 z-20 bg-black/80 text-green-400 px-2 py-1 rounded border border-green-400/50 text-xs font-bold flex items-center backdrop-blur-sm shadow-lg shadow-green-500/30">
         <ZapIcon className="h-3 w-3 mr-1" />
-        {formatVotes(votes)}
+        {formatVotes(displayVotes)}
       </div>
     );
   };
@@ -273,17 +271,17 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
               <span className="text-sm truncate">{author}</span>
             </div>
             <div className="flex items-center gap-3 text-xs text-gray-500">
-              <span>{formatDistanceToNow(creationTime, { addSuffix: true })}</span>
+              <span>{formatDistanceToNow(creationTime * 1000, { addSuffix: true })}</span>
               {showViews && viewStats && (
                 <span className="flex items-center text-cyan-400">
                   <EyeIcon className="h-3 w-3 mr-1" />
                   {formatViewCount(viewStats.totalViews)}
                 </span>
               )}
-              {showVotes && votes !== undefined && votes !== null && (
+              {showVotes && displayVotes > 0 && (
                 <span className="flex items-center text-green-400">
                   <ZapIcon className="h-3 w-3 mr-1" />
-                  {formatVotes(votes)}
+                  {formatVotes(displayVotes)}
                 </span>
               )}
             </div>
@@ -359,7 +357,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
           </div>
           <div className="flex items-center flex-shrink-0 ml-2">
             <CalendarIcon className="h-4 w-4 mr-1" />
-            <span className="text-xs">{formatDistanceToNow(creationTime, { addSuffix: true })}</span>
+            <span className="text-xs">{formatDistanceToNow(creationTime * 1000, { addSuffix: true })}</span>
           </div>
         </div>
 
@@ -380,10 +378,10 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
                 {formatViewCount(viewStats.totalViews)}
               </span>
             )}
-            {showVotes && votes !== undefined && votes !== null && (
+            {showVotes && displayVotes > 0 && (
               <span className="flex items-center text-green-400">
                 <ZapIcon className="h-3 w-3 mr-1" />
-                {formatVotes(votes)}
+                {formatVotes(displayVotes)}
               </span>
             )}
           </div>
@@ -424,7 +422,7 @@ export const EvermarkCard: React.FC<EvermarkCardProps> = ({
 
 // Helper components remain the same but with updated styling
 export const LeaderboardEvermarkCard: React.FC<{
-  evermark: any;
+  evermark: StandardizedEvermark;
   rank: number;
   votes: bigint;
   onOpenModal: (id: string, options?: ModalOptions) => void;
@@ -442,7 +440,7 @@ export const LeaderboardEvermarkCard: React.FC<{
 );
 
 export const ExploreEvermarkCard: React.FC<{
-  evermark: any;
+  evermark: StandardizedEvermark;
   onOpenModal: (id: string, options?: ModalOptions) => void;
   compact?: boolean;
 }> = ({ evermark, onOpenModal, compact = false }) => (
@@ -455,7 +453,7 @@ export const ExploreEvermarkCard: React.FC<{
 );
 
 export const HeroEvermarkCard: React.FC<{
-  evermark: any;
+  evermark: StandardizedEvermark;
   onOpenModal: (id: string, options?: ModalOptions) => void;
 }> = ({ evermark, onOpenModal }) => (
   <EvermarkCard

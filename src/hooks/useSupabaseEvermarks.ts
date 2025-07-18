@@ -1,13 +1,11 @@
-// ===================================================================
-// src/hooks/useSupabaseEvermarks.ts - UPDATED with tokenIds filter
-// ===================================================================
-
-import { useState, useEffect, useCallback } from 'react'; // ✅ FIXED: Add missing imports
+// src/hooks/useSupabaseEvermarks.ts - CORRECTED version using your actual code structure
+import { useState, useEffect, useCallback } from 'react';
 import { supabase, type EvermarkRow } from '../lib/supabase';
 import { 
-  MetadataTransformer, 
+  EvermarkSchemaTransformer, 
+  QueryService,
   type StandardizedEvermark
-} from '../utils/MetadataTransformer';
+} from '../lib/supabase-schema';
 
 interface UseSupabaseEvermarksOptions {
   page?: number;
@@ -20,7 +18,7 @@ interface UseSupabaseEvermarksOptions {
   verified?: boolean;
   includeUnprocessed?: boolean;
   enableBlockchainFallback?: boolean;
-  tokenIds?: number[]; // ✅ NEW: Array of specific token IDs to fetch
+  tokenIds?: number[]; // NEW: Array of specific token IDs to fetch
 }
 
 interface UseSupabaseEvermarksResult {
@@ -46,7 +44,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
     creator,
     verified,
     includeUnprocessed = false,
-    tokenIds // ✅ NEW: Extract tokenIds option
+    tokenIds // NEW: Extract tokenIds option
   } = options;
 
   const [evermarks, setEvermarks] = useState<StandardizedEvermark[]>([]);
@@ -63,7 +61,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
         page, pageSize, sortBy, sortOrder, search, author, creator, verified, tokenIds
       });
 
-      // ✅ UPDATED: Build query with optional tokenIds filtering
+      // Build query using your existing supabase structure
       let query = supabase
         .from('evermarks')
         .select(`
@@ -85,10 +83,14 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
           image_processed_at,
           metadata,
           metadata_json,
-          ipfs_metadata
+          ipfs_metadata,
+          tx_hash,
+          block_number,
+          last_synced_at,
+          user_id
         `, { count: 'exact' });
 
-      // ✅ NEW: Apply token ID filter FIRST if provided
+      // NEW: Apply token ID filter FIRST if provided
       if (tokenIds && tokenIds.length > 0) {
         console.log(`🎯 Filtering by ${tokenIds.length} specific token IDs:`, tokenIds.slice(0, 5));
         query = query.in('token_id', tokenIds);
@@ -111,17 +113,16 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
         query = query.eq('verified', verified);
       }
 
-      // ✅ FIXED: More permissive image processing filter
+      // More permissive image processing filter
       if (!includeUnprocessed) {
         // Only exclude items that explicitly failed processing
-        // Allow pending, completed, and items without processing status
         query = query.not('image_processing_status', 'eq', 'failed');
       }
 
       // Apply sorting
       query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-      // ✅ SMART PAGINATION: Skip pagination for small token ID lists
+      // SMART PAGINATION: Skip pagination for small token ID lists
       if (tokenIds && tokenIds.length > 0 && tokenIds.length <= 100) {
         console.log('📄 Skipping pagination for small token ID list');
         // Get all requested tokens in one query (up to 100)
@@ -140,27 +141,21 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
 
       console.log(`✅ Retrieved ${rawData?.length || 0} raw Evermarks from Supabase`);
 
-      // Transform using MetadataTransformer
+      // Transform using the new schema layer
       const transformedEvermarks: StandardizedEvermark[] = [];
 
       if (rawData) {
         for (const row of rawData) {
           try {
-            const standardized = MetadataTransformer.transform(row as EvermarkRow);
-            
-            // Validate the result
-            const validation = MetadataTransformer.validate(standardized);
-            if (!validation.isValid) {
-              console.warn(`⚠️ Validation failed for Evermark ${row.token_id}:`, validation.errors);
-            }
-            
+            // Use the schema transformer instead of the old MetadataTransformer
+            const standardized = EvermarkSchemaTransformer.toStandardized(row as any);
             transformedEvermarks.push(standardized);
             
           } catch (transformError) {
             console.error(`❌ Failed to transform Evermark ${row.token_id}:`, transformError);
             
             // Still include a fallback version
-            const fallback = MetadataTransformer.transform(row as EvermarkRow);
+            const fallback = EvermarkSchemaTransformer.toStandardized(row as any);
             transformedEvermarks.push(fallback);
           }
         }
@@ -180,7 +175,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
     }
   }, [
     page, pageSize, sortBy, sortOrder, search, author, creator, verified, 
-    includeUnprocessed, tokenIds?.join(',') // ✅ NEW: Include tokenIds in dependencies
+    includeUnprocessed, tokenIds?.join(',') // Include tokenIds in dependencies
   ]);
 
   useEffect(() => {
@@ -210,7 +205,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
   };
 }
 
-// ✅ UNCHANGED: Keep existing single evermark hook
+// Keep your existing single evermark hook but update it to use schema layer
 export function useSupabaseEvermark(tokenId: string | undefined) {
   const [evermark, setEvermark] = useState<StandardizedEvermark | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -246,13 +241,9 @@ export function useSupabaseEvermark(tokenId: string | undefined) {
         throw new Error(`No data returned for Evermark ${tokenId}`);
       }
 
-      const standardized = MetadataTransformer.transform(data as EvermarkRow);
+      // Use the schema transformer
+      const standardized = EvermarkSchemaTransformer.toStandardized(data as any);
       
-      const validation = MetadataTransformer.validate(standardized);
-      if (!validation.isValid) {
-        console.warn(`⚠️ Validation failed for Evermark ${tokenId}:`, validation.errors);
-      }
-
       console.log(`✅ Successfully fetched and transformed Evermark ${tokenId}`);
       setEvermark(standardized);
 
@@ -285,11 +276,7 @@ export function useSupabaseEvermark(tokenId: string | undefined) {
 // Export types for use in components
 export type { StandardizedEvermark, UseSupabaseEvermarksOptions, UseSupabaseEvermarksResult };
 
-// ===================================================================
-// src/hooks/useEvermarks.ts - UPDATED to use new tokenIds filter
-// ===================================================================
-
-// ✅ NEW: Efficient batch hook using tokenIds filter
+// NEW: Efficient batch hook using tokenIds filter (this is the key improvement)
 export function useEvermarksBatch(tokenIds: number[]) {
   // Use the enhanced hook with tokenIds filter
   const { 
@@ -297,50 +284,14 @@ export function useEvermarksBatch(tokenIds: number[]) {
     isLoading, 
     error 
   } = useSupabaseEvermarks({
-    tokenIds, // ✅ This now works efficiently at the database level!
+    tokenIds, // This now works efficiently at the database level!
     sortBy: 'created_at',
     sortOrder: 'desc',
     enableBlockchainFallback: false // Skip blockchain for performance
   });
 
-  // Convert to legacy format for compatibility
-  const convertToLegacyFormat = (evermark: StandardizedEvermark) => ({
-    id: evermark.id,
-    name: evermark.title,
-    title: evermark.title,
-    description: evermark.description || '',
-    content: evermark.description || '',
-    image: evermark.image,
-    external_url: evermark.sourceUrl,
-    author: evermark.author,
-    creator: evermark.creator,
-    timestamp: new Date(evermark.creationTime * 1000).toISOString(),
-    created_at: evermark.createdAt,
-    updated_at: evermark.updatedAt,
-    creationTime: evermark.creationTime,
-    tx_hash: undefined,
-    block_number: undefined,
-    metadataURI: evermark.metadataURI,
-    evermark_type: 'standard',
-    source_platform: evermark.sourceUrl?.includes('farcaster') ? 'farcaster' : 'web',
-    sourceUrl: evermark.sourceUrl,
-    voting_power: evermark.votes || 0,
-    view_count: 0,
-    tags: evermark.tags,
-    category: 'general',
-    metadata: {
-      creator: evermark.creator,
-      sourceUrl: evermark.sourceUrl,
-      image: evermark.image,
-      metadataURI: evermark.metadataURI,
-      creationTime: evermark.creationTime,
-      tokenId: evermark.tokenId,
-      extendedMetadata: evermark.extendedMetadata
-    }
-  });
-
   return {
-    evermarks: supabaseEvermarks.map(convertToLegacyFormat),
+    evermarks: supabaseEvermarks, // Already in StandardizedEvermark format
     isLoading,
     error
   };
