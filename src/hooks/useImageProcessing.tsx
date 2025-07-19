@@ -1,5 +1,5 @@
-// src/hooks/useImageProcessing.tsx - Hook for handling image processing and optimization
-import { useState, useEffect, useCallback } from 'react';
+// src/hooks/useImageProcessing.tsx - FIXED version to prevent infinite re-renders
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { StandardizedEvermark } from '../lib/supabase-schema';
 
 interface ImageProcessingMetadata {
@@ -22,109 +22,153 @@ interface UseImageProcessingResult {
   getOptimalImageUrl: (size?: 'thumbnail' | 'medium' | 'large' | 'original') => string | null;
 }
 
-// Helper to extract image from various metadata sources
-const extractImageFromEvermark = (evermark: StandardizedEvermark): ImageProcessingMetadata => {
-  // Priority order:
-  // 1. Direct image field (already processed)
-  // 2. No other sources available in current schema
+// Helper to resolve IPFS URLs - memoized to prevent re-computation
+const resolveIPFSUrl = (url: string | null): string | null => {
+  if (!url) return null;
   
-  const directImage = evermark.image;
-
-  // Determine the best available URL
-  let bestUrl: string | null = directImage || null;
-  let originalUrl: string | null = directImage || null;
-
-  // Resolve IPFS URLs
-  if (bestUrl?.startsWith('ipfs://')) {
-    const hash = bestUrl.replace('ipfs://', '');
-    bestUrl = `https://gateway.pinata.cloud/ipfs/${hash}`;
+  if (url.startsWith('ipfs://')) {
+    const hash = url.replace('ipfs://', '');
+    return `https://gateway.pinata.cloud/ipfs/${hash}`;
   }
-
-  if (originalUrl?.startsWith('ipfs://')) {
-    const hash = originalUrl.replace('ipfs://', '');
-    originalUrl = `https://gateway.pinata.cloud/ipfs/${hash}`;
-  }
-
-  // Safely handle imageStatus - ensure it's one of our expected values
-  const validStatuses: Array<'none' | 'processing' | 'processed' | 'failed'> = ['none', 'processing', 'processed', 'failed'];
-  const status = validStatuses.includes(evermark.imageStatus as any) 
-    ? (evermark.imageStatus as 'none' | 'processing' | 'processed' | 'failed')
-    : 'none';
-
-  return {
-    url: bestUrl,
-    status,
-    processedUrl: bestUrl || undefined,
-    originalUrl: originalUrl || undefined,
-  };
+  
+  return url;
 };
 
-// Generate thumbnail URLs for different sizes
+// Generate SVG placeholder for missing images
+const generateSVGPlaceholder = (title: string, author: string, size = 400): string => {
+  const cleanTitle = title.slice(0, 30).replace(/[^\w\s]/g, '');
+  const cleanAuthor = author.slice(0, 20).replace(/[^\w\s]/g, '');
+  
+  // Color based on content hash for consistency
+  const hash = cleanTitle.split('').reduce((a, b) => {
+    a = ((a << 5) - a) + b.charCodeAt(0);
+    return a & a;
+  }, 0);
+  
+  const hue = Math.abs(hash) % 360;
+  
+  const svg = `
+    <svg width="${size}" height="${size * 0.75}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:hsl(${hue}, 70%, 60%)" />
+          <stop offset="100%" style="stop-color:hsl(${hue + 60}, 70%, 40%)" />
+        </linearGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="url(#bg)" />
+      <text x="50%" y="40%" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="${size / 20}" font-weight="bold">
+        ${cleanTitle}
+      </text>
+      <text x="50%" y="70%" text-anchor="middle" fill="rgba(255,255,255,0.8)" font-family="Arial, sans-serif" font-size="${size / 25}">
+        by ${cleanAuthor}
+      </text>
+    </svg>
+  `;
+  
+  return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
+
+// FIXED: Memoized metadata extraction to prevent re-renders
+const useImageMetadata = (evermark: StandardizedEvermark | null): ImageProcessingMetadata => {
+  return useMemo(() => {
+    if (!evermark) {
+      return { url: null, status: 'none' };
+    }
+
+    // Priority order for image sources:
+    // 1. Direct image field (most common)
+    // 2. Extended metadata processed URL
+    // 3. Extended metadata original image
+    // 4. Generate placeholder
+
+    let bestUrl: string | null = null;
+    let originalUrl: string | null = null;
+    let status: 'none' | 'processing' | 'processed' | 'failed' = 'none';
+
+    // Check direct image field first
+    if (evermark.image) {
+      bestUrl = resolveIPFSUrl(evermark.image);
+      originalUrl = evermark.image;
+      status = 'processed';
+    }
+
+    // Check extended metadata for processed image
+    if (!bestUrl && evermark.extendedMetadata?.processedImageUrl) {
+      bestUrl = resolveIPFSUrl(evermark.extendedMetadata.processedImageUrl);
+      status = 'processed';
+    }
+
+    // Use image status from evermark if available
+    if (evermark.imageStatus && evermark.imageStatus !== 'none') {
+      status = evermark.imageStatus;
+    }
+
+    // If no image found, generate SVG placeholder
+    if (!bestUrl) {
+      bestUrl = generateSVGPlaceholder(evermark.title, evermark.author);
+      status = 'none';
+    }
+
+    return {
+      url: bestUrl,
+      status,
+      processedUrl: bestUrl || undefined,
+      originalUrl: originalUrl || undefined,
+    };
+  }, [
+    // FIXED: Only depend on essential fields to prevent re-renders
+    evermark?.id,
+    evermark?.image,
+    evermark?.imageStatus,
+    evermark?.title,
+    evermark?.author,
+    evermark?.extendedMetadata?.processedImageUrl
+  ]);
+};
+
+// Generate size-optimized URLs
 const generateImageUrl = (baseUrl: string | null, size: 'thumbnail' | 'medium' | 'large' | 'original'): string | null => {
   if (!baseUrl) return null;
 
-  // If it's already a processed URL from our backend, we might have size variants
-  if (baseUrl.includes('processed') || baseUrl.includes('optimized')) {
-    // This would be where you'd integrate with your image processing service
-    // For now, return the base URL
-    return baseUrl;
-  }
+  // If it's a data URL (SVG placeholder), return as-is
+  if (baseUrl.startsWith('data:')) return baseUrl;
 
-  // For IPFS or external URLs, return as-is
+  // For IPFS or external URLs, return as-is for now
   // In the future, you could proxy these through an image processing service
   return baseUrl;
 };
 
 export function useImageProcessing(evermark: StandardizedEvermark | null): UseImageProcessingResult {
-  const [imageMetadata, setImageMetadata] = useState<ImageProcessingMetadata>({
-    url: null,
-    status: 'none'
-  });
+  // FIXED: Use memoized metadata extraction
+  const imageMetadata = useImageMetadata(evermark);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
-  // Extract image metadata when evermark changes
-  useEffect(() => {
-    if (!evermark) {
-      setImageMetadata({ url: null, status: 'none' });
-      setError(null);
-      return;
-    }
-
-    try {
-      const extracted = extractImageFromEvermark(evermark);
-      setImageMetadata(extracted);
-      setError(null);
-    } catch (err) {
-      console.error('Error extracting image metadata:', err);
-      setError('Failed to process image metadata');
-      setImageMetadata({ url: null, status: 'failed' });
-    }
-  }, [evermark?.id, evermark?.image, evermark?.imageStatus]); // More specific dependencies
-
-  // Function to get optimal image URL for different use cases
+  // FIXED: Stable getOptimalImageUrl function
   const getOptimalImageUrl = useCallback((size: 'thumbnail' | 'medium' | 'large' | 'original' = 'medium'): string | null => {
     return generateImageUrl(imageMetadata.url, size);
-  }, [imageMetadata.url]);
+  }, [imageMetadata.url]); // Only depend on imageMetadata.url
 
-  // Refresh function (could trigger reprocessing in the future)
+  // FIXED: Stable refresh function
   const refresh = useCallback(() => {
     if (!evermark) return;
     
     setIsLoading(true);
+    setError(null);
     
-    // Re-extract metadata
-    try {
-      const extracted = extractImageFromEvermark(evermark);
-      setImageMetadata(extracted);
-      setError(null);
-    } catch (err) {
-      console.error('Error refreshing image metadata:', err);
-      setError('Failed to refresh image metadata');
-    } finally {
+    // Simple refresh by incrementing trigger
+    setTimeout(() => {
+      setRefreshTrigger(prev => prev + 1);
       setIsLoading(false);
-    }
-  }, [evermark]);
+    }, 100);
+  }, [evermark?.id]); // Only depend on evermark ID
+
+  // Clear error when evermark changes
+  useEffect(() => {
+    setError(null);
+  }, [evermark?.id]);
 
   return {
     imageMetadata,
@@ -135,7 +179,7 @@ export function useImageProcessing(evermark: StandardizedEvermark | null): UseIm
   };
 }
 
-// Hook for validating and preprocessing image URLs
+// FIXED: Stable image validation hook
 export function useImageValidation(url: string | null) {
   const [isValid, setIsValid] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -145,47 +189,60 @@ export function useImageValidation(url: string | null) {
     if (!url) {
       setIsValid(false);
       setResolvedUrl(null);
+      setIsChecking(false);
+      return;
+    }
+
+    // Skip validation for data URLs (SVG placeholders)
+    if (url.startsWith('data:')) {
+      setIsValid(true);
+      setResolvedUrl(url);
+      setIsChecking(false);
       return;
     }
 
     setIsChecking(true);
 
     // Resolve IPFS URLs
-    let checkUrl = url;
-    if (url.startsWith('ipfs://')) {
-      const hash = url.replace('ipfs://', '');
-      checkUrl = `https://gateway.pinata.cloud/ipfs/${hash}`;
-    }
-
+    const checkUrl = resolveIPFSUrl(url);
     setResolvedUrl(checkUrl);
 
     // Validate image by attempting to load it
     const img = new Image();
     
+    const cleanup = () => {
+      img.onload = null;
+      img.onerror = null;
+    };
+    
     img.onload = () => {
       setIsValid(true);
       setIsChecking(false);
+      cleanup();
     };
     
     img.onerror = () => {
       setIsValid(false);
       setIsChecking(false);
+      cleanup();
     };
 
     // Add timeout to prevent hanging
     const timeout = setTimeout(() => {
       setIsValid(false);
       setIsChecking(false);
+      cleanup();
     }, 10000); // 10 second timeout
 
-    img.src = checkUrl;
+    if (checkUrl) {
+      img.src = checkUrl;
+    }
 
     return () => {
       clearTimeout(timeout);
-      img.onload = null;
-      img.onerror = null;
+      cleanup();
     };
-  }, [url]);
+  }, [url]); // FIXED: Only depend on url
 
   return {
     isValid,
@@ -194,29 +251,22 @@ export function useImageValidation(url: string | null) {
   };
 }
 
-// Hook for generating placeholder images
+// FIXED: Stable placeholder hook
 export function useImagePlaceholder(evermark: StandardizedEvermark | null) {
   const generatePlaceholder = useCallback((width = 400, height = 300) => {
     if (!evermark) {
-      return `https://via.placeholder.com/${width}x${height}/374151/9CA3AF?text=No+Content`;
+      return `data:image/svg+xml;base64,${btoa(`
+        <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="#374151" />
+          <text x="50%" y="50%" text-anchor="middle" fill="#9CA3AF" font-family="Arial, sans-serif" font-size="16">
+            No Content
+          </text>
+        </svg>
+      `)}`;
     }
 
-    const title = encodeURIComponent(evermark.title.slice(0, 30));
-    const author = encodeURIComponent(evermark.author.slice(0, 20));
-    
-    // Generate a color based on the content type
-    const colorMap: Record<string, string> = {
-      'Cast': '6366F1', // Indigo
-      'DOI': '059669',  // Green  
-      'ISBN': 'DC2626', // Red
-      'URL': '2563EB',  // Blue
-      'Custom': '7C3AED' // Purple
-    };
-    
-    const color = colorMap[evermark.contentType] || '6B7280';
-    
-    return `https://via.placeholder.com/${width}x${height}/${color}/FFFFFF?text=${title}%0A%0Aby+${author}`;
-  }, [evermark]);
+    return generateSVGPlaceholder(evermark.title, evermark.author, width);
+  }, [evermark?.title, evermark?.author]); // FIXED: Stable dependencies
 
   return { generatePlaceholder };
 }
