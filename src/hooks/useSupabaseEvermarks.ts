@@ -1,5 +1,4 @@
-// src/hooks/useSupabaseEvermarks.ts - CORRECTED version using your actual code structure
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase, type EvermarkRow } from '../lib/supabase';
 import { 
   EvermarkSchemaTransformer, 
@@ -18,7 +17,7 @@ interface UseSupabaseEvermarksOptions {
   verified?: boolean;
   includeUnprocessed?: boolean;
   enableBlockchainFallback?: boolean;
-  tokenIds?: number[]; // NEW: Array of specific token IDs to fetch
+  tokenIds?: number[]; // Array of specific token IDs to fetch
 }
 
 interface UseSupabaseEvermarksResult {
@@ -44,7 +43,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
     creator,
     verified,
     includeUnprocessed = false,
-    tokenIds // NEW: Extract tokenIds option
+    tokenIds
   } = options;
 
   const [evermarks, setEvermarks] = useState<StandardizedEvermark[]>([]);
@@ -52,13 +51,26 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
 
+  // 🚨 FIXED: Memoize tokenIds to prevent infinite loops
+  const stableTokenIds = useMemo(() => {
+    if (!tokenIds || tokenIds.length === 0) return null;
+    // Create a stable reference by sorting and joining
+    return [...tokenIds].sort((a, b) => a - b);
+  }, [tokenIds?.join(',')]); // Only change when the actual content changes
+
+  // 🚨 FIXED: Create stable cache key for tokenIds
+  const tokenIdsCacheKey = useMemo(() => {
+    return stableTokenIds ? stableTokenIds.join(',') : '';
+  }, [stableTokenIds]);
+
   const fetchEvermarks = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
       console.log('🔍 Fetching Evermarks with options:', {
-        page, pageSize, sortBy, sortOrder, search, author, creator, verified, tokenIds
+        page, pageSize, sortBy, sortOrder, search, author, creator, verified, 
+        tokenIdsCount: stableTokenIds?.length || 0
       });
 
       // Build query using your existing supabase structure
@@ -90,10 +102,10 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
           user_id
         `, { count: 'exact' });
 
-      // NEW: Apply token ID filter FIRST if provided
-      if (tokenIds && tokenIds.length > 0) {
-        console.log(`🎯 Filtering by ${tokenIds.length} specific token IDs:`, tokenIds.slice(0, 5));
-        query = query.in('token_id', tokenIds);
+      // Apply token ID filter FIRST if provided
+      if (stableTokenIds && stableTokenIds.length > 0) {
+        console.log(`🎯 Filtering by ${stableTokenIds.length} specific token IDs:`, stableTokenIds.slice(0, 5));
+        query = query.in('token_id', stableTokenIds);
       }
 
       // Apply other filters
@@ -123,7 +135,7 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
       query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
       // SMART PAGINATION: Skip pagination for small token ID lists
-      if (tokenIds && tokenIds.length > 0 && tokenIds.length <= 100) {
+      if (stableTokenIds && stableTokenIds.length > 0 && stableTokenIds.length <= 100) {
         console.log('📄 Skipping pagination for small token ID list');
         // Get all requested tokens in one query (up to 100)
       } else {
@@ -174,8 +186,17 @@ export function useSupabaseEvermarks(options: UseSupabaseEvermarksOptions = {}):
       setIsLoading(false);
     }
   }, [
-    page, pageSize, sortBy, sortOrder, search, author, creator, verified, 
-    includeUnprocessed, tokenIds?.join(',') // Include tokenIds in dependencies
+    // 🚨 FIXED: Use stable dependencies only
+    page, 
+    pageSize, 
+    sortBy, 
+    sortOrder, 
+    search, 
+    author, 
+    creator, 
+    verified, 
+    includeUnprocessed, 
+    tokenIdsCacheKey // Use the stable cache key instead of array
   ]);
 
   useEffect(() => {
@@ -211,8 +232,13 @@ export function useSupabaseEvermark(tokenId: string | undefined) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 🚨 FIXED: Memoize tokenId to prevent unnecessary re-fetches
+  const stableTokenId = useMemo(() => {
+    return tokenId ? tokenId.toString() : null;
+  }, [tokenId]);
+
   const fetchEvermark = useCallback(async () => {
-    if (!tokenId) {
+    if (!stableTokenId) {
       setEvermark(null);
       setError(null);
       return;
@@ -222,40 +248,40 @@ export function useSupabaseEvermark(tokenId: string | undefined) {
       setIsLoading(true);
       setError(null);
 
-      console.log(`🔍 Fetching single Evermark: ${tokenId}`);
+      console.log(`🔍 Fetching single Evermark: ${stableTokenId}`);
 
       const { data, error: queryError } = await supabase
         .from('evermarks')
         .select('*')
-        .eq('token_id', parseInt(tokenId))
+        .eq('token_id', parseInt(stableTokenId))
         .single();
 
       if (queryError) {
         if (queryError.code === 'PGRST116') {
-          throw new Error(`Evermark ${tokenId} not found`);
+          throw new Error(`Evermark ${stableTokenId} not found`);
         }
         throw new Error(`Database error: ${queryError.message}`);
       }
 
       if (!data) {
-        throw new Error(`No data returned for Evermark ${tokenId}`);
+        throw new Error(`No data returned for Evermark ${stableTokenId}`);
       }
 
       // Use the schema transformer
       const standardized = EvermarkSchemaTransformer.toStandardized(data as any);
       
-      console.log(`✅ Successfully fetched and transformed Evermark ${tokenId}`);
+      console.log(`✅ Successfully fetched and transformed Evermark ${stableTokenId}`);
       setEvermark(standardized);
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch Evermark';
-      console.error(`❌ Single Evermark fetch error for ${tokenId}:`, err);
+      console.error(`❌ Single Evermark fetch error for ${stableTokenId}:`, err);
       setError(errorMessage);
       setEvermark(null);
     } finally {
       setIsLoading(false);
     }
-  }, [tokenId]);
+  }, [stableTokenId]); // Use stable tokenId
 
   useEffect(() => {
     fetchEvermark();
@@ -276,15 +302,22 @@ export function useSupabaseEvermark(tokenId: string | undefined) {
 // Export types for use in components
 export type { StandardizedEvermark, UseSupabaseEvermarksOptions, UseSupabaseEvermarksResult };
 
-// NEW: Efficient batch hook using tokenIds filter (this is the key improvement)
+// Efficient batch hook using tokenIds filter
 export function useEvermarksBatch(tokenIds: number[]) {
+  // 🚨 FIXED: Memoize the tokenIds to prevent infinite loops
+  const stableTokenIds = useMemo(() => {
+    if (!tokenIds || tokenIds.length === 0) return [];
+    // Create a stable reference
+    return [...tokenIds].sort((a, b) => a - b);
+  }, [tokenIds?.join(',')]);
+
   // Use the enhanced hook with tokenIds filter
   const { 
     evermarks: supabaseEvermarks, 
     isLoading, 
     error 
   } = useSupabaseEvermarks({
-    tokenIds, // This now works efficiently at the database level!
+    tokenIds: stableTokenIds, // Use stable tokenIds
     sortBy: 'created_at',
     sortOrder: 'desc',
     enableBlockchainFallback: false // Skip blockchain for performance
